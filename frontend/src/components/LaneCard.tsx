@@ -152,6 +152,18 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
           )}
         </div>
       )}
+      {lane.qaCommand && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--muted, #9aa3af)', marginBottom: 4 }}>Run this in Claude Code:</div>
+          <code
+            onClick={() => navigator.clipboard.writeText(lane.qaCommand!)}
+            title="Click to copy"
+            style={{ display: 'block', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: 'var(--bg, #15171c)', border: '1px solid var(--border, #2c313a)', borderRadius: 6, padding: '8px 10px', fontSize: 12, cursor: 'pointer', userSelect: 'all' }}
+          >
+            {lane.qaCommand}
+          </code>
+        </div>
+      )}
       {/* Generate Report button — shown when evidence exists but index.html is missing */}
       {(needsReport || (isComplete && !reportUrl)) && (
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>

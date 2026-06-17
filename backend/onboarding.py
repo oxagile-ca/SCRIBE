@@ -34,6 +34,13 @@ def _ref(secret_key: str) -> str:
     return "${secret:" + secret_key + "}"
 
 
+def app_slug(product_name: str) -> str:
+    """A filesystem/command-safe slug for the product, used to name its dedicated skill
+    folder (qa-evidence-<slug>) and its /qa-evidence-<slug> command."""
+    slug = re.sub(r"[^a-z0-9]+", "-", (product_name or "").strip().lower()).strip("-")
+    return slug or "app"
+
+
 ISSUE_TYPES = {"jira", "linear", "azure", "github"}
 VCS_TYPES = {"github", "bitbucket", "azure"}
 ENV_MODES = {"static", "script", "local", "deployed"}
@@ -114,12 +121,15 @@ def build_instance_config(answers: dict) -> tuple[dict, dict]:
     if answers.get("anthropicKey"):
         secrets["ANTHROPIC_API_KEY"] = answers["anthropicKey"]
 
+    slug = app_slug(company.get("productName"))
     config = {
         "orgName": company.get("orgName"),
         "productName": company.get("productName"),
         "productType": company.get("productType"),
         "description": company.get("description"),
         "urls": company.get("urls", []),
+        "appSlug": slug,
+        "skillCommand": f"/qa-evidence-{slug}",
         "environments": env,
         "issueTracker": issue,
         "vcs": vcs,
@@ -132,16 +142,42 @@ def build_instance_config(answers: dict) -> tuple[dict, dict]:
 PRODUCT_CONTEXT_MARKER = "<!-- PRODUCT_CONTEXT -->"
 
 
-def render_skill(answers: dict, base_skill: str) -> str:
-    """Inject a generated 'Product Context' block into the base /qa-evidence skill.
+def _yaml_str(s: str) -> str:
+    return '"' + (s or "").replace('"', "'").replace("\n", " ").strip() + '"'
 
-    Replaces PRODUCT_CONTEXT_MARKER if present; otherwise prepends the block. All base
-    content is preserved.
-    """
+
+def skill_frontmatter(answers: dict) -> str:
+    """YAML frontmatter so Claude Code registers the per-app skill + slash command.
+    Without this (and the SKILL.md filename) the skill is 'unknown'."""
+    company = answers.get("company", {})
+    slug = app_slug(company.get("productName"))
+    name = f"qa-evidence-{slug}"
+    product = (company.get("productName") or "the product").strip()
+    desc = _yaml_str(
+        f"QA evidence pipeline for {product}: reads the PR diff, generates and runs "
+        "tests, captures screenshots + markup, runs smoke/sanity, scores, and writes an "
+        "HTML evidence report."
+    )
+    return (
+        "---\n"
+        f"name: {name}\n"
+        f"description: {desc}\n"
+        "version: 1.0.0\n"
+        "triggers:\n"
+        f"  - /{name}\n"
+        "---\n\n"
+    )
+
+
+def render_skill(answers: dict, base_skill: str) -> str:
+    """Render the per-app skill: YAML frontmatter (so Claude Code registers it) + the
+    base skill with a generated 'Product Context' block injected at the marker."""
     block = _product_context_block(answers)
     if PRODUCT_CONTEXT_MARKER in base_skill:
-        return base_skill.replace(PRODUCT_CONTEXT_MARKER, block)
-    return block + "\n\n" + base_skill
+        body = base_skill.replace(PRODUCT_CONTEXT_MARKER, block)
+    else:
+        body = block + "\n\n" + base_skill
+    return skill_frontmatter(answers) + body
 
 
 def _product_context_block(answers: dict) -> str:
@@ -271,7 +307,7 @@ def write_outputs(
     paths = {
         "config": os.path.join(config_dir, "instance.config.json"),
         "secrets": os.path.join(config_dir, ".secrets.env"),
-        "skill": os.path.join(skill_dir, "qa-evidence.md"),
+        "skill": os.path.join(skill_dir, "SKILL.md"),
         "patterns": os.path.join(skill_dir, "patterns.yml"),
     }
 
@@ -291,9 +327,26 @@ def write_outputs(
     return paths
 
 
+def write_skill_bundle(skill_text: str, patterns: dict, dest_dir: str) -> dict:
+    """Write just the skill + patterns to dest_dir (used for the repo-local copy)."""
+    os.makedirs(dest_dir, exist_ok=True)
+    paths = {
+        "skill": os.path.join(dest_dir, "SKILL.md"),
+        "patterns": os.path.join(dest_dir, "patterns.yml"),
+    }
+    with open(paths["skill"], "w", encoding="utf-8") as fh:
+        fh.write(skill_text)
+    with open(paths["patterns"], "w", encoding="utf-8") as fh:
+        yaml.safe_dump(patterns, fh, sort_keys=False)
+    return paths
+
+
 DEFAULT_BASE_SKILL = os.path.join(
     os.path.dirname(__file__), "templates", "qa-evidence.skill.base.md"
 )
+# Generic template stays in the repo; generated per-app skills go to a dedicated folder.
+DEFAULT_SKILLS_ROOT = os.path.join(os.path.expanduser("~"), ".claude", "skills")
+DEFAULT_INSTANCES_ROOT = os.path.join(os.path.dirname(os.path.dirname(__file__)), "instances")
 _FALLBACK_BASE_SKILL = "# /qa-evidence\n\n" + PRODUCT_CONTEXT_MARKER + "\n"
 
 
@@ -309,25 +362,39 @@ def run_onboarding(
     answers: dict,
     *,
     config_dir: str,
-    skill_dir: str,
+    skills_root: str = DEFAULT_SKILLS_ROOT,
+    repo_instances_root: str = DEFAULT_INSTANCES_ROOT,
     base_skill_path: str = DEFAULT_BASE_SKILL,
 ) -> dict:
-    """End-to-end: build config+secrets, render the product skill, seed patterns, write
-    everything, and return {paths, summary}. Callers should validate_answers() first.
+    """End-to-end: build config+secrets, render the product skill, seed patterns, and
+    write everything. The skill installs to a DEDICATED per-app folder
+    (skills_root/qa-evidence-<slug>) so apps never collide, with a versioned copy kept
+    in the repo at instances/<slug>/. Callers should validate_answers() first.
     """
     config, secrets = build_instance_config(answers)
+    slug = config["appSlug"]
     skill_text = render_skill(answers, _read_base_skill(base_skill_path))
     patterns = build_patterns(answers)
+
+    install_dir = os.path.join(skills_root, f"qa-evidence-{slug}")
+    repo_dir = os.path.join(repo_instances_root, slug)
+
     paths = write_outputs(
         config, secrets, skill_text, patterns,
-        config_dir=config_dir, skill_dir=skill_dir,
+        config_dir=config_dir, skill_dir=install_dir,
     )
+    repo_paths = write_skill_bundle(skill_text, patterns, repo_dir)
+
     summary = {
         "productName": config.get("productName"),
+        "appSlug": slug,
+        "skillCommand": config.get("skillCommand"),
         "issueTracker": (config.get("issueTracker") or {}).get("type"),
         "vcs": (config.get("vcs") or {}).get("type"),
         "envMode": (config.get("environments") or {}).get("mode"),
         "patternRules": len(patterns["rules"]),
         "secretsCount": len(secrets),
+        "skillInstallDir": install_dir,
+        "skillRepoDir": repo_dir,
     }
-    return {"paths": paths, "summary": summary}
+    return {"paths": {**paths, "skillRepo": repo_paths["skill"]}, "summary": summary}

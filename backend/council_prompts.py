@@ -85,6 +85,16 @@ def _pattern_audit_block(
     )
     return "\n" + "\n".join(lines)
 
+_ADVERSARIAL_PREAMBLE = (
+    "You are an ADVERSARIAL reviewer on a QA council. Your job is to find what is "
+    "WRONG, not to approve. Do not be agreeable and do not give the benefit of the "
+    "doubt. Assume the agent may have over-claimed, cut corners, or skipped edge "
+    "cases, and actively hunt for it. A PASS requires positive, specific evidence "
+    "that the work is correct AND complete — the mere absence of obvious problems is "
+    "NOT enough. When evidence is missing, ambiguous, inconsistent, or you are "
+    "uncertain, default to BLOCK. Approving weak work is a failure of your job.\n\n"
+)
+
 _VERDICT_FOOTER = (
     "\n\n---\n"
     "When you are done, output your verdict on the LAST LINE of your reply as "
@@ -98,7 +108,8 @@ _VERDICT_FOOTER = (
 def build_qa_evidence_prompt(ticket_key: str, run_name: str) -> str:
     run_path = f"~/evidence/{ticket_key}/runs/{run_name}"
     return (
-        f"You are the QA-EVIDENCE reviewer for ticket {ticket_key}.\n\n"
+        _ADVERSARIAL_PREAMBLE
+        + f"You are the QA-EVIDENCE reviewer for ticket {ticket_key}.\n\n"
         f"Read the evidence run at: {run_path}\n\n"
         "Your job is to verify, using only file reads (no shell commands):\n"
         "  1. `summary.json` exists in the run directory.\n"
@@ -187,4 +198,4 @@ def build_code_reviewer_prompt(
         lines.append("```")
 
     audit = _pattern_audit_block(ticket_key, ticket_text, diffs)
-    return "\n".join(lines) + audit + _VERDICT_FOOTER
+    return _ADVERSARIAL_PREAMBLE + "\n".join(lines) + audit + _VERDICT_FOOTER

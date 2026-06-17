@@ -5,6 +5,7 @@ import os
 import yaml
 
 from onboarding import (
+    app_slug,
     build_instance_config,
     build_patterns,
     render_skill,
@@ -78,6 +79,19 @@ def sample_answers():
     }
 
 
+def test_app_slug_normalizes_product_name():
+    assert app_slug("Beeventory ") == "beeventory"
+    assert app_slug("Acme CMS") == "acme-cms"
+    assert app_slug("My App!! 2.0") == "my-app-2-0"
+    assert app_slug("") == "app"
+
+
+def test_build_instance_config_sets_app_slug_and_skill_command():
+    config, _ = build_instance_config(sample_answers())  # productName "Acme CMS"
+    assert config["appSlug"] == "acme-cms"
+    assert config["skillCommand"] == "/qa-evidence-acme-cms"
+
+
 def test_build_instance_config_passes_status_mapping_through():
     answers = sample_answers()
     answers["issueTracker"]["statusMapping"] = {
@@ -141,6 +155,10 @@ def test_render_skill_injects_product_context_at_marker():
     assert "Intro text that must survive." in out
     assert "## Phase 0: Validate" in out
 
+    # YAML frontmatter so Claude Code registers the per-app skill + slash command
+    assert out.startswith("---\n")
+    assert "name: qa-evidence-acme-cms" in out
+    assert "/qa-evidence-acme-cms" in out
     # generated product context present
     assert "Product Context" in out
     assert "Acme CMS" in out
@@ -251,21 +269,27 @@ def test_run_onboarding_writes_all_artifacts_and_summarizes(tmp_path):
     result = run_onboarding(
         sample_answers(),
         config_dir=str(tmp_path / "cfg"),
-        skill_dir=str(tmp_path / "skill"),
+        skills_root=str(tmp_path / "skills"),
+        repo_instances_root=str(tmp_path / "instances"),
         base_skill_path=str(base),
     )
 
     assert os.path.exists(result["paths"]["config"])
     assert os.path.exists(result["paths"]["secrets"])
-    assert os.path.exists(result["paths"]["skill"])
-    assert os.path.exists(result["paths"]["patterns"])
+
+    # skill installed to a DEDICATED per-app folder (no generic-name collision)
+    install = os.path.join(str(tmp_path / "skills"), "qa-evidence-acme-cms", "SKILL.md")
+    assert os.path.exists(install)
+    assert result["paths"]["skill"] == install
+    # and a versioned repo copy under instances/<app>/
+    repo_skill = os.path.join(str(tmp_path / "instances"), "acme-cms", "SKILL.md")
+    assert os.path.exists(repo_skill)
+    assert os.path.exists(os.path.join(str(tmp_path / "instances"), "acme-cms", "patterns.yml"))
 
     summary = result["summary"]
     assert summary["productName"] == "Acme CMS"
-    assert summary["issueTracker"] == "jira"
-    assert summary["vcs"] == "github"
+    assert summary["appSlug"] == "acme-cms"
+    assert summary["skillCommand"] == "/qa-evidence-acme-cms"
     assert summary["envMode"] == "static"
     assert summary["patternRules"] == 1
-
-    # base skill's product-context marker was filled
-    assert "Acme CMS" in open(result["paths"]["skill"], encoding="utf-8").read()
+    assert "Acme CMS" in open(install, encoding="utf-8").read()

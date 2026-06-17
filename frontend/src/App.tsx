@@ -54,6 +54,9 @@ export default function App() {
   // Already-deployed apps (static/local/deployed modes) skip build & deploy — only
   // 'script' mode needs them. Drives which stages the lane shows.
   const [needsBuildDeploy, setNeedsBuildDeploy] = useState(true)
+  // Ref mirror so the start callbacks read the current value (not a stale closure).
+  const needsBuildDeployRef = useRef(true)
+  useEffect(() => { needsBuildDeployRef.current = needsBuildDeploy }, [needsBuildDeploy])
   const [envLocks, setEnvLocks] = useState<EnvLocks>({})
   const [pipelineStates, setPipelineStates] = useState<Record<string, {
     ticketKey: string
@@ -301,13 +304,15 @@ export default function App() {
 
     const laneId = `lane-${Date.now()}`
     const agents = makeAgentStatuses()
-    agents.builder.state = 'active'
+    // Already-deployed apps skip build/deploy — the lane starts at the test stage.
+    const firstAgent: AgentName = needsBuildDeployRef.current ? 'builder' : 'inspector'
+    agents[firstAgent].state = 'active'
 
     const newLane: Lane = {
       id: laneId,
       ticket,
       agents,
-      currentAgent: 'builder',
+      currentAgent: firstAgent,
       streamId: null,
       pipelineId: null,
       env,
@@ -315,7 +320,7 @@ export default function App() {
       startedAt: new Date().toISOString(),
     }
     setLanes(prev => [...prev, newLane])
-    laneCurrentAgent.current[laneId] = 'builder'
+    laneCurrentAgent.current[laneId] = firstAgent
 
     try {
       // Fetch dev info on-demand for this ticket
@@ -330,7 +335,9 @@ export default function App() {
 
       const repo = devInfo[0]?.repo || ''
       const branch = devInfo[0]?.branch || ''
-      if (!repo || !branch) {
+      // repo/branch are only needed to build & deploy. Already-deployed apps test an
+      // existing env, so missing dev-info is fine — the backend goes straight to test.
+      if ((!repo || !branch) && needsBuildDeployRef.current) {
         updateLaneAgent(laneId, 'builder', { state: 'failed', message: 'No repo/branch info — set dev info in Jira' })
         return
       }
@@ -849,7 +856,9 @@ export default function App() {
 
       const repo = devInfo[0]?.repo || ''
       const branch = devInfo[0]?.branch || ''
-      if (!repo || !branch) {
+      // repo/branch are only needed to build & deploy. Already-deployed apps test an
+      // existing env, so missing dev-info is fine — the backend goes straight to test.
+      if ((!repo || !branch) && needsBuildDeployRef.current) {
         updateLaneAgent(laneId, 'builder', { state: 'failed', message: 'No repo/branch info — set dev info in Jira' })
         return
       }

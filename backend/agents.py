@@ -582,7 +582,10 @@ async def run_deploy(env, service, snapshot):
 
 async def run_test(ticket_key, env_url):
     """Emit the QA command for the user and finish. User clicks 'Check Evidence' when ready."""
-    qa_cmd = f"/qa-evidence {ticket_key} run:qa-feature env:{env_url} --headless --auto-approve"
+    from instance_config import load_instance_config
+    _cfg = load_instance_config() or {}
+    skill_cmd = _cfg.get("skillCommand") or "/qa-evidence"
+    qa_cmd = f"{skill_cmd} {ticket_key} run:qa-feature env:{env_url} --headless --auto-approve"
 
     # Record what evidence exists NOW so check_new_evidence can compare
     runs_path = os.path.join(EVIDENCE_DIR, ticket_key, "runs")
@@ -848,6 +851,23 @@ async def _builder_stage(env, services, check_deploy_fn=None):
 async def run_pipeline(repo, branch, env, service, snapshot, ticket_key, env_url):
     """Full pipeline: fetch dev info → build all repos → deploy all → test → evidence."""
     env_name = env or DEFAULT_ENV
+
+    # Already-deployed apps (static/local/deployed modes) skip build & deploy entirely:
+    # we just need the PR (for analysis) + ticket info, then emit the test command.
+    from instance_config import load_instance_config
+    _cfg = load_instance_config() or {}
+    _mode = (_cfg.get("environments") or {}).get("mode")
+    if _mode in ("static", "local", "deployed"):
+        if not env_url:
+            _urls = (_cfg.get("environments") or {}).get("staticUrls") or []
+            env_url = (_urls[0] if _urls else None) or env
+        yield {"type": "log", "data": f"=== Pipeline for {ticket_key} ==="}
+        yield {"type": "log", "data": f"App is already deployed ({_mode}) — skipping build & deploy."}
+        yield {"type": "stage_change", "stage": "inspector"}
+        yield {"type": "log", "data": f"[Inspector] Target env: {env_url or 'not set'}"}
+        async for event in run_test(ticket_key, env_url):
+            yield event
+        return
 
     # Fetch dev info from Jira to discover all PRs/repos
     from jira_client import _get_dev_info, _headers

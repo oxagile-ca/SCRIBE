@@ -2,6 +2,8 @@
 instance.config.json
 .secrets.env
 .scribe/
+# Per-app generated skill copies (product-specific; per-deployment).
+instances/
 
 # Local runtime state — never commit these. They contain real ticket data
 # and per-user pipeline history.
@@ -47,3 +49,6 @@ council-audit.jsonl
 
 # Yarn lockfile — repo standardizes on npm (package-lock.json).
 yarn.lock
+
+# uvicorn run log
+*.out

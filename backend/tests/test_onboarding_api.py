@@ -10,7 +10,8 @@ os.environ["HOME"] = _TMP
 os.environ["USERPROFILE"] = _TMP
 os.environ["SCRIBE_CONFIG"] = os.path.join(_TMP, "instance.config.json")
 os.environ["SCRIBE_CONFIG_DIR"] = _TMP
-os.environ["SCRIBE_SKILL_DIR"] = os.path.join(_TMP, "skill")
+os.environ["SCRIBE_SKILL_DIR"] = os.path.join(_TMP, "skills")
+os.environ["SCRIBE_INSTANCES_DIR"] = os.path.join(_TMP, "instances")
 
 import json  # noqa: E402
 

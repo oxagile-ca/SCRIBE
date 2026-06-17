@@ -58,3 +58,15 @@ def default_skill_dir() -> str:
     return os.environ.get("SCRIBE_SKILL_DIR") or str(
         Path.home() / ".claude" / "skills" / "qa-evidence"
     )
+
+
+def default_skills_root() -> str:
+    """Root under which per-app skill folders (qa-evidence-<slug>) are installed."""
+    return os.environ.get("SCRIBE_SKILL_DIR") or str(Path.home() / ".claude" / "skills")
+
+
+def default_instances_root() -> str:
+    """Repo-local root for per-app generated-skill copies (instances/<slug>/)."""
+    return os.environ.get("SCRIBE_INSTANCES_DIR") or os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "instances"
+    )

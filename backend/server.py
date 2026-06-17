@@ -23,7 +23,10 @@ from chat import chat_stream
 from streams import StreamRegistry, replay_events_from_disk, END_MARKER
 from pipeline_store import PipelineStore
 from onboarding import validate_answers, run_onboarding
-from instance_config import load_instance_config, load_secrets_env, default_config_dir, default_skill_dir
+from instance_config import (
+    load_instance_config, load_secrets_env, default_config_dir,
+    default_skills_root, default_instances_root,
+)
 import linear_client
 from status_map import resolve_status_mapping, categorize_status
 
@@ -93,6 +96,15 @@ auto_provision.streams_mod = streams
 
 @app.on_event("startup")
 async def _start_auto_provision_loop():
+    # Auto-provisioning pre-stages build/deploy envs (deploycli) — only relevant when
+    # the instance actually builds & deploys. Already-deployed apps (static/local/
+    # deployed) don't need it, so skip the loops to avoid noisy deploycli failures.
+    import sys
+    cfg = load_instance_config() or {}
+    mode = (cfg.get("environments") or {}).get("mode")
+    if cfg and mode in ("static", "local", "deployed"):
+        print(f"[auto-provision] disabled — already-deployed mode ({mode})", file=sys.stderr, flush=True)
+        return
     asyncio.create_task(auto_provision.run_loop())
     asyncio.create_task(_parent_env_keepalive_loop())
 
@@ -225,7 +237,8 @@ async def api_onboarding(answers: Dict[str, Any]):
         result = run_onboarding(
             answers,
             config_dir=default_config_dir(),
-            skill_dir=default_skill_dir(),
+            skills_root=default_skills_root(),
+            repo_instances_root=default_instances_root(),
         )
         # Load the just-written secrets so the running process picks up tokens
         # immediately — no restart needed.

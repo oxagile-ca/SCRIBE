@@ -26,6 +26,15 @@ const STEPS = [
 const linesToArr = (s: string) => s.split('\n').map((l) => l.trim()).filter(Boolean)
 const arrToLines = (a: string[]) => a.join('\n')
 
+// Per-provider default status names. The user can override; if left as-is the backend
+// applies these (and its own defaults) when normalizing statuses.
+const STATUS_DEFAULTS: Record<IssueType, { ready_for_qa: string[]; in_qa: string[] }> = {
+  jira: { ready_for_qa: ['Ready for QA'], in_qa: ['In QA'] },
+  linear: { ready_for_qa: ['Ready for testing'], in_qa: ['In QA'] },
+  azure: { ready_for_qa: ['Ready for QA'], in_qa: ['In QA'] },
+  github: { ready_for_qa: [], in_qa: [] },
+}
+
 function AccessChecks({ value, onChange }: { value: Access; onChange: (a: Access) => void }) {
   return (
     <div className="ob-access">
@@ -46,6 +55,61 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span>{label}</span>
       {children}
     </label>
+  )
+}
+
+// Multi-line list input. Keeps the RAW text in local state so newlines (and blank
+// in-progress lines) survive typing; only parses to an array on change. Binding the
+// textarea straight to arrToLines(array) would strip the trailing newline every
+// keystroke, making it impossible to type a second line.
+function ListTextarea({
+  value,
+  onChange,
+  rows = 3,
+  placeholder,
+}: {
+  value: string[]
+  onChange: (v: string[]) => void
+  rows?: number
+  placeholder?: string
+}) {
+  const [text, setText] = useState(() => arrToLines(value))
+  return (
+    <textarea
+      rows={rows}
+      placeholder={placeholder}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value)
+        onChange(linesToArr(e.target.value))
+      }}
+    />
+  )
+}
+
+// Key pages: "Name | /route" per line. Same raw-text-in-local-state approach.
+function KeyPagesTextarea({
+  value,
+  onChange,
+}: {
+  value: { name: string; route: string }[]
+  onChange: (v: { name: string; route: string }[]) => void
+}) {
+  const [text, setText] = useState(() => value.map((p) => `${p.name} | ${p.route}`).join('\n'))
+  return (
+    <textarea
+      rows={3}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value)
+        onChange(
+          linesToArr(e.target.value).map((line) => {
+            const [name, route] = line.split('|')
+            return { name: (name || '').trim(), route: (route || '').trim() }
+          })
+        )
+      }}
+    />
   )
 }
 
@@ -105,13 +169,18 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
               </select>
             </Field>
             <Field label="Primary URLs (one per line)">
-              <textarea rows={2} value={arrToLines(c.urls)} onChange={(e) => set('company', { urls: linesToArr(e.target.value) })} />
+              <ListTextarea rows={2} value={c.urls} onChange={(urls) => set('company', { urls })} />
             </Field>
           </>
         )
       case 1:
         return (
           <>
+            <p className="ob-hint">
+              Does QA Pilot need to build &amp; deploy your app before testing? Most teams
+              test an already-running environment — only "Build &amp; deploy via scripts" adds
+              build/deploy stages; the others skip straight to analyze-PR → test → report.
+            </p>
             <Field label="How should we test?">
               <select value={env.mode} onChange={(e) => set('environments', { mode: e.target.value as EnvMode })}>
                 <option value="static">Static staging URL (no deploy)</option>
@@ -122,12 +191,12 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
             </Field>
             {(env.mode === 'static' || env.mode === 'deployed') && (
               <Field label="Staging / QA URLs (one per line) *">
-                <textarea rows={2} value={arrToLines(env.staticUrls)} onChange={(e) => set('environments', { staticUrls: linesToArr(e.target.value) })} />
+                <ListTextarea rows={2} value={env.staticUrls} onChange={(staticUrls) => set('environments', { staticUrls })} />
               </Field>
             )}
             {env.mode === 'local' && (
               <Field label="Local dev server URL (e.g. http://localhost:3000)">
-                <textarea rows={1} value={arrToLines(env.staticUrls)} onChange={(e) => set('environments', { staticUrls: linesToArr(e.target.value) })} />
+                <ListTextarea rows={1} value={env.staticUrls} onChange={(staticUrls) => set('environments', { staticUrls })} />
               </Field>
             )}
             {env.mode === 'script' && (
@@ -169,7 +238,13 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
         return (
           <>
             <Field label="Issue tracker *">
-              <select value={it.type} onChange={(e) => set('issueTracker', { type: e.target.value as IssueType })}>
+              <select
+                value={it.type}
+                onChange={(e) => {
+                  const type = e.target.value as IssueType
+                  set('issueTracker', { type, statusMapping: STATUS_DEFAULTS[type] })
+                }}
+              >
                 <option value="jira">Jira</option>
                 <option value="linear">Linear</option>
                 <option value="azure">Azure DevOps Boards</option>
@@ -180,7 +255,7 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
               <input value={it.baseUrl} onChange={(e) => set('issueTracker', { baseUrl: e.target.value })} placeholder="https://acme.atlassian.net" />
             </Field>
             <Field label="Project keys (one per line)">
-              <textarea rows={2} value={arrToLines(it.projects)} onChange={(e) => set('issueTracker', { projects: linesToArr(e.target.value) })} />
+              <ListTextarea rows={2} value={it.projects} onChange={(projects) => set('issueTracker', { projects })} />
             </Field>
             <Field label="Account email">
               <input value={it.email} onChange={(e) => set('issueTracker', { email: e.target.value })} />
@@ -189,6 +264,23 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
               <input type="password" value={it.token} onChange={(e) => set('issueTracker', { token: e.target.value })} />
             </Field>
             <AccessChecks value={it.access} onChange={(access) => set('issueTracker', { access })} />
+            <p className="ob-hint">Statuses are team-specific — tell us which ones map to your QA stages.</p>
+            <Field label="Status(es) that mean 'Ready for QA' (one per line)">
+              <ListTextarea
+                key={`rfq-${it.type}`}
+                rows={2}
+                value={it.statusMapping.ready_for_qa}
+                onChange={(arr) => set('issueTracker', { statusMapping: { ...it.statusMapping, ready_for_qa: arr } })}
+              />
+            </Field>
+            <Field label="Status(es) that mean 'In QA' (one per line)">
+              <ListTextarea
+                key={`inqa-${it.type}`}
+                rows={2}
+                value={it.statusMapping.in_qa}
+                onChange={(arr) => set('issueTracker', { statusMapping: { ...it.statusMapping, in_qa: arr } })}
+              />
+            </Field>
           </>
         )
       case 3:
@@ -205,7 +297,7 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
               <input value={vcs.org} onChange={(e) => set('vcs', { org: e.target.value })} />
             </Field>
             <Field label="Repos (one per line)">
-              <textarea rows={3} value={arrToLines(vcs.repos)} onChange={(e) => set('vcs', { repos: linesToArr(e.target.value) })} />
+              <ListTextarea rows={3} value={vcs.repos} onChange={(repos) => set('vcs', { repos })} />
             </Field>
             <Field label="API token">
               <input type="password" value={vcs.token} onChange={(e) => set('vcs', { token: e.target.value })} />
@@ -247,7 +339,7 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
           <>
             <p className="ob-hint">This is what personalizes your QA skill — what to test, and what counts as save/publish.</p>
             <Field label="Critical user flows (one per line)">
-              <textarea rows={3} value={arrToLines(qa.criticalFlows)} onChange={(e) => set('productQA', { criticalFlows: linesToArr(e.target.value) })} placeholder="Create and publish an article" />
+              <ListTextarea rows={3} value={qa.criticalFlows} onChange={(criticalFlows) => set('productQA', { criticalFlows })} placeholder="Create and publish an article" />
             </Field>
             <Field label="What does 'Save' mean in your product?">
               <textarea rows={2} value={qa.saveSemantics} onChange={(e) => set('productQA', { saveSemantics: e.target.value })} />
@@ -256,24 +348,13 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
               <textarea rows={2} value={qa.publishSemantics} onChange={(e) => set('productQA', { publishSemantics: e.target.value })} />
             </Field>
             <Field label="Key pages (one per line: Name | /route)">
-              <textarea
-                rows={3}
-                value={qa.keyPages.map((p) => `${p.name} | ${p.route}`).join('\n')}
-                onChange={(e) =>
-                  set('productQA', {
-                    keyPages: linesToArr(e.target.value).map((line) => {
-                      const [name, route] = line.split('|')
-                      return { name: (name || '').trim(), route: (route || '').trim() }
-                    }),
-                  })
-                }
-              />
+              <KeyPagesTextarea value={qa.keyPages} onChange={(keyPages) => set('productQA', { keyPages })} />
             </Field>
             <Field label="Known risk areas / past bugs (one per line)">
-              <textarea rows={3} value={arrToLines(qa.riskAreas)} onChange={(e) => set('productQA', { riskAreas: linesToArr(e.target.value) })} />
+              <ListTextarea rows={3} value={qa.riskAreas} onChange={(riskAreas) => set('productQA', { riskAreas })} />
             </Field>
             <Field label="Always check (one per line)">
-              <textarea rows={2} value={arrToLines(qa.alwaysCheck)} onChange={(e) => set('productQA', { alwaysCheck: linesToArr(e.target.value) })} placeholder="No console errors" />
+              <ListTextarea rows={2} value={qa.alwaysCheck} onChange={(alwaysCheck) => set('productQA', { alwaysCheck })} placeholder="No console errors" />
             </Field>
           </>
         )

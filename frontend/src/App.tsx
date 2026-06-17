@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Ticket, Lane, AgentName, AgentStatus } from './types'
-import { fetchTickets, startPipeline, fetchDevInfo, subscribeSSE, fetchPipelineStates, resumePipeline, checkEvidence, checkDeploy, runCommand, releaseEnv, fetchEnvLocks, generateReport, fetchEvidenceHistory, EvidenceHistoryItem, subscribeCouncil, overrideCouncil, retryAutoProvision } from './api'
+import { fetchTickets, startPipeline, fetchDevInfo, subscribeSSE, fetchPipelineStates, resumePipeline, checkEvidence, checkDeploy, runCommand, releaseEnv, fetchEnvLocks, generateReport, fetchEvidenceHistory, EvidenceHistoryItem, subscribeCouncil, overrideCouncil, retryAutoProvision, getOnboardingStatus } from './api'
 import type { EnvInUseError } from './api'
 import { loadLanes, dumpLanes, reconcileLanesWithBackend } from './laneSchema'
 
@@ -51,6 +51,9 @@ export default function App() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [environments, setEnvironments] = useState<string[]>([])
   const [projects, setProjects] = useState<string[]>([])
+  // Already-deployed apps (static/local/deployed modes) skip build & deploy — only
+  // 'script' mode needs them. Drives which stages the lane shows.
+  const [needsBuildDeploy, setNeedsBuildDeploy] = useState(true)
   const [envLocks, setEnvLocks] = useState<EnvLocks>({})
   const [pipelineStates, setPipelineStates] = useState<Record<string, {
     ticketKey: string
@@ -90,6 +93,9 @@ export default function App() {
     fetch('/api/projects')
       .then(r => r.json())
       .then(d => setProjects(d.projects || []))
+      .catch(() => {})
+    getOnboardingStatus()
+      .then(s => setNeedsBuildDeploy(s.envMode === 'script'))
       .catch(() => {})
   }, [])
 
@@ -954,7 +960,7 @@ export default function App() {
   const handleStartNext = useCallback(() => {
     const activeLaneKeys = lanes.map(l => l.ticket.key)
     const nextTicket = tickets
-      .filter(t => !activeLaneKeys.includes(t.key) && t.status === 'Ready for QA' && !t.flagged)
+      .filter(t => !activeLaneKeys.includes(t.key) && t.statusCategory === 'ready_for_qa' && !t.flagged)
       .sort((a, b) => {
         const priOrder: Record<string, number> = { Highest: 0, High: 1, Medium: 2, Low: 3, Lowest: 4 }
         return (priOrder[a.priority] ?? 2) - (priOrder[b.priority] ?? 2)
@@ -1014,6 +1020,7 @@ export default function App() {
         onOverrideCouncil={handleOverrideCouncil}
         onStartFromQuartermaster={handleStartFromQuartermaster}
         evidenceHistory={evidenceHistory}
+        needsBuildDeploy={needsBuildDeploy}
       />
       <Queue
         tickets={tickets}

@@ -52,7 +52,7 @@ export default function TopBar({
   onRefresh, isRefreshing,
 }: Props) {
   const { version, restartedSinceMount } = useBackendVersion()
-  const readyTickets = tickets.filter(t => t.status === 'Ready for QA')
+  const readyTickets = tickets.filter(t => t.statusCategory === 'ready_for_qa')
   const withEvidence = readyTickets.filter(t =>
     t.evidence.status === 'tested' || t.evidence.status === 'published'
   )

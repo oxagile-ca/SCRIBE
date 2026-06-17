@@ -30,6 +30,26 @@ def load_instance_config(path: str | None = None) -> dict | None:
         return json.load(fh)
 
 
+def load_secrets_env(path: str | None = None) -> dict:
+    """Parse a KEY=VALUE .secrets.env file into os.environ so adapters can read their
+    tokens. Skips comments and blank values. Returns the dict of keys loaded."""
+    path = path or os.path.join(default_config_dir(), ".secrets.env")
+    if not os.path.exists(path):
+        return {}
+    loaded: dict = {}
+    with open(path, encoding="utf-8") as fh:
+        for raw in fh:
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key, value = key.strip(), value.strip()
+            if key and value:
+                os.environ[key] = value
+                loaded[key] = value
+    return loaded
+
+
 def default_config_dir() -> str:
     return os.environ.get("SCRIBE_CONFIG_DIR") or os.getcwd()
 

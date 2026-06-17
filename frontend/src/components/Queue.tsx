@@ -34,7 +34,8 @@ export default function Queue({ tickets, activeLaneKeys, lanesAreFull, onStart, 
     .filter(t => !activeLaneKeys.includes(t.key))
     .filter(t => {
       if (filter === 'All') return true
-      return t.status === filter
+      const cat = filter === 'Ready for QA' ? 'ready_for_qa' : 'in_qa'
+      return t.statusCategory === cat
     })
     .sort((a, b) => {
       const priOrder: Record<string, number> = { Highest: 0, High: 1, Medium: 2, Low: 3, Lowest: 4 }

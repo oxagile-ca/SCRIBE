@@ -3,7 +3,10 @@ import { Lane, AgentName } from '../types'
 import AgentDetail from './AgentDetail'
 import { CouncilPanel } from './CouncilPanel'
 
-const AGENT_ORDER: AgentName[] = ['quartermaster', 'builder', 'shipper', 'inspector', 'scribe']
+const FULL_AGENT_ORDER: AgentName[] = ['quartermaster', 'builder', 'shipper', 'inspector', 'scribe']
+// Apps that are already deployed (static / local / deployed modes) skip build & deploy:
+// the run is just analyze-PR → test → report.
+const TEST_ONLY_ORDER: AgentName[] = ['inspector', 'scribe']
 const STAGE_LABELS: Record<AgentName, string> = {
   quartermaster: 'Provision',
   builder: 'Build',
@@ -22,12 +25,15 @@ interface Props {
   onResume: (laneId: string) => void
   onOverrideCouncil: (laneId: string, reason: string) => Promise<void>
   onStartFromQuartermaster: (lane: Lane) => void
+  needsBuildDeploy?: boolean
 }
 
-export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeploy, onRunCommand, onGenerateReport, onResume, onOverrideCouncil, onStartFromQuartermaster }: Props) {
+export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeploy, onRunCommand, onGenerateReport, onResume, onOverrideCouncil, onStartFromQuartermaster, needsBuildDeploy = true }: Props) {
   const [expandedAgent, setExpandedAgent] = useState<AgentName | null>(null)
   const [cmdInput, setCmdInput] = useState('')
   const { ticket, agents, currentAgent } = lane
+
+  const AGENT_ORDER: AgentName[] = needsBuildDeploy ? FULL_AGENT_ORDER : TEST_ONLY_ORDER
 
   const overallProgress = AGENT_ORDER.reduce((sum, name) => {
     const agentProgress = agents[name]?.progress ?? 0

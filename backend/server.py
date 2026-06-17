@@ -23,7 +23,13 @@ from chat import chat_stream
 from streams import StreamRegistry, replay_events_from_disk, END_MARKER
 from pipeline_store import PipelineStore
 from onboarding import validate_answers, run_onboarding
-from instance_config import load_instance_config, default_config_dir, default_skill_dir
+from instance_config import load_instance_config, load_secrets_env, default_config_dir, default_skill_dir
+import linear_client
+from status_map import resolve_status_mapping, categorize_status
+
+# Load onboarding-generated secrets (.secrets.env) into the environment at startup so
+# adapters (Linear/Jira/etc.) can read their tokens.
+load_secrets_env()
 
 
 def _resolve_version():
@@ -221,6 +227,9 @@ async def api_onboarding(answers: Dict[str, Any]):
             config_dir=default_config_dir(),
             skill_dir=default_skill_dir(),
         )
+        # Load the just-written secrets so the running process picks up tokens
+        # immediately — no restart needed.
+        load_secrets_env(result["paths"].get("secrets"))
     except Exception as e:  # noqa: BLE001 — surface any generation failure to the wizard
         return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
     return {"ok": True, **result}
@@ -233,9 +242,12 @@ async def api_environments():
 
 @app.get("/api/projects")
 async def api_projects():
-    """List of Jira project keys the dashboard knows about. Frontend fetches
-    this so the project dropdown can't drift out of sync with the backend's
-    PROJECTS allowlist."""
+    """Project keys the dashboard offers. Prefers the onboarded instance config (read
+    live so it applies without a restart); falls back to the built-in defaults."""
+    cfg = load_instance_config()
+    projects = ((cfg or {}).get("issueTracker") or {}).get("projects")
+    if projects:
+        return {"projects": projects, "default": projects[0]}
     return {"projects": PROJECTS, "default": DEFAULT_PROJECT}
 
 
@@ -274,10 +286,24 @@ async def api_release_env(req: ReleaseEnvRequest):
 
 @app.get("/api/tickets")
 async def api_tickets(project: str = Query(default=DEFAULT_PROJECT)):
-    if project not in PROJECTS:
-        return {"error": f"Unknown project: {project}"}
-    tickets = await get_tickets(project)
+    """Fetch tickets from the configured issue tracker. Dispatches by the onboarded
+    issueTracker.type (read live); falls back to the built-in Jira source."""
+    cfg = load_instance_config() or {}
+    issue = cfg.get("issueTracker") or {}
+    itype = issue.get("type")
+    if itype == "linear":
+        tickets = await linear_client.get_tickets(
+            os.environ.get("LINEAR_TOKEN", ""), issue.get("projects") or []
+        )
+    else:
+        if not cfg and project not in PROJECTS:
+            return {"error": f"Unknown project: {project}"}
+        tickets = await get_tickets(project)
+    # Normalize each tracker's native status to a canonical category the frontend
+    # branches on (ready_for_qa / in_qa / other), then enrich with evidence.
+    mapping = resolve_status_mapping(cfg, itype or "jira")
     for t in tickets:
+        t["statusCategory"] = categorize_status(t.get("status", ""), mapping)
         t["evidence"] = check_evidence(t["key"])
     return tickets
 

@@ -13,6 +13,7 @@ export interface Ticket {
   key: string
   summary: string
   status: string
+  statusCategory?: 'ready_for_qa' | 'in_qa' | 'other'
   priority: string
   assignee: string
   qaAssignee: string

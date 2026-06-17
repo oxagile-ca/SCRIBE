@@ -78,6 +78,16 @@ def sample_answers():
     }
 
 
+def test_build_instance_config_passes_status_mapping_through():
+    answers = sample_answers()
+    answers["issueTracker"]["statusMapping"] = {
+        "ready_for_qa": ["Ready for testing"],
+        "in_qa": ["In QA"],
+    }
+    config, _ = build_instance_config(answers)
+    assert config["issueTracker"]["statusMapping"]["ready_for_qa"] == ["Ready for testing"]
+
+
 def test_build_instance_config_splits_secrets_out_of_config():
     config, secrets = build_instance_config(sample_answers())
 

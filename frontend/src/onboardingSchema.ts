@@ -36,6 +36,7 @@ export interface OnboardingAnswers {
     email: string
     token: string
     access: Access
+    statusMapping: { ready_for_qa: string[]; in_qa: string[] }
   }
   vcs: {
     type: VcsType
@@ -78,7 +79,15 @@ export function emptyAnswers(): OnboardingAnswers {
       readinessUrlPattern: '',
       testAuth: { required: false, loginUrl: '', username: '', password: '', notes: '' },
     },
-    issueTracker: { type: 'jira', baseUrl: '', projects: [], email: '', token: '', access: { read: true, write: true } },
+    issueTracker: {
+      type: 'jira',
+      baseUrl: '',
+      projects: [],
+      email: '',
+      token: '',
+      access: { read: true, write: true },
+      statusMapping: { ready_for_qa: ['Ready for QA'], in_qa: ['In QA'] },
+    },
     vcs: { type: 'github', org: '', repos: [], token: '', access: { read: true, write: true } },
     publish: {
       jiraComment: true,

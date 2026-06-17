@@ -1,0 +1,4 @@
+{
+  "name": "weird-repo",
+  "configBase": "k8s-stable"
+}

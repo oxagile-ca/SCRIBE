@@ -1,0 +1,12 @@
+{
+  "name": "service-a",
+  "deployable": "service",
+  "dependencies": {
+    "service": ["service-b", "acme-server"]
+  },
+  "peerDependencies": {
+    "service": ["ai-media"]
+  },
+  "healthCheck": "/health",
+  "configBase": "k8s-stable"
+}

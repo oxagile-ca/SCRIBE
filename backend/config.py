@@ -103,3 +103,32 @@ AUTO_PROVISION_PARENT_ENV = os.environ.get("QA_DASH_PARENT_ENV", "qa-env-1")
 # happening. Renew on backend startup and then once per interval below.
 AUTO_PROVISION_PARENT_KEEPALIVE_HOURS = 168
 AUTO_PROVISION_PARENT_KEEPALIVE_INTERVAL_SEC = 24 * 60 * 60
+
+
+# --- Instance config overrides (onboarding-generated) -------------------------
+# When an instance.config.json exists (written by the onboarding wizard), use it to
+# reconfigure the dashboard to the deployed product instead of these built-in defaults.
+# Silently falls back to the defaults above when absent.
+try:
+    from instance_config import load_instance_config as _load_instance_config
+    _instance = _load_instance_config()
+except Exception:
+    _instance = None
+
+if _instance:
+    _it = _instance.get("issueTracker") or {}
+    if _it.get("projects"):
+        PROJECTS = _it["projects"]
+        DEFAULT_PROJECT = PROJECTS[0]
+    if _it.get("baseUrl"):
+        JIRA_BASE_URL = _it["baseUrl"]
+    if _it.get("email"):
+        JIRA_EMAIL = _it["email"]
+    _env_cfg = _instance.get("environments") or {}
+    _static_urls = _env_cfg.get("staticUrls") or []
+    if _static_urls:
+        ENVIRONMENTS = _static_urls
+        DEFAULT_ENV = _static_urls[0]
+    _repos = (_instance.get("vcs") or {}).get("repos")
+    if _repos:
+        REPO_LIST = _repos

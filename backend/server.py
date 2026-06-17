@@ -22,6 +22,8 @@ import bitbucket_client as bb
 from chat import chat_stream
 from streams import StreamRegistry, replay_events_from_disk, END_MARKER
 from pipeline_store import PipelineStore
+from onboarding import validate_answers, run_onboarding
+from instance_config import load_instance_config, default_config_dir, default_skill_dir
 
 
 def _resolve_version():
@@ -188,6 +190,40 @@ async def api_version():
         "startedAt": STARTED_AT,
         "uptimeSec": int(time.time() - STARTED_AT),
     }
+
+
+@app.get("/api/onboarding/status")
+async def api_onboarding_status():
+    """Whether this instance has been onboarded. The frontend gates the dashboard on
+    this: not configured → show the onboarding wizard."""
+    cfg = load_instance_config()
+    if not cfg:
+        return {"configured": False}
+    return {
+        "configured": True,
+        "productName": cfg.get("productName"),
+        "issueTracker": (cfg.get("issueTracker") or {}).get("type"),
+        "vcs": (cfg.get("vcs") or {}).get("type"),
+        "envMode": (cfg.get("environments") or {}).get("mode"),
+    }
+
+
+@app.post("/api/onboarding")
+async def api_onboarding(answers: Dict[str, Any]):
+    """Run the onboarding wizard payload: write instance config + secrets, generate the
+    product-customized /qa-evidence skill and seeded patterns.yml."""
+    errors = validate_answers(answers)
+    if errors:
+        return JSONResponse(status_code=400, content={"ok": False, "errors": errors})
+    try:
+        result = run_onboarding(
+            answers,
+            config_dir=default_config_dir(),
+            skill_dir=default_skill_dir(),
+        )
+    except Exception as e:  # noqa: BLE001 — surface any generation failure to the wizard
+        return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
+    return {"ok": True, **result}
 
 
 @app.get("/api/environments")

@@ -1,3 +1,8 @@
+# Onboarding-generated instance config + secrets (per-deployment; never commit).
+instance.config.json
+.secrets.env
+.scribe/
+
 # Local runtime state — never commit these. They contain real ticket data
 # and per-user pipeline history.
 pipeline-state.db
@@ -39,3 +44,6 @@ council-audit.jsonl
 
 # Inter-session hand-off patches; do not commit.
 *.patch
+
+# Yarn lockfile — repo standardizes on npm (package-lock.json).
+yarn.lock

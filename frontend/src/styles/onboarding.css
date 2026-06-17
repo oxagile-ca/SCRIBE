@@ -1,0 +1,95 @@
+.ob-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--text, #ddd);
+  background: var(--bg, #15171c);
+}
+
+.ob-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg, #15171c);
+  padding: 24px;
+  overflow: auto;
+}
+
+.ob-card {
+  width: 100%;
+  max-width: 640px;
+  background: var(--panel, #1e2128);
+  border: 1px solid var(--border, #2c313a);
+  border-radius: 12px;
+  color: var(--text, #e6e6e6);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+.ob-head {
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid var(--border, #2c313a);
+}
+.ob-head h2 { margin: 0 0 6px; font-size: 18px; }
+.ob-progress { font-size: 12px; color: var(--muted, #9aa3af); }
+.ob-bar { height: 4px; background: var(--border, #2c313a); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+.ob-bar > div { height: 100%; background: var(--accent, #5b8cff); transition: width 0.2s ease; }
+
+.ob-body { padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+
+.ob-field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+.ob-field > span { color: var(--muted, #9aa3af); }
+.ob-field input,
+.ob-field textarea,
+.ob-field select {
+  background: var(--bg, #15171c);
+  border: 1px solid var(--border, #2c313a);
+  border-radius: 6px;
+  color: var(--text, #e6e6e6);
+  padding: 8px 10px;
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.ob-field textarea { resize: vertical; }
+
+.ob-inline { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+
+.ob-access { display: flex; align-items: center; gap: 14px; font-size: 13px; }
+.ob-access-label { color: var(--muted, #9aa3af); }
+.ob-access label { display: flex; align-items: center; gap: 5px; }
+
+.ob-fieldset { border: 1px solid var(--border, #2c313a); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.ob-fieldset legend { color: var(--muted, #9aa3af); font-size: 12px; padding: 0 6px; }
+
+.ob-hint { font-size: 12px; color: var(--muted, #9aa3af); margin: 0; }
+
+.ob-review ul { margin: 0; padding-left: 18px; line-height: 1.7; font-size: 13px; }
+.ob-errors { margin-top: 14px; padding: 10px 12px; border: 1px solid #a33; border-radius: 8px; background: rgba(170,51,51,0.12); }
+.ob-errors ul { margin: 6px 0 0; }
+
+.ob-foot {
+  padding: 14px 24px;
+  border-top: 1px solid var(--border, #2c313a);
+  display: flex;
+  justify-content: space-between;
+}
+.ob-foot button {
+  background: var(--bg, #15171c);
+  border: 1px solid var(--border, #2c313a);
+  color: var(--text, #e6e6e6);
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font: inherit;
+}
+.ob-foot button:disabled { opacity: 0.4; cursor: default; }
+.ob-primary { background: var(--accent, #5b8cff) !important; border-color: var(--accent, #5b8cff) !important; color: #fff !important; }
+
+.ob-done { padding: 28px 24px; text-align: center; }
+.ob-done h2 { margin-top: 0; }
+.ob-done .ob-primary { margin-top: 16px; padding: 10px 20px; border-radius: 8px; }

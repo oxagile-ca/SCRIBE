@@ -55,6 +55,37 @@ export async function fetchEvidenceHistory(): Promise<EvidenceHistoryItem[]> {
   return res.json()
 }
 
+export interface OnboardingStatus {
+  configured: boolean
+  productName?: string
+  issueTracker?: string
+  vcs?: string
+  envMode?: string
+}
+
+export async function getOnboardingStatus(): Promise<OnboardingStatus> {
+  const res = await fetch(`${BASE}/onboarding/status`)
+  if (!res.ok) throw new Error(`Failed to fetch onboarding status: ${res.status}`)
+  return res.json()
+}
+
+export interface OnboardingResult {
+  ok: boolean
+  errors?: string[]
+  error?: string
+  summary?: Record<string, unknown>
+  paths?: Record<string, string>
+}
+
+export async function submitOnboarding(answers: unknown): Promise<OnboardingResult> {
+  const res = await fetch(`${BASE}/onboarding`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(answers),
+  })
+  return res.json().catch(() => ({ ok: false, error: `status ${res.status}` }))
+}
+
 export async function startBuild(repo: string, branch: string): Promise<string> {
   const res = await fetch(`${BASE}/build`, {
     method: 'POST',

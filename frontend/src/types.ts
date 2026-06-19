@@ -38,6 +38,7 @@ export interface EvidenceStatus {
   reportUrl?: string
   needsReport?: boolean
   latestRun?: string
+  claudeCost?: number | null
 }
 
 export type CouncilStatus = 'pending' | 'pass' | 'block' | 'overridden' | null

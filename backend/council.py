@@ -20,7 +20,6 @@ import datetime
 import json
 import os
 import re
-import shlex
 import threading
 from dataclasses import dataclass
 from typing import Callable, Optional
@@ -46,8 +45,12 @@ def _claude_bin() -> str:
     return os.environ.get(CLAUDE_BIN_ENV, "claude")
 
 
-def _build_reviewer_cmd(prompt: str) -> str:
-    parts = [
+def _build_reviewer_cmd(prompt: str) -> list[str]:
+    """Argv list for create_subprocess_exec — NOT a shell string. Passing an argv
+    vector avoids shell quoting entirely; the old shell+shlex.quote build mangled
+    the multi-line prompt on Windows (cmd.exe ignores POSIX single quotes), so
+    claude received a stray `'You` and never returned a VERDICT."""
+    return [
         _claude_bin(),
         "-p",
         "--output-format", "stream-json",
@@ -55,7 +58,6 @@ def _build_reviewer_cmd(prompt: str) -> str:
         "--permission-mode", "bypassPermissions",
         prompt,
     ]
-    return " ".join(shlex.quote(p) for p in parts)
 
 
 def _extract_text_from_assistant(message: dict) -> str:
@@ -75,8 +77,8 @@ async def _run_reviewer(reviewer: Reviewer, ctx: dict) -> dict:
     """
     prompt = reviewer.prompt_builder(**ctx)
     cmd = _build_reviewer_cmd(prompt)
-    proc = await asyncio.create_subprocess_shell(
-        cmd,
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

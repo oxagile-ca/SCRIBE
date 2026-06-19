@@ -26,6 +26,7 @@ export default function QueueRow({ ticket, onStart, disabled, environments, envL
   const [customEnv, setCustomEnv] = useState('')
   const priColor = PRIORITY_COLORS[ticket.priority] || 'var(--text-dim)'
   const isBlocked = ticket.flagged
+  const isQAed = isTicketQAed(ticket)
   const rowClass = isBlocked ? 'queue-row queue-row--blocked' :
     ticket.staleDays >= 3 ? 'queue-row queue-row--stale' : 'queue-row'
 
@@ -43,7 +44,47 @@ export default function QueueRow({ ticket, onStart, disabled, environments, envL
           {ticket.key}
         </span>
         <span className="queue-row__summary">{ticket.summary}</span>
+        {isQAed && (() => {
+          const ev = ticket.evidence
+          const parts: string[] = []
+          if (ev?.score != null) parts.push(`${ev.score}/100`)
+          if (ev?.claudeCost != null) parts.push(`$${ev.claudeCost.toFixed(2)}`)
+          if (ev?.time) parts.push(ev.time)
+          return (
+            <span
+              className="queue-row__metrics"
+              title="QA score \u00b7 Claude token cost \u00b7 run time (from OTEL telemetry + score step)"
+            >
+              {parts.length
+                ? parts.join('  \u00b7  ')
+                : <span className="queue-row__metrics--missing">cost/time not tracked</span>}
+            </span>
+          )
+        })()}
         <span className="queue-row__assignee">{ticket.assignee || '\u2014'}</span>
+        {isQAed && (
+          ticket.evidence?.reportUrl ? (
+            <a
+              className="queue-row__badge"
+              href={ticket.evidence.reportUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title={`QA'd by SCRIBE${ticket.evidence.score != null ? ` \u2014 score ${ticket.evidence.score}/100` : ''}${ticket.evidence.latestRun ? ` (${ticket.evidence.latestRun})` : ''} \u2014 not yet moved to Done. Click to open evidence.`}
+              style={{ color: 'var(--success, #4ade80)', background: 'rgba(74,222,128,0.15)', textDecoration: 'none' }}
+            >
+              {'\u2713'} QAed{ticket.evidence.score != null ? ` ${ticket.evidence.score}` : ''}
+            </a>
+          ) : (
+            <span
+              className="queue-row__badge"
+              title={`QA'd by SCRIBE${ticket.evidence?.score != null ? ` \u2014 score ${ticket.evidence.score}/100` : ''} \u2014 not yet moved to Done`}
+              style={{ color: 'var(--success, #4ade80)', background: 'rgba(74,222,128,0.15)' }}
+            >
+              {'\u2713'} QAed{ticket.evidence?.score != null ? ` ${ticket.evidence.score}` : ''}
+            </span>
+          )
+        )}
         {ticket.staleDays >= 3 && (
           <span className="queue-row__badge" style={{ color: 'var(--warning)', background: 'rgba(246,173,85,0.15)' }}>
             {ticket.staleDays}d
@@ -234,6 +275,18 @@ export default function QueueRow({ ticket, onStart, disabled, environments, envL
       )}
     </>
   )
+}
+
+/** A ticket whose Linear state is a terminal/closed state. */
+export function isTicketDone(t: Ticket): boolean {
+  return /^(done|completed|complete|cancell?ed|closed|shipped|released)$/i.test((t.status || '').trim())
+}
+
+/** SCRIBE has captured QA evidence (tested/published) but the ticket has not been
+ *  moved to Done yet — i.e. it's awaiting closure. Drives the "QAed" badge + filter. */
+export function isTicketQAed(t: Ticket): boolean {
+  const s = t.evidence?.status
+  return (s === 'tested' || s === 'published') && !isTicketDone(t)
 }
 
 function extractACs(description: string): string[] {

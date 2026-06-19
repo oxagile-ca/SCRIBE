@@ -135,11 +135,145 @@ def build_instance_config(answers: dict) -> tuple[dict, dict]:
         "vcs": vcs,
         "publish": publish,
         "knowledge": knowledge,
+        "api": copy.deepcopy(answers.get("api", {})),
     }
     return config, secrets
 
 
 PRODUCT_CONTEXT_MARKER = "<!-- PRODUCT_CONTEXT -->"
+API_SURFACE_MARKER = "<!-- API_SURFACE -->"
+
+# In-page live-API helper, shipped beside each generated skill. __BASE_URL__ is
+# replaced with the product's API base URL at generation time. Reads the in-browser
+# bearer token (the SPA stores it) and calls the API from the page so the token never
+# leaves the browser. See Phase 2.7 in the skill.
+LIVE_API_HELPER_TEMPLATE = """// scribe-live-api.js (generated) — in-page live API verification helper.
+// Paste into the Claude-in-Chrome javascript_tool on an authenticated app tab, then:
+//   await scribeApi('GET','<endpoint>',{query:{...}})   /   {body:{...}} for POST/PUT
+// Returns {status, ok, shape, data}. Surface only status/ok/shape — never the token,
+// and avoid dumping r.data (may carry PII).
+globalThis.scribeApi = async function (method, path, opts = {}) {
+  const BASE = '__BASE_URL__';
+  // Find a bearer token the SPA stashed (Cognito oidc.user, or a *token* key).
+  const pick = (store) => {
+    const k = Object.keys(store).find(x => /oidc\\.user|id_token|access_token|auth/i.test(x));
+    if (!k) return null;
+    const raw = store.getItem(k);
+    try { const o = JSON.parse(raw); return o.id_token || o.access_token || o.token || raw; }
+    catch (e) { return raw; }
+  };
+  const tok = pick(sessionStorage) || pick(localStorage);
+  if (!tok) return { error: 'no in-browser token (expired? not signed in on this tab)' };
+  let url = BASE + (path.startsWith('/') ? path : '/' + path);
+  if (opts.query) {
+    const qs = new URLSearchParams();
+    for (const [a, b] of Object.entries(opts.query)) { Array.isArray(b) ? b.forEach(v => qs.append(a, v)) : qs.append(a, b); }
+    url += '?' + qs.toString();
+  }
+  const init = { method, headers: { Authorization: 'Bearer ' + tok } };
+  if (opts.body !== undefined) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opts.body); }
+  let resp, data;
+  try { resp = await fetch(url, init); } catch (e) { return { error: 'fetch failed: ' + e.message }; }
+  const t = await resp.text();
+  try { data = JSON.parse(t); } catch (e) { data = t; }
+  const sum = (d) => Array.isArray(d)
+    ? { type: 'array', length: d.length, itemKeys: (d[0] && typeof d[0] === 'object') ? Object.keys(d[0]) : null }
+    : (d && typeof d === 'object') ? { type: 'object', keys: Object.keys(d) } : { type: typeof d };
+  return { status: resp.status, ok: resp.ok, shape: sum(data), data };
+};
+'scribeApi ready';
+"""
+
+
+def _parse_postman_endpoints(path: str) -> dict:
+    """Parse a Postman v2.1 collection into {group_name: [(METHOD, /path), ...]}.
+    Returns {} on any error (missing file / bad JSON) so generation never fails on it."""
+    try:
+        with open(os.path.expanduser(path), encoding="utf-8") as fh:
+            coll = json.load(fh)
+    except Exception:
+        return {}
+
+    def url_path(req: dict) -> str:
+        u = req.get("url")
+        raw = u if isinstance(u, str) else ((u or {}).get("raw", "") if isinstance(u, dict) else "")
+        raw = (raw or "").split("?")[0]
+        return re.sub(r"\{\{[^}]+\}\}", "", raw)  # strip {{BASE_URL}} etc.
+
+    groups: dict = {}
+
+    def walk(items, group):
+        for it in items:
+            if "item" in it:
+                walk(it["item"], it.get("name", group))
+            else:
+                req = it.get("request", {}) or {}
+                p = url_path(req)
+                if p:
+                    groups.setdefault(group, []).append((req.get("method", "?"), p))
+
+    walk(coll.get("item", []), (coll.get("info", {}) or {}).get("name", "API"))
+    return groups
+
+
+def _api_surface_block(answers: dict) -> str:
+    """Generate the '## API Surface (generated)' section from answers['api'].
+    Returns '' when no API is configured (so the marker renders empty)."""
+    api = answers.get("api") or {}
+    base_url = (api.get("baseUrl") or "").strip()
+    coll_path = (api.get("postmanCollectionPath") or "").strip()
+    if not (base_url or coll_path):
+        return ""
+
+    product = (answers.get("company", {}) or {}).get("productName") or "the product"
+    lines = ["## API Surface (generated)", ""]
+    lines.append(
+        f"{product}'s UI is a thin client over its REST API. Many tickets are API-shaped "
+        "(a response field, validation rule, math, scope/permission), so QA must verify the "
+        "live API contract, not just the rendered UI — see **Phase 2.7 — Live API Verification**."
+    )
+    if base_url:
+        line = f"- **Base URL:** `{base_url}`"
+        if api.get("prefix"):
+            line += f" · prefix `{api['prefix']}`"
+        lines.append(line)
+        auth = api.get("authType", "bearer")
+        authline = f"- **Auth:** {auth}"
+        if api.get("tokenLocation"):
+            authline += f" — in-browser token at `{api['tokenLocation']}`"
+        lines.append(authline)
+    if api.get("scopeParam"):
+        lines.append(f"- **Scope:** most calls require/accept `{api['scopeParam']}`; cross-scope access must be denied.")
+    ref_bits = []
+    if coll_path:
+        ref_bits.append(f"raw collection `{coll_path}`")
+    if api.get("referencePath"):
+        ref_bits.append(f"catalog `{api['referencePath']}`")
+    if ref_bits:
+        lines.append("- **Full reference:** " + "; ".join(ref_bits) + " (private — keep out of the public repo).")
+
+    groups = _parse_postman_endpoints(coll_path) if coll_path else {}
+    if groups:
+        total = sum(len(v) for v in groups.values())
+        lines.append("")
+        lines.append(f"Endpoint catalog — {total} requests / {len(groups)} groups:")
+        lines.append("")
+        for g, eps in groups.items():
+            shown = ", ".join(f"{m} `{p}`" for m, p in eps[:24])
+            if len(eps) > 24:
+                shown += f", … (+{len(eps) - 24})"
+            lines.append(f"- **{g}:** {shown}")
+    lines.append("")
+    lines.append(
+        "When a TC maps to a backend change, cite the matching endpoint(s) in its `notes` "
+        "and attach a live API assertion (Phase 2.7)."
+    )
+    return "\n".join(lines)
+
+
+def _live_api_helper_js(base_url: str) -> str:
+    """Render the per-app scribe-live-api.js with the product's API base URL baked in."""
+    return LIVE_API_HELPER_TEMPLATE.replace("__BASE_URL__", base_url or "")
 
 
 def _yaml_str(s: str) -> str:
@@ -173,10 +307,16 @@ def render_skill(answers: dict, base_skill: str) -> str:
     """Render the per-app skill: YAML frontmatter (so Claude Code registers it) + the
     base skill with a generated 'Product Context' block injected at the marker."""
     block = _product_context_block(answers)
+    api_block = _api_surface_block(answers)
     if PRODUCT_CONTEXT_MARKER in base_skill:
         body = base_skill.replace(PRODUCT_CONTEXT_MARKER, block)
     else:
         body = block + "\n\n" + base_skill
+    # Inject the per-app API Surface at its marker (empty when no API configured).
+    if API_SURFACE_MARKER in body:
+        body = body.replace(API_SURFACE_MARKER, api_block)
+    elif api_block:
+        body = body.replace(block, block + "\n\n" + api_block, 1) if block in body else api_block + "\n\n" + body
     return skill_frontmatter(answers) + body
 
 
@@ -311,6 +451,14 @@ def write_outputs(
         "patterns": os.path.join(skill_dir, "patterns.yml"),
     }
 
+    # Ship the in-page live-API helper beside the skill when an API base URL is set
+    # (referenced by Phase 2.7). Skipped for products with no documented API.
+    api_base = (config.get("api") or {}).get("baseUrl")
+    if api_base:
+        paths["liveApiHelper"] = os.path.join(skill_dir, "scribe-live-api.js")
+        with open(paths["liveApiHelper"], "w", encoding="utf-8") as fh:
+            fh.write(_live_api_helper_js(api_base))
+
     with open(paths["config"], "w", encoding="utf-8") as fh:
         json.dump(config, fh, indent=2)
 
@@ -371,6 +519,18 @@ def run_onboarding(
     (skills_root/qa-evidence-<slug>) so apps never collide, with a versioned copy kept
     in the repo at instances/<slug>/. Callers should validate_answers() first.
     """
+    # Sticky API config: if the wizard didn't supply answers["api"], reuse the api
+    # block already persisted in this instance's config so a regeneration never loses
+    # the generated API Surface section / live-verification helper.
+    if not (answers.get("api") or {}):
+        try:
+            with open(os.path.join(config_dir, "instance.config.json"), encoding="utf-8") as fh:
+                prior = json.load(fh)
+            if prior.get("api"):
+                answers = {**answers, "api": prior["api"]}
+        except Exception:
+            pass
+
     config, secrets = build_instance_config(answers)
     slug = config["appSlug"]
     skill_text = render_skill(answers, _read_base_skill(base_skill_path))

@@ -1193,7 +1193,9 @@ def check_evidence(ticket_key):
     latest_run_name = runs[0]
     latest_run = os.path.join(runs_path, latest_run_name)
     report_path = os.path.join(latest_run, "index.html")
-    has_html = os.path.exists(report_path)
+    # A 0-byte index.html counts as missing — some generators leave an empty
+    # placeholder in the run dir while writing the real portal to the ticket root.
+    has_html = os.path.exists(report_path) and os.path.getsize(report_path) > 0
     score = None
     time_taken = ""
 
@@ -1221,10 +1223,22 @@ def check_evidence(ticket_key):
                 score = _raw_conf
         time_taken = summary.get("time", "") or summary.get("date", "")
 
-    # Always surface reportUrl so "View Report" / "Generate Report" can show.
-    # When index.html is missing, needsReport=True tells the UI to show
-    # "Generate Report" instead of "View Report".
-    report_url = _report_url_for(ticket_key, latest_run_name, latest_run)
+    # Resolve the report URL/path. Prefer the run-level portal; fall back to the
+    # ticket-root index.html for runs whose generator wrote the portal there and
+    # left an empty placeholder in the run dir. needsReport=True tells the UI to
+    # show "Generate Report" instead of a (broken) "View Report".
+    if has_html:
+        report_url = _report_url_for(ticket_key, latest_run_name, latest_run)
+        resolved_path = report_path
+    else:
+        root_html = os.path.join(evidence_path, "index.html")
+        if os.path.exists(root_html) and os.path.getsize(root_html) > 0:
+            report_url = f"/evidence/{ticket_key}/index.html"
+            resolved_path = root_html
+            has_html = True
+        else:
+            report_url = _report_url_for(ticket_key, latest_run_name, latest_run)
+            resolved_path = ""
 
     # Sum Claude token cost across all runs that have session tracking in infra.json
     claude_cost = _otel.total_cost_for_ticket(runs_path)
@@ -1233,7 +1247,7 @@ def check_evidence(ticket_key):
         "status": "tested",
         "score": score,
         "time": time_taken,
-        "reportPath": report_path if has_html else "",
+        "reportPath": resolved_path,
         "reportUrl": report_url,
         "needsReport": not has_html and _run_has_content(latest_run),
         "latestRun": latest_run_name,

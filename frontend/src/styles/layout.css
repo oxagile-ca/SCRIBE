@@ -324,6 +324,79 @@
   color: var(--accent);
   background: var(--accent-soft);
 }
+.queue__qaed-hint {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--success, #4ade80);
+  letter-spacing: 0;
+}
+.queue__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.queue__search {
+  flex: 1;
+  min-width: 180px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 10px;
+  transition: border-color 0.15s var(--ease);
+}
+.queue__search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.queue__search::placeholder { color: var(--text-dim); }
+.queue__search-clear {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+.queue__search-clear:hover { color: var(--text); border-color: var(--border-strong); }
+.queue__sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.queue__sort-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.queue__sort-select {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.queue__sort-select:focus { outline: none; border-color: var(--accent); }
+.queue__sort-dir {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+.queue__sort-dir:hover { color: var(--accent); border-color: var(--accent); }
 .queue__list {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -378,6 +451,20 @@
   min-width: 60px;
   text-align: center;
   font-weight: 600;
+}
+.queue-row__metrics {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-family: monospace;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.queue-row__metrics--missing {
+  color: var(--text-dim);
+  font-style: italic;
+  opacity: 0.7;
 }
 .queue-row__badge {
   font-size: 10px;

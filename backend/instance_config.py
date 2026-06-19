@@ -18,6 +18,9 @@ def default_config_path() -> str:
     local = os.path.join(os.getcwd(), "instance.config.json")
     if os.path.exists(local):
         return local
+    backend_local = os.path.join(_backend_dir(), "instance.config.json")
+    if os.path.exists(backend_local):
+        return backend_local
     return str(Path.home() / ".scribe" / "instance.config.json")
 
 
@@ -50,8 +53,19 @@ def load_secrets_env(path: str | None = None) -> dict:
     return loaded
 
 
+def _backend_dir() -> str:
+    """Absolute path of this backend package (where .secrets.env and
+    instance.config.json ship). Used as the cwd-independent fallback so launching
+    the server from the wrong directory no longer silently drops LINEAR_TOKEN and
+    empties the board."""
+    return os.path.dirname(os.path.abspath(__file__))
+
+
 def default_config_dir() -> str:
-    return os.environ.get("SCRIBE_CONFIG_DIR") or os.getcwd()
+    # Was os.getcwd(): that made .secrets.env loading depend on where the process
+    # happened to be launched. A restart from any other dir lost LINEAR_TOKEN, and
+    # get_tickets("") fails silent -> blank board. Anchor to the backend dir instead.
+    return os.environ.get("SCRIBE_CONFIG_DIR") or _backend_dir()
 
 
 def default_skill_dir() -> str:

@@ -15,6 +15,20 @@ def _set_stub(monkeypatch, name):
     monkeypatch.setenv("CLAUDE_BIN", path)
 
 
+def test_build_reviewer_cmd_is_argv_with_prompt_intact():
+    # Regression: the reviewer command must be an argv list (consumed by
+    # create_subprocess_exec), NOT a shell-quoted string. The old shell+shlex.quote
+    # build mangled the prompt on Windows (cmd.exe ignores POSIX single quotes), so
+    # claude received a stray `'You` instead of the prompt and never returned a
+    # VERDICT -> council BLOCKed every ticket.
+    from council import _build_reviewer_cmd
+    prompt = "You are the QA reviewer.\nEnd with exactly: VERDICT: PASS or BLOCK."
+    cmd = _build_reviewer_cmd(prompt)
+    assert isinstance(cmd, list)
+    assert cmd[-1] == prompt  # whole prompt arrives as ONE argument, unsplit
+    assert "-p" in cmd
+
+
 def test_parse_simple_pass():
     text = "Looks good overall.\nVERDICT: PASS"
     assert _parse_verdict_line(text) == ("PASS", "")

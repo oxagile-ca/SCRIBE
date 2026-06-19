@@ -2,6 +2,8 @@
 
 <!-- PRODUCT_CONTEXT -->
 
+<!-- API_SURFACE -->
+
 ## What this skill does
 
 End-to-end QA system with three integrated components:
@@ -381,6 +383,48 @@ step 6. Each is non-skippable; an exemption requires
 - Evidence: `diffs/UV-6_<page-slug>.png` per page.
 - Skip with explicit exemption only if no baseline exists AND
   `--no-baseline-warning` is passed.
+
+## Phase 2.7 — Live API Verification (for API-based tickets)
+
+If this product has an **API Surface (generated)** section above, many tickets
+will be API-shaped (a response field, a validation rule, math, scope/permission).
+The rendered UI can pass while the API contract is wrong — or vice-versa. For
+every TC whose diff/AC touches a documented endpoint, assert the **live API
+response** alongside the UI evidence, using the endpoint catalog + expected
+body/response shapes from the API Surface section. If there is no API Surface
+section, skip this phase.
+
+**How (the token never leaves the page):** when the app authenticates in-browser
+(a bearer token in sessionStorage/localStorage), run the API call *in-page* via
+the browser `javascript_tool` so the token stays in the browser — return only
+status + response shape/values, never the token (the harness blocks raw token
+egress anyway). A same-origin SPA→API call is CORS-permitted because the app
+already makes it. A generated helper ships beside this skill as
+`scribe-live-api.js` (pre-filled with this product's API base URL): paste it into
+`javascript_tool`, then
+`const r = await scribeApi('GET','<endpoint>',{query,body}); JSON.stringify({status:r.status, ok:r.ok, shape:r.shape})`.
+
+**Assert:**
+- HTTP 2xx — or the documented expected error.
+- Expected fields present (from the diff + the API Surface catalog).
+- Value correctness when the ticket is about math (totals, taxes, fees, counts).
+- Scope/permission: a call carrying another tenant's/bucket's scope id is rejected.
+- FE↔BE parity: the value shown in the UI matches the raw API value.
+
+**Safety (mutations):**
+- GET / read endpoints: run freely.
+- POST / PUT / DELETE: real mutations on shared non-prod data. Only against
+  disposable test fixtures, subject to the same irreversibility cautions as UI
+  saves. In `--headless`, do NOT perform destructive writes — verify via reads
+  only and log the skipped write.
+
+**Evidence:** `automated/<TC>/api-<name>.json` =
+`{request:{method,path,query}, status, ok, responseKeys:[...], asserted:{...}}`.
+Scrub PII before saving. Add `api` to the TC's `evidence_required`.
+
+**Gap gate (Phase 8):** every TC whose `notes` cite an endpoint must have a
+matching `automated/<TC>/api-*.json` with `ok:true` (or a documented expected
+non-2xx). UI-only TCs are exempt.
 
 ## Phase 3 — Convert videos to GIFs
 

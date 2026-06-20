@@ -85,3 +85,31 @@ def test_summary_today_equals_alltime_when_all_today(tmp_path, monkeypatch):
     assert s["allTime"]["cost_usd"] == 0.03
     assert s["today"]["cost_usd"] == 0.03
     assert s["allTime"]["input_tokens"] == 300
+
+
+def test_record_relative_path_no_dir(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    ul.record(task="chat", ticket=None, pipeline_id=None, model=None,
+              usage={"cost_usd": 0.001, "input_tokens": 1, "output_tokens": 1},
+              path="ledger.jsonl")
+    with open("ledger.jsonl", encoding="utf-8") as f:
+        assert len([l for l in f if l.strip()]) == 1
+
+
+def test_aggregate_total_matches_group_sum(tmp_path):
+    p = str(tmp_path / "ledger.jsonl")
+    for c in (0.1, 0.2, 0.3):
+        ul.record(task="chat", ticket="T", pipeline_id=None, model="m",
+                  usage={"cost_usd": c, "input_tokens": 1, "output_tokens": 1}, path=p)
+    agg = ul.aggregate_for_ticket("T", path=p)
+    assert agg["cost_usd"] == round(sum(t["cost_usd"] for t in agg["tasks"]), 6)
+
+
+def test_record_is_error_roundtrips(tmp_path):
+    import json
+    p = str(tmp_path / "ledger.jsonl")
+    ul.record(task="qa-evidence", ticket="T", pipeline_id=None, model="m",
+              usage={"cost_usd": 0.0}, is_error=True, path=p)
+    with open(p, encoding="utf-8") as f:
+        rec = json.loads(f.read().splitlines()[0])
+    assert rec["is_error"] is True

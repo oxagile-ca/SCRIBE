@@ -62,7 +62,9 @@ def record(*, task: str, ticket: Optional[str], pipeline_id: Optional[str],
         "is_error": bool(is_error),
         "session_id": session_id,
     }
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    _dir = os.path.dirname(path)
+    if _dir:
+        os.makedirs(_dir, exist_ok=True)
     with _LOCK:
         with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(rec) + "\n")
@@ -87,7 +89,6 @@ def aggregate_for_ticket(key: str, path: Optional[str] = None) -> dict:
     path = path or LEDGER_PATH
     groups: dict = {}
     tot_in = tot_out = 0
-    tot_cost = 0.0
     for rec in _iter(path):
         if rec.get("ticket") != key:
             continue
@@ -101,9 +102,9 @@ def aggregate_for_ticket(key: str, path: Optional[str] = None) -> dict:
         g["cost_usd"] = round(g["cost_usd"] + (rec.get("cost_usd") or 0), 6)
         tot_in += rec.get("input_tokens") or 0
         tot_out += rec.get("output_tokens") or 0
-        tot_cost += rec.get("cost_usd") or 0
     return {"tasks": list(groups.values()), "input_tokens": tot_in,
-            "output_tokens": tot_out, "cost_usd": round(tot_cost, 6)}
+            "output_tokens": tot_out,
+            "cost_usd": round(sum(g["cost_usd"] for g in groups.values()), 6)}
 
 
 def summary(path: Optional[str] = None) -> dict:

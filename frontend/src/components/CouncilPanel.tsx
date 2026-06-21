@@ -39,6 +39,11 @@ export function CouncilPanel({ status, verdict, overrideInfo, onOverride }: Prop
             <span className="reviewer-name">{r.name}</span>
             <span className="reviewer-verdict">{r.verdict}</span>
             {r.reason && <span className="reviewer-reason">{r.reason}</span>}
+            {r.usage && (r.usage.cost_usd != null || r.usage.input_tokens != null) && (
+              <span className="reviewer-usage" style={{ color: 'var(--text-dim)', fontSize: 10, marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>
+                {r.model ?? 'default'} · {(r.usage.input_tokens ?? 0)}/{(r.usage.output_tokens ?? 0)} tok · ${(r.usage.cost_usd ?? 0).toFixed(4)}
+              </span>
+            )}
           </li>
         ))}
       </ul>

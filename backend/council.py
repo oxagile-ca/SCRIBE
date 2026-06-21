@@ -41,25 +41,27 @@ class Reviewer:
     prompt_builder: Callable[..., str]
     idle_timeout_s: int = DEFAULT_IDLE_TIMEOUT_S
     total_timeout_s: int = DEFAULT_TOTAL_TIMEOUT_S
+    model: Optional[str] = None
 
 
 def _claude_bin() -> str:
     return os.environ.get(CLAUDE_BIN_ENV, "claude")
 
 
-def _build_reviewer_cmd(prompt: str) -> list[str]:
-    """Argv list for create_subprocess_exec — NOT a shell string. Passing an argv
-    vector avoids shell quoting entirely; the old shell+shlex.quote build mangled
-    the multi-line prompt on Windows (cmd.exe ignores POSIX single quotes), so
-    claude received a stray `'You` and never returned a VERDICT."""
-    return [
+def _build_reviewer_cmd(prompt: str, model: Optional[str] = None) -> list[str]:
+    """Argv list for create_subprocess_exec. A `--model` flag is added only when
+    `model` is set; the prompt is always the final element."""
+    cmd = [
         _claude_bin(),
         "-p",
         "--output-format", "stream-json",
         "--verbose",
         "--permission-mode", "bypassPermissions",
-        prompt,
     ]
+    if model:
+        cmd += ["--model", model]
+    cmd.append(prompt)
+    return cmd
 
 
 def _extract_text_from_assistant(message: dict) -> str:
@@ -78,7 +80,7 @@ async def _run_reviewer(reviewer: Reviewer, ctx: dict) -> dict:
     verdict is "PASS" | "BLOCK" | None (no verdict line) | "ERROR".
     """
     prompt = reviewer.prompt_builder(**ctx)
-    cmd = _build_reviewer_cmd(prompt)
+    cmd = _build_reviewer_cmd(prompt, reviewer.model)
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
@@ -256,9 +258,12 @@ def configure(streams_registry, pipeline_store_instance):
 
 def _default_reviewers() -> list:
     from council_prompts import build_qa_evidence_prompt, build_code_reviewer_prompt
+    from config import QA_EVIDENCE_MODEL
     return [
-        Reviewer(name="qa-evidence", prompt_builder=build_qa_evidence_prompt),
+        Reviewer(name="qa-evidence", prompt_builder=build_qa_evidence_prompt,
+                 model=QA_EVIDENCE_MODEL),
         Reviewer(name="code-reviewer", prompt_builder=build_code_reviewer_prompt),
+        # code-reviewer: model stays None → no --model flag → CLI default
     ]
 
 

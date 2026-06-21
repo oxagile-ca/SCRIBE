@@ -274,3 +274,26 @@ def test_synthesize_carries_per_reviewer_usage():
     by_name = {r["name"]: r for r in result["reviewers"]}
     assert by_name["qa-evidence"]["model"] == "claude-haiku-4-5"
     assert by_name["code-reviewer"]["usage"]["cost_usd"] == 0.50
+
+
+def test_build_reviewer_cmd_includes_model_when_set():
+    from council import _build_reviewer_cmd
+    cmd = _build_reviewer_cmd("PROMPT TEXT", "claude-haiku-4-5")
+    assert "--model" in cmd
+    assert cmd[cmd.index("--model") + 1] == "claude-haiku-4-5"
+    assert cmd[-1] == "PROMPT TEXT"   # prompt stays the final argv element
+
+
+def test_build_reviewer_cmd_omits_model_when_none():
+    from council import _build_reviewer_cmd
+    cmd = _build_reviewer_cmd("PROMPT TEXT")
+    assert "--model" not in cmd
+    assert cmd[-1] == "PROMPT TEXT"
+
+
+def test_default_reviewers_sets_model_only_on_qa_evidence():
+    import config
+    from council import _default_reviewers
+    by_name = {r.name: r for r in _default_reviewers()}
+    assert by_name["qa-evidence"].model == config.QA_EVIDENCE_MODEL
+    assert by_name["code-reviewer"].model is None

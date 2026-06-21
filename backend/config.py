@@ -51,6 +51,14 @@ REPO_MAP = {
 JIRA_EMAIL = os.environ.get("JIRA_EMAIL", "qa.engineer@example.com")
 JIRA_TOKEN = os.environ.get("JIRA_TOKEN", "")
 
+# --- Per-task model selection (cost control) ---
+# Low-effort AI tasks (QA-Evidence reviewer, FRIDAY chat) run on a cheaper model to
+# cut per-token API cost. The high-effort Code Reviewer is intentionally NOT pinned
+# here — it keeps the CLI default model. Override either via env var, no code change.
+CHEAP_MODEL = "claude-haiku-4-5"
+QA_EVIDENCE_MODEL = os.environ.get("SCRIBE_QA_EVIDENCE_MODEL", CHEAP_MODEL)
+CHAT_MODEL = os.environ.get("SCRIBE_CHAT_MODEL", CHEAP_MODEL)
+
 # Default reference each service uses on stable. Most are k8s-stable.
 DEFAULT_REFERENCE = "k8s-stable"
 SERVICE_REFERENCE_MAP = {

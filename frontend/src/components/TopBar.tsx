@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Ticket } from '../types'
-import { fetchVersion } from '../api'
+import { Ticket, UsageSummary } from '../types'
+import { fetchVersion, getUsageSummary } from '../api'
 
 interface Props {
   project: string
@@ -52,6 +52,14 @@ export default function TopBar({
   onRefresh, isRefreshing,
 }: Props) {
   const { version, restartedSinceMount } = useBackendVersion()
+  const [spend, setSpend] = useState<UsageSummary | null>(null)
+  useEffect(() => {
+    let alive = true
+    const load = () => getUsageSummary().then(s => { if (alive) setSpend(s) }).catch(() => {})
+    load()
+    const handle = setInterval(load, 30000)
+    return () => { alive = false; clearInterval(handle) }
+  }, [])
   const readyTickets = tickets.filter(t => t.statusCategory === 'ready_for_qa')
   const withEvidence = readyTickets.filter(t =>
     t.evidence.status === 'tested' || t.evidence.status === 'published'
@@ -84,6 +92,12 @@ export default function TopBar({
         </div>
       </div>
       <div className="top-bar__actions">
+        {spend && (
+          <span className="top-bar__spend" title="AI spend — today / all-time"
+                style={{ fontSize: 12, color: 'var(--text-dim)', fontVariantNumeric: 'tabular-nums' }}>
+            ${spend.today.cost_usd.toFixed(2)} today · ${spend.allTime.cost_usd.toFixed(2)} all-time
+          </span>
+        )}
         <span
           style={{
             fontSize: 10,

@@ -110,3 +110,18 @@ async def test_chat_writes_usage_ledger_line(monkeypatch, tmp_path):
     assert recs[0]["cost_usd"] == 0.007
     assert recs[0]["input_tokens"] == 40
     assert recs[0]["output_tokens"] == 8
+
+
+def test_build_cmd_includes_model(monkeypatch):
+    import chat
+    monkeypatch.setattr(chat, "CHAT_MODEL", "claude-haiku-4-5")
+    cmd = chat._build_cmd("hello", None)
+    assert "--model" in cmd
+    assert "claude-haiku-4-5" in cmd
+
+
+def test_build_cmd_omits_model_when_empty(monkeypatch):
+    import chat
+    monkeypatch.setattr(chat, "CHAT_MODEL", "")
+    cmd = chat._build_cmd("hello", None)
+    assert "--model" not in cmd

@@ -7,6 +7,7 @@ import shlex
 from typing import AsyncIterator, Optional
 
 import usage_ledger
+from config import CHAT_MODEL
 
 
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
@@ -54,6 +55,8 @@ def _build_cmd(message: str, session_id: Optional[str]) -> str:
         "--verbose",
         "--permission-mode", "bypassPermissions",
     ]
+    if CHAT_MODEL:
+        parts += ["--model", CHAT_MODEL]
     if session_id:
         parts += ["--resume", session_id]
     parts.append(message)

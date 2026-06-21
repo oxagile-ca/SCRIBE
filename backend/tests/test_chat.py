@@ -7,7 +7,6 @@ per-line idle (CHAT_IDLE_TIMEOUT) and total wall-clock (CHAT_TOTAL_TIMEOUT)
 """
 import asyncio
 import json as _json
-import os as _os
 
 import pytest
 
@@ -110,3 +109,4 @@ async def test_chat_writes_usage_ledger_line(monkeypatch, tmp_path):
     assert recs[0]["model"] == "claude-haiku-4-5"
     assert recs[0]["cost_usd"] == 0.007
     assert recs[0]["input_tokens"] == 40
+    assert recs[0]["output_tokens"] == 8

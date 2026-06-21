@@ -1,4 +1,8 @@
-# SCRIBE Local Technical Getting Started Guide
+# qa-dashboard ("Agent Squad")
+
+Per-user local dashboard for QA pipelines: fetches issue tracker tickets,
+runs build -> deploy -> test -> evidence flows against your QA environments,
+and generates shareable evidence reports.
 
 This guide is for a technical user who wants to run SCRIBE locally and connect it to their own product, issue tracker, repositories, and QA environment.
 

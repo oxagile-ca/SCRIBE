@@ -1,7 +1,9 @@
-import { useState } from 'react'
-import { Lane, AgentName } from '../types'
+import { useState, useEffect } from 'react'
+import { Lane, AgentName, TicketUsage } from '../types'
 import AgentDetail from './AgentDetail'
 import { CouncilPanel } from './CouncilPanel'
+import { getTicketUsage } from '../api'
+import { UsageBreakdown } from './UsageBreakdown'
 
 const FULL_AGENT_ORDER: AgentName[] = ['quartermaster', 'builder', 'shipper', 'inspector', 'scribe']
 // Apps that are already deployed (static / local / deployed modes) skip build & deploy:
@@ -31,7 +33,14 @@ interface Props {
 export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeploy, onRunCommand, onGenerateReport, onResume, onOverrideCouncil, onStartFromQuartermaster, needsBuildDeploy = true }: Props) {
   const [expandedAgent, setExpandedAgent] = useState<AgentName | null>(null)
   const [cmdInput, setCmdInput] = useState('')
+  const [usage, setUsage] = useState<TicketUsage | null>(null)
   const { ticket, agents, currentAgent } = lane
+
+  useEffect(() => {
+    let alive = true
+    getTicketUsage(ticket.key).then(u => { if (alive) setUsage(u) }).catch(() => {})
+    return () => { alive = false }
+  }, [ticket.key])
 
   const AGENT_ORDER: AgentName[] = needsBuildDeploy ? FULL_AGENT_ORDER : TEST_ONLY_ORDER
 
@@ -70,6 +79,12 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
           <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>
             {ticket.assignee}
           </span>
+          {usage && usage.total_cost_usd > 0 && (
+            <span className="lane-card__cost" title="AI spend on this ticket (council + chat + evidence)"
+                  style={{ marginLeft: 'auto', color: 'var(--text-dim)', fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>
+              ${usage.total_cost_usd.toFixed(2)}
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {reportUrl && (
@@ -109,6 +124,12 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
       <div className="lane-card__progress">
         <div className="lane-card__progress-fill" style={{ width: `${overallProgress}%` }} />
       </div>
+      {usage && usage.tasks.length > 0 && (
+        <details className="lane-card__usage">
+          <summary style={{ cursor: 'pointer', fontSize: 11, color: 'var(--text-dim)' }}>AI usage</summary>
+          <UsageBreakdown usage={usage} />
+        </details>
+      )}
       {lane.connectionLost && lane.pipelineId && (
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>
           <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>Connection lost</span>

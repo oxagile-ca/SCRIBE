@@ -334,15 +334,19 @@ def start(
             outcomes = await asyncio.gather(*tasks)
 
             verdict = _synthesize(outcomes)
-            for o in outcomes:
-                usage_ledger.record(
-                    task=o["name"], ticket=ticket_key, pipeline_id=pipeline_id,
-                    model=o.get("model"), usage=o.get("usage") or {},
-                    is_error=(o.get("verdict") == "ERROR"),
+            try:
+                for o in outcomes:
+                    usage_ledger.record(
+                        task=o["name"], ticket=ticket_key, pipeline_id=pipeline_id,
+                        model=o.get("model"), usage=o.get("usage") or {},
+                        is_error=(o.get("verdict") == "ERROR"),
+                    )
+                verdict["cost_usd"] = round(
+                    sum((o.get("usage") or {}).get("cost_usd", 0) for o in outcomes), 6
                 )
-            verdict["cost_usd"] = round(
-                sum((o.get("usage") or {}).get("cost_usd", 0) for o in outcomes), 6
-            )
+            except Exception:
+                # Usage tracking is best-effort: it must never block the review gate.
+                verdict.setdefault("cost_usd", 0.0)
             status = "pass" if verdict["verdict"] == "PASS" else "block"
             _pipeline_store.upsert(
                 pipeline_id,

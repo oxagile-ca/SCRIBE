@@ -12,7 +12,7 @@ FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 
 @pytest.mark.asyncio
 async def test_run_reviewer_captures_usage_and_model(monkeypatch):
-    # NOTE: spawns a subprocess; skips cleanly on Windows (pre-existing WinError 6).
+    # NOTE: spawns a subprocess; errors with OSError WinError 193/6 on Windows (pre-existing limitation — CI/Linux-verified).
     stub = os.path.join(FIXTURES_DIR, "stub_claude_pass_with_usage.sh")
     monkeypatch.setenv("CLAUDE_BIN", stub)
     rv = Reviewer(name="qa-evidence", prompt_builder=build_qa_evidence_prompt)

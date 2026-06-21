@@ -81,7 +81,7 @@ def _iter(path: str):
                 continue
             try:
                 yield json.loads(line)
-            except Exception:
+            except (json.JSONDecodeError, ValueError):
                 continue
 
 

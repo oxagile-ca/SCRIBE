@@ -67,7 +67,7 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
   return (
     <div className={`lane-card${isComplete ? ' lane-card--complete' : ''}`}>
       <div className="lane-card__header">
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
           <a
             className="lane-card__key"
             href={`https://acme.atlassian.net/browse/${ticket.key}`}

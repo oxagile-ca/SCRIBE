@@ -49,8 +49,11 @@ def _claude_bin() -> str:
 
 
 def _build_reviewer_cmd(prompt: str, model: Optional[str] = None) -> list[str]:
-    """Argv list for create_subprocess_exec. A `--model` flag is added only when
-    `model` is set; the prompt is always the final element."""
+    """Argv list for create_subprocess_exec — NOT a shell-quoted string. Passing an
+    argv vector avoids shell quoting entirely; the old shell+shlex.quote build mangled
+    the multi-line prompt on Windows (cmd.exe ignores POSIX single quotes), so claude
+    received a stray `'You` and never returned a VERDICT. A `--model` flag is added only
+    when `model` is set; the prompt is always the final element."""
     cmd = [
         _claude_bin(),
         "-p",
@@ -76,7 +79,7 @@ def _extract_text_from_assistant(message: dict) -> str:
 async def _run_reviewer(reviewer: Reviewer, ctx: dict) -> dict:
     """Spawn one reviewer subprocess and return its outcome.
 
-    Outcome dict: {name, verdict, reason, stdout, error}.
+    Outcome dict: {name, verdict, reason, stdout, error, model, usage}.
     verdict is "PASS" | "BLOCK" | None (no verdict line) | "ERROR".
     """
     prompt = reviewer.prompt_builder(**ctx)

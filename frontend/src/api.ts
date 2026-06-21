@@ -1,4 +1,4 @@
-import { Ticket, SSEEvent, CouncilStatus, CouncilVerdict, CouncilOverride } from './types'
+import { Ticket, SSEEvent, CouncilStatus, CouncilVerdict, CouncilOverride, TicketUsage, UsageSummary } from './types'
 
 const BASE = '/api'
 
@@ -333,6 +333,18 @@ export function subscribeCouncil(
   onError: (err: Event) => void = () => {},
 ): () => void {
   return subscribeSSE(streamId, onEvent as (e: SSEEvent) => void, onError)
+}
+
+export async function getTicketUsage(key: string): Promise<TicketUsage> {
+  const res = await fetch(`${BASE}/usage/ticket/${key}`)
+  if (!res.ok) throw new Error(`getTicketUsage failed: ${res.status}`)
+  return res.json()
+}
+
+export async function getUsageSummary(): Promise<UsageSummary> {
+  const res = await fetch(`${BASE}/usage/summary`)
+  if (!res.ok) throw new Error(`getUsageSummary failed: ${res.status}`)
+  return res.json()
 }
 
 export function subscribeSSE(

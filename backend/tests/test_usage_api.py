@@ -33,6 +33,8 @@ def test_usage_ticket_appends_evidence_runs_row(tmp_path, monkeypatch):
     ev = [t for t in body["tasks"] if t["task"] == "evidence-runs"][0]
     assert ev["cost_usd"] == 1.25
     assert ev["input_tokens"] is None
+    assert ev["output_tokens"] is None
+    assert ev["model"] is None
     assert body["total_cost_usd"] == 1.25
 
 

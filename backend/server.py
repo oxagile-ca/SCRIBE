@@ -445,7 +445,7 @@ async def api_usage_ticket(key: str):
     tasks = list(agg["tasks"])
     runs_path = os.path.join(EVIDENCE_DIR, key, "runs")
     ev_cost = _otel.total_cost_for_ticket(runs_path)
-    if ev_cost:
+    if ev_cost is not None:
         tasks.append({"task": "evidence-runs", "model": None,
                       "input_tokens": None, "output_tokens": None, "cost_usd": ev_cost})
     return {

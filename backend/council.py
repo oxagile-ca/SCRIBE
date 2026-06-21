@@ -24,6 +24,8 @@ import threading
 from dataclasses import dataclass
 from typing import Callable, Optional
 
+import usage_ledger
+
 
 COUNCIL_AUDIT_PATH = os.path.expanduser("~/qa-dashboard/council-audit.jsonl")
 _AUDIT_LOCK = threading.Lock()
@@ -87,6 +89,8 @@ async def _run_reviewer(reviewer: Reviewer, ctx: dict) -> dict:
     start = asyncio.get_event_loop().time()
     killed = False
     error: Optional[str] = None
+    reviewer_model: Optional[str] = None
+    reviewer_usage: dict = {}
 
     try:
         while True:
@@ -111,8 +115,12 @@ async def _run_reviewer(reviewer: Reviewer, ctx: dict) -> dict:
                 event = json.loads(line)
             except Exception:
                 continue
-            if event.get("type") == "assistant":
+            if event.get("type") == "system":
+                reviewer_model = usage_ledger.parse_model_from_init(event) or reviewer_model
+            elif event.get("type") == "assistant":
                 transcript_chunks.append(_extract_text_from_assistant(event.get("message", {})))
+            elif event.get("type") == "result":
+                reviewer_usage = usage_ledger.parse_result_usage(event)
     finally:
         if killed:
             try:
@@ -124,7 +132,8 @@ async def _run_reviewer(reviewer: Reviewer, ctx: dict) -> dict:
     stdout = "\n".join(transcript_chunks)
 
     if error:
-        return {"name": reviewer.name, "verdict": "ERROR", "reason": "", "stdout": stdout, "error": error}
+        return {"name": reviewer.name, "verdict": "ERROR", "reason": "", "stdout": stdout, "error": error,
+                "model": reviewer_model, "usage": reviewer_usage}
 
     if proc.returncode != 0:
         stderr = (await proc.stderr.read()).decode("utf-8", errors="replace") if proc.stderr else ""
@@ -134,6 +143,8 @@ async def _run_reviewer(reviewer: Reviewer, ctx: dict) -> dict:
             "reason": "",
             "stdout": stdout,
             "error": f"reviewer crashed: exit {proc.returncode}: {stderr[-200:]}",
+            "model": reviewer_model,
+            "usage": reviewer_usage,
         }
 
     verdict, reason = _parse_verdict_line(stdout)
@@ -143,6 +154,8 @@ async def _run_reviewer(reviewer: Reviewer, ctx: dict) -> dict:
         "reason": reason,
         "stdout": stdout,
         "error": None,
+        "model": reviewer_model,
+        "usage": reviewer_usage,
     }
 
 
@@ -196,21 +209,25 @@ def _synthesize(outcomes: list[dict]) -> dict:
         error = o.get("error") or ""
 
         if verdict == "PASS":
-            reviewers_summary.append({"name": name, "verdict": "PASS", "reason": reason})
+            reviewers_summary.append({"name": name, "verdict": "PASS", "reason": reason,
+                                      "model": o.get("model"), "usage": o.get("usage") or {}})
             continue
 
         if verdict == "BLOCK":
             block_reasons.append(f"{name}: {reason or '(no reason given)'}")
-            reviewers_summary.append({"name": name, "verdict": "BLOCK", "reason": reason})
+            reviewers_summary.append({"name": name, "verdict": "BLOCK", "reason": reason,
+                                      "model": o.get("model"), "usage": o.get("usage") or {}})
             continue
 
         if verdict == "ERROR":
             block_reasons.append(f"{name}: {error or '(no error message)'}")
-            reviewers_summary.append({"name": name, "verdict": "ERROR", "reason": error})
+            reviewers_summary.append({"name": name, "verdict": "ERROR", "reason": error,
+                                      "model": o.get("model"), "usage": o.get("usage") or {}})
             continue
 
         block_reasons.append(f"{name}: did not return a verdict")
-        reviewers_summary.append({"name": name, "verdict": "UNPARSEABLE", "reason": ""})
+        reviewers_summary.append({"name": name, "verdict": "UNPARSEABLE", "reason": "",
+                                  "model": o.get("model"), "usage": o.get("usage") or {}})
 
     if not block_reasons:
         return {
@@ -317,6 +334,19 @@ def start(
             outcomes = await asyncio.gather(*tasks)
 
             verdict = _synthesize(outcomes)
+            try:
+                for o in outcomes:
+                    usage_ledger.record(
+                        task=o["name"], ticket=ticket_key, pipeline_id=pipeline_id,
+                        model=o.get("model"), usage=o.get("usage") or {},
+                        is_error=(o.get("verdict") == "ERROR"),
+                    )
+                verdict["cost_usd"] = round(
+                    sum((o.get("usage") or {}).get("cost_usd", 0) for o in outcomes), 6
+                )
+            except Exception:
+                # Usage tracking is best-effort: it must never block the review gate.
+                verdict.setdefault("cost_usd", 0.0)
             status = "pass" if verdict["verdict"] == "PASS" else "block"
             _pipeline_store.upsert(
                 pipeline_id,

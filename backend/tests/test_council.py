@@ -259,3 +259,18 @@ async def test_run_reviewer_no_verdict(monkeypatch):
     assert outcome["verdict"] is None
     # Full stdout retained for debugging
     assert "forgot the verdict" in outcome["stdout"]
+
+
+def test_synthesize_carries_per_reviewer_usage():
+    outcomes = [
+        {"name": "qa-evidence", "verdict": "PASS", "reason": "", "error": None,
+         "model": "claude-haiku-4-5",
+         "usage": {"cost_usd": 0.01, "input_tokens": 100, "output_tokens": 20}},
+        {"name": "code-reviewer", "verdict": "PASS", "reason": "", "error": None,
+         "model": "default",
+         "usage": {"cost_usd": 0.50, "input_tokens": 8000, "output_tokens": 900}},
+    ]
+    result = _synthesize(outcomes)
+    by_name = {r["name"]: r for r in result["reviewers"]}
+    assert by_name["qa-evidence"]["model"] == "claude-haiku-4-5"
+    assert by_name["code-reviewer"]["usage"]["cost_usd"] == 0.50

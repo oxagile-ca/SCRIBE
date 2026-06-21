@@ -3,9 +3,24 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
+from council import _run_reviewer, Reviewer
+from council_prompts import build_qa_evidence_prompt
 
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+
+
+@pytest.mark.asyncio
+async def test_run_reviewer_captures_usage_and_model(monkeypatch):
+    # NOTE: spawns a subprocess; errors with OSError WinError 193/6 on Windows (pre-existing limitation — CI/Linux-verified).
+    stub = os.path.join(FIXTURES_DIR, "stub_claude_pass_with_usage.sh")
+    monkeypatch.setenv("CLAUDE_BIN", stub)
+    rv = Reviewer(name="qa-evidence", prompt_builder=build_qa_evidence_prompt)
+    outcome = await _run_reviewer(rv, {"ticket_key": "INV-1", "run_name": "r1"})
+    assert outcome["verdict"] == "PASS"
+    assert outcome["model"] == "claude-haiku-4-5"
+    assert outcome["usage"]["cost_usd"] == 0.0123
+    assert outcome["usage"]["input_tokens"] == 1200
 
 
 def _set_stub(monkeypatch, name):

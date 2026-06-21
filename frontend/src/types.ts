@@ -47,6 +47,8 @@ export interface CouncilReviewer {
   name: string
   verdict: 'PASS' | 'BLOCK' | 'ERROR' | 'UNPARSEABLE'
   reason: string
+  model?: string | null
+  usage?: { cost_usd?: number; input_tokens?: number; output_tokens?: number }
 }
 
 export interface CouncilVerdict {
@@ -83,6 +85,33 @@ export interface Lane {
   councilOverride?: CouncilOverride | null
   provisionFailures?: number
   provisionBlocked?: boolean
+}
+
+export interface TaskUsage {
+  task: string
+  model: string | null
+  input_tokens: number | null
+  output_tokens: number | null
+  cost_usd: number
+}
+
+export interface TicketUsage {
+  ticket: string
+  tasks: TaskUsage[]
+  total_cost_usd: number
+  total_input_tokens: number
+  total_output_tokens: number
+}
+
+export interface UsageBucket {
+  cost_usd: number
+  input_tokens: number
+  output_tokens: number
+}
+
+export interface UsageSummary {
+  today: UsageBucket
+  allTime: UsageBucket
 }
 
 export interface SSEEvent {

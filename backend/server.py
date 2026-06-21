@@ -16,6 +16,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from config import DEFAULT_PROJECT, PROJECTS, ENVIRONMENTS, EVIDENCE_DIR, STREAMS_DIR, STREAMS_RETENTION_DAYS, PIPELINE_DB, PIPELINE_RETENTION_DAYS
 import otel as _otel
+import usage_ledger
 from jira_client import get_tickets, get_huddle_data, get_3x3_data
 from agents import run_build, run_deploy, run_test, run_pipeline, watch_evidence, check_evidence, check_new_evidence, cleanup_env, generate_html_report
 import bitbucket_client as bb
@@ -435,6 +436,31 @@ async def api_otel_status():
                     "runs": [{"run": k, "cost": v} for k, v in sorted(costs.items())],
                 })
     return {"available": True, "tickets": tickets}
+
+
+@app.get("/api/usage/ticket/{key}")
+async def api_usage_ticket(key: str):
+    """Per-ticket token + USD breakdown: ledger (council + chat) plus OTEL evidence $."""
+    agg = usage_ledger.aggregate_for_ticket(key)
+    tasks = list(agg["tasks"])
+    runs_path = os.path.join(EVIDENCE_DIR, key, "runs")
+    ev_cost = _otel.total_cost_for_ticket(runs_path)
+    if ev_cost is not None:
+        tasks.append({"task": "evidence-runs", "model": None,
+                      "input_tokens": None, "output_tokens": None, "cost_usd": ev_cost})
+    return {
+        "ticket": key,
+        "tasks": tasks,
+        "total_cost_usd": round(agg["cost_usd"] + (ev_cost or 0), 6),
+        "total_input_tokens": agg["input_tokens"],
+        "total_output_tokens": agg["output_tokens"],
+    }
+
+
+@app.get("/api/usage/summary")
+async def api_usage_summary():
+    """Global spend totals (today / all-time) for the dashboard."""
+    return usage_ledger.summary()
 
 
 # ── Bitbucket Cloud endpoints ─────────────────────────────────────────────

@@ -6,6 +6,8 @@ import os
 import shlex
 from typing import AsyncIterator, Optional
 
+import usage_ledger
+
 
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
 CHAT_CWD = os.path.expanduser("~")
@@ -84,6 +86,7 @@ async def chat_stream(message: str, session_id: Optional[str] = None) -> AsyncIt
     sent_session = False
     start = asyncio.get_event_loop().time()
     killed_for_timeout = False
+    chat_model: Optional[str] = None
 
     try:
         while True:
@@ -151,12 +154,23 @@ async def chat_stream(message: str, session_id: Optional[str] = None) -> AsyncIt
                             "is_error": bool(block.get("is_error")),
                         }
 
+            elif etype == "system":
+                chat_model = usage_ledger.parse_model_from_init(event) or chat_model
+
             elif etype == "result":
+                u = usage_ledger.parse_result_usage(event)
+                usage_ledger.record(
+                    task="chat", ticket=None, pipeline_id=None, model=chat_model,
+                    usage=u, session_id=event.get("session_id", ""),
+                    is_error=bool(event.get("is_error")),
+                )
                 yield {
                     "type": "result",
                     "session_id": event.get("session_id", ""),
-                    "cost": event.get("total_cost_usd", 0.0),
-                    "duration_ms": event.get("duration_ms", 0),
+                    "cost": u["cost_usd"],
+                    "input_tokens": u["input_tokens"],
+                    "output_tokens": u["output_tokens"],
+                    "duration_ms": u["duration_ms"],
                     "is_error": bool(event.get("is_error")),
                     "result": event.get("result", ""),
                 }

@@ -2213,7 +2213,7 @@ document.addEventListener('keydown', function(e) {{
 </html>"""
 
     out_path = os.path.join(run_dir, "index.html")
-    with open(out_path, "w") as f:
+    with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
 
     report_url = f"/evidence/{ticket_key}/runs/{run_name}/index.html"

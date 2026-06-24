@@ -335,7 +335,13 @@ async def api_dev_info(key: str):
         )
         if resp.status_code != 200:
             return await _bb_dev_info_fallback(key)
-        issue_id = resp.json()["id"]
+        try:
+            issue_id = resp.json()["id"]
+        except (ValueError, KeyError):
+            # Jira can answer 200 with an empty/non-JSON body (e.g. Linear
+            # INV-* keys that don't exist in Jira) — fall back to Bitbucket
+            # rather than 500ing on the JSON decode.
+            return await _bb_dev_info_fallback(key)
     result = await _get_dev_info(issue_id)
     if not result:
         result = await _bb_dev_info_fallback(key)

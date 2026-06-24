@@ -132,7 +132,9 @@ hardcoding one. Pool config in `~/qa-env-pool.json`:
 - If still blocked, STOP and ask user which env to use.
 
 **Parallel testing:** With 3 envs, you can run 3 tickets simultaneously
-via `--all-ready`, each on its own env.
+via `--all-ready`, each on its own env. Each parallel ticket must also get
+its own dedicated browser window/tab for live FE verification — never share a
+browser session across tickets (see Phase 2.8 browser-session isolation).
 
 **Timings**: Build ~16-20 min, Deploy ~7-25 min. Total Phase -1: ~25-45 min.
 
@@ -426,6 +428,56 @@ Scrub PII before saving. Add `api` to the TC's `evidence_required`.
 matching `automated/<TC>/api-*.json` with `ok:true` (or a documented expected
 non-2xx). UI-only TCs are exempt.
 
+## Phase 2.8 — Live Front-End Verification (HARD REQUIREMENT for UI tickets)
+
+Most of this pipeline verifies behavior headlessly — DOM reads, captured
+screenshots, and live API assertions (Phase 2.7). That is sufficient for
+backend / data ACs. It is **NOT** sufficient for any TC whose diff or AC
+touches a **Front End / UI surface**: a component, page route, layout,
+spacing, styling, copy, icon, color/theme token, interaction, animation,
+responsive behavior, or empty / error / loading state.
+
+DOM inspection and a matching API response can both be green while the
+rendered UI is actually broken — mis-aligned, unstyled, overlapping,
+off by a theme token, rendering stale data, or not mounted at all. A DOM
+node existing is not proof the user sees the change correctly.
+
+For every UI-scoped TC you MUST:
+
+1. **Launch the app in a real, rendered browser session** (the running
+   front end at the staging / QA URL from Product Context — driven via the
+   browser automation tools, not just DOM/HTML scraping) and navigate to the
+   changed surface.
+2. **Visually confirm the change is present and correct in the front end
+   itself** — that the user-visible result matches the AC, not merely that
+   the DOM contains the value or the API returned it.
+3. **Capture the rendered screenshot** as the AC's primary evidence at
+   `automated/<TC>/live.png`, in addition to any DOM-capture / PIL-render
+   used for markup (Phase 6).
+
+**Scoring rule:** a UI / FE AC may only be scored `pass` once it has been
+observed live in the rendered app with a `live.png` to prove it. If the
+surface genuinely cannot be reached live (guarded state, missing seed data,
+past-stay guard), say so explicitly in the TC notes and downgrade it to
+`needs-review` — never pass a UI AC on DOM / API evidence alone.
+
+### Browser-session isolation (parallel tickets must not clash)
+
+More than one ticket is frequently under test at the same time (e.g.
+`--all-ready`, or several `/qa-evidence` runs in flight). Concurrent runs
+**MUST NOT share a browser session** — shared tabs, cookies, auth state, and
+in-page navigation cross-contaminate evidence and produce false verdicts
+(one ticket's screenshot captured against another ticket's page state).
+
+For each ticket, open a **dedicated new browser window/tab** for its live
+verification and confine that ticket's navigation to it. Never reuse one
+shared window across tickets. This mirrors the per-ticket evidence-worktree
+isolation in Phase 0 and the per-env allocation in Phase -1: one ticket →
+one env → one evidence worktree → one browser window.
+
+**Evidence:** `automated/<TC>/live.png` for every UI / FE TC (and a
+`needs-review` note when a surface could not be reached live).
+
 ## Phase 3 — Convert videos to GIFs
 
 Plugin config `gif_level` controls which tests get GIFs:
@@ -532,7 +584,9 @@ Writes `confidence:` block to manifest:
 - **If the gap is testable** (e.g., "only tested BIO, should also test
   STRUCTUREDCONTENT"), **run parallel browser instances** to cover
   additional contexts instead of just noting the gap. Use the Agent tool
-  to dispatch parallel test runs on different documents/brands/contexts.
+  to dispatch parallel test runs on different documents/brands/contexts —
+  each in its own dedicated browser window/tab so the runs don't clash
+  (Phase 2.8 browser-session isolation).
 - Do NOT deduct for: programmatic verification (DOM reads are valid
   evidence), single brand when the component is shared, theoretical
   edge cases not mentioned in the ticket.
@@ -584,6 +638,12 @@ Verify:
       `automated/**/*.png` has a corresponding annotated file in
       `markup/**` OR a `markup/<TC>_<image>_clean.note` explaining the
       skip. No bare unannotated screenshots ship.
+- [ ] **Live Front-End Verification (Phase 2.8):** every TC whose diff or AC
+      touches a UI / FE surface has `automated/<TC>/live.png` captured from
+      the rendered app, OR a documented `needs-review` downgrade in the TC
+      notes explaining why the surface could not be reached live. A UI / FE
+      AC scored `pass` with no `live.png` fails the gate — DOM / API evidence
+      alone cannot pass a front-end AC. No headline-confidence override.
 
 Fail → STOP, print numbered remediation list, exit non-zero.
 

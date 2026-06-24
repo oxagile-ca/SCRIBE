@@ -128,7 +128,9 @@ hardcoding one. Pool config in `~/qa-env-pool.json`:
 - If still blocked, STOP and ask user which env to use.
 
 **Parallel testing:** With 3 envs, you can run 3 tickets simultaneously
-via `--all-ready`, each on its own env.
+via `--all-ready`, each on its own env. Each parallel ticket must also get
+its own dedicated browser window/tab for live FE verification — never share a
+browser session across tickets (see Phase 2.8 browser-session isolation).
 
 **Timings**: Build ~16-20 min, Deploy ~7-25 min. Total Phase -1: ~25-45 min.
 
@@ -380,6 +382,98 @@ step 6. Each is non-skippable; an exemption requires
 - Skip with explicit exemption only if no baseline exists AND
   `--no-baseline-warning` is passed.
 
+## Phase 2.7 — Live API Verification (for API-based tickets)
+
+If this product has an **API Surface (generated)** section above, many tickets
+will be API-shaped (a response field, a validation rule, math, scope/permission).
+The rendered UI can pass while the API contract is wrong — or vice-versa. For
+every TC whose diff/AC touches a documented endpoint, assert the **live API
+response** alongside the UI evidence, using the endpoint catalog + expected
+body/response shapes from the API Surface section. If there is no API Surface
+section, skip this phase.
+
+**How (the token never leaves the page):** when the app authenticates in-browser
+(a bearer token in sessionStorage/localStorage), run the API call *in-page* via
+the browser `javascript_tool` so the token stays in the browser — return only
+status + response shape/values, never the token (the harness blocks raw token
+egress anyway). A same-origin SPA→API call is CORS-permitted because the app
+already makes it. A generated helper ships beside this skill as
+`scribe-live-api.js` (pre-filled with this product's API base URL): paste it into
+`javascript_tool`, then
+`const r = await scribeApi('GET','<endpoint>',{query,body}); JSON.stringify({status:r.status, ok:r.ok, shape:r.shape})`.
+
+**Assert:**
+- HTTP 2xx — or the documented expected error.
+- Expected fields present (from the diff + the API Surface catalog).
+- Value correctness when the ticket is about math (totals, taxes, fees, counts).
+- Scope/permission: a call carrying another tenant's/bucket's scope id is rejected.
+- FE↔BE parity: the value shown in the UI matches the raw API value.
+
+**Safety (mutations):**
+- GET / read endpoints: run freely.
+- POST / PUT / DELETE: real mutations on shared non-prod data. Only against
+  disposable test fixtures, subject to the same irreversibility cautions as UI
+  saves. In `--headless`, do NOT perform destructive writes — verify via reads
+  only and log the skipped write.
+
+**Evidence:** `automated/<TC>/api-<name>.json` =
+`{request:{method,path,query}, status, ok, responseKeys:[...], asserted:{...}}`.
+Scrub PII before saving. Add `api` to the TC's `evidence_required`.
+
+**Gap gate (Phase 8):** every TC whose `notes` cite an endpoint must have a
+matching `automated/<TC>/api-*.json` with `ok:true` (or a documented expected
+non-2xx). UI-only TCs are exempt.
+
+## Phase 2.8 — Live Front-End Verification (HARD REQUIREMENT for UI tickets)
+
+Most of this pipeline verifies behavior headlessly — DOM reads, captured
+screenshots, and live API assertions (Phase 2.7). That is sufficient for
+backend / data ACs. It is **NOT** sufficient for any TC whose diff or AC
+touches a **Front End / UI surface**: a component, page route, layout,
+spacing, styling, copy, icon, color/theme token, interaction, animation,
+responsive behavior, or empty / error / loading state.
+
+DOM inspection and a matching API response can both be green while the
+rendered UI is actually broken — mis-aligned, unstyled, overlapping,
+off by a theme token, rendering stale data, or not mounted at all. A DOM
+node existing is not proof the user sees the change correctly.
+
+For every UI-scoped TC you MUST:
+
+1. **Launch the app in a real, rendered browser session** (the running
+   front end at the staging / QA URL from Product Context — driven via the
+   browser automation tools, not just DOM/HTML scraping) and navigate to the
+   changed surface.
+2. **Visually confirm the change is present and correct in the front end
+   itself** — that the user-visible result matches the AC, not merely that
+   the DOM contains the value or the API returned it.
+3. **Capture the rendered screenshot** as the AC's primary evidence at
+   `automated/<TC>/live.png`, in addition to any DOM-capture / PIL-render
+   used for markup (Phase 6).
+
+**Scoring rule:** a UI / FE AC may only be scored `pass` once it has been
+observed live in the rendered app with a `live.png` to prove it. If the
+surface genuinely cannot be reached live (guarded state, missing seed data,
+past-stay guard), say so explicitly in the TC notes and downgrade it to
+`needs-review` — never pass a UI AC on DOM / API evidence alone.
+
+### Browser-session isolation (parallel tickets must not clash)
+
+More than one ticket is frequently under test at the same time (e.g.
+`--all-ready`, or several `/qa-evidence` runs in flight). Concurrent runs
+**MUST NOT share a browser session** — shared tabs, cookies, auth state, and
+in-page navigation cross-contaminate evidence and produce false verdicts
+(one ticket's screenshot captured against another ticket's page state).
+
+For each ticket, open a **dedicated new browser window/tab** for its live
+verification and confine that ticket's navigation to it. Never reuse one
+shared window across tickets. This mirrors the per-ticket evidence-worktree
+isolation in Phase 0 and the per-env allocation in Phase -1: one ticket →
+one env → one evidence worktree → one browser window.
+
+**Evidence:** `automated/<TC>/live.png` for every UI / FE TC (and a
+`needs-review` note when a surface could not be reached live).
+
 ## Phase 3 — Convert videos to GIFs
 
 Plugin config `gif_level` controls which tests get GIFs:
@@ -486,7 +580,9 @@ Writes `confidence:` block to manifest:
 - **If the gap is testable** (e.g., "only tested BIO, should also test
   STRUCTUREDCONTENT"), **run parallel browser instances** to cover
   additional contexts instead of just noting the gap. Use the Agent tool
-  to dispatch parallel test runs on different documents/brands/contexts.
+  to dispatch parallel test runs on different documents/brands/contexts —
+  each in its own dedicated browser window/tab so the runs don't clash
+  (Phase 2.8 browser-session isolation).
 - Do NOT deduct for: programmatic verification (DOM reads are valid
   evidence), single brand when the component is shared, theoretical
   edge cases not mentioned in the ticket.
@@ -538,6 +634,12 @@ Verify:
       `automated/**/*.png` has a corresponding annotated file in
       `markup/**` OR a `markup/<TC>_<image>_clean.note` explaining the
       skip. No bare unannotated screenshots ship.
+- [ ] **Live Front-End Verification (Phase 2.8):** every TC whose diff or AC
+      touches a UI / FE surface has `automated/<TC>/live.png` captured from
+      the rendered app, OR a documented `needs-review` downgrade in the TC
+      notes explaining why the surface could not be reached live. A UI / FE
+      AC scored `pass` with no `live.png` fails the gate — DOM / API evidence
+      alone cannot pass a front-end AC. No headline-confidence override.
 
 Fail → STOP, print numbered remediation list, exit non-zero.
 

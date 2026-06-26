@@ -90,6 +90,10 @@ pipeline_states = pipeline_store.all_states()
 import council
 council.configure(streams, pipeline_store)
 
+import qa_orchestrator
+import auto_mode
+auto_mode.configure(pipeline_store, streams)
+
 import auto_provision
 auto_provision.pipeline_store = pipeline_store
 auto_provision.streams_mod = streams
@@ -108,6 +112,11 @@ async def _start_auto_provision_loop():
         return
     asyncio.create_task(auto_provision.run_loop())
     asyncio.create_task(_parent_env_keepalive_loop())
+
+
+@app.on_event("startup")
+async def _start_auto_mode_loop():
+    asyncio.create_task(auto_mode.run_loop())
 
 
 async def _parent_env_keepalive_loop():
@@ -797,6 +806,15 @@ class PipelineRequest(BaseModel):
     envUrl: str = ""
 
 
+class QaRunRequest(BaseModel):
+    envUrl: str = ""
+
+
+class AutomationRequest(BaseModel):
+    enabled: bool | None = None
+    armed: bool | None = None
+
+
 @app.post("/api/build")
 async def api_build(req: BuildRequest):
     stream_id = str(uuid.uuid4())
@@ -819,6 +837,43 @@ async def api_test(req: TestRequest):
     streams.create(stream_id)
     asyncio.create_task(_run_stream(stream_id, run_test(req.ticketKey, req.envUrl)))
     return {"streamId": stream_id}
+
+
+@app.post("/api/qa-run/{key}")
+async def api_qa_run(key: str, req: QaRunRequest):
+    """Close the copy-paste gap (#9): run qa-evidence server-side, then report+pdf+gated attach."""
+    stream_id = str(uuid.uuid4())
+    streams.create(stream_id)
+    state = auto_mode.get_state()
+    asyncio.create_task(_run_stream(
+        stream_id,
+        qa_orchestrator.run_and_finalize(key, req.envUrl, armed=state["armed"], manual=False),
+    ))
+    return {"streamId": stream_id}
+
+
+@app.post("/api/attach/{key}")
+async def api_attach(key: str):
+    """Manual 'Attach to Linear' for the latest run — write-flag only, no arm needed."""
+    stream_id = str(uuid.uuid4())
+    streams.create(stream_id)
+    asyncio.create_task(_run_stream(stream_id, auto_mode.attach_latest(key)))
+    return {"streamId": stream_id}
+
+
+@app.get("/api/automation")
+async def api_automation_get():
+    cfg = load_instance_config() or {}
+    write_allowed = bool((cfg.get("issueTracker") or {}).get("access", {}).get("write", False))
+    return {"writeAllowed": write_allowed, "autoMode": auto_mode.get_state()}
+
+
+@app.post("/api/automation")
+async def api_automation_set(req: AutomationRequest):
+    auto_mode.set_state(enabled=req.enabled, armed=req.armed)
+    cfg = load_instance_config() or {}
+    write_allowed = bool((cfg.get("issueTracker") or {}).get("access", {}).get("write", False))
+    return {"writeAllowed": write_allowed, "autoMode": auto_mode.get_state()}
 
 
 class ChatSendRequest(BaseModel):

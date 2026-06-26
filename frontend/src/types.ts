@@ -15,11 +15,17 @@ export interface Ticket {
   status: string
   statusCategory?: 'ready_for_qa' | 'in_qa' | 'other'
   priority: string
+  priorityValue?: number
   assignee: string
   qaAssignee: string
   description: string
   flagged: boolean
   staleDays: number
+  createdAt?: string
+  parent?: { key: string; title: string } | null
+  labels?: string[]
+  difficulty?: 'Easy' | 'Medium' | 'Hard'
+  difficultyScore?: number
   devInfo: DevInfo[]
   evidence: EvidenceStatus
 }

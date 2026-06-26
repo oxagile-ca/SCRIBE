@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Ticket, Lane, AgentName, AgentStatus } from './types'
-import { fetchTickets, startPipeline, fetchDevInfo, subscribeSSE, fetchPipelineStates, resumePipeline, checkEvidence, checkDeploy, runCommand, releaseEnv, fetchEnvLocks, generateReport, fetchEvidenceHistory, EvidenceHistoryItem, subscribeCouncil, overrideCouncil, retryAutoProvision, getOnboardingStatus, startQaRun, attachToLinear, getAutomation } from './api'
+import { fetchTickets, startPipeline, fetchDevInfo, subscribeSSE, fetchPipelineStates, resumePipeline, checkEvidence, checkDeploy, runCommand, releaseEnv, fetchEnvLocks, generateReport, fetchEvidenceHistory, EvidenceHistoryItem, subscribeCouncil, overrideCouncil, retryAutoProvision, getOnboardingStatus, startQaRun, attachToLinear, getAutomation, setAutomation } from './api'
 import type { EnvInUseError } from './api'
 import { loadLanes, dumpLanes, reconcileLanesWithBackend } from './laneSchema'
 
@@ -58,8 +58,15 @@ export default function App() {
   const needsBuildDeployRef = useRef(true)
   useEffect(() => { needsBuildDeployRef.current = needsBuildDeploy }, [needsBuildDeploy])
   const [writeAllowed, setWriteAllowed] = useState(false)
+  const [autoMode, setAutoMode] = useState<{ enabled: boolean; armed: boolean }>({ enabled: false, armed: false })
   useEffect(() => {
-    getAutomation().then(a => setWriteAllowed(a.writeAllowed)).catch(() => {})
+    getAutomation().then(a => { setWriteAllowed(a.writeAllowed); setAutoMode(a.autoMode) }).catch(() => {})
+  }, [])
+  const handleToggleAutoMode = useCallback(async (enabled: boolean) => {
+    const a = await setAutomation({ enabled }); setAutoMode(a.autoMode)
+  }, [])
+  const handleToggleArm = useCallback(async (armed: boolean) => {
+    const a = await setAutomation({ armed }); setAutoMode(a.autoMode)
   }, [])
   const [envLocks, setEnvLocks] = useState<EnvLocks>({})
   const [pipelineStates, setPipelineStates] = useState<Record<string, {
@@ -1063,6 +1070,10 @@ export default function App() {
         lastRefresh={lastRefresh}
         onRefresh={loadTickets}
         isRefreshing={isRefreshing}
+        autoMode={autoMode}
+        writeAllowed={writeAllowed}
+        onToggleAutoMode={handleToggleAutoMode}
+        onToggleArm={handleToggleArm}
       />
       <ActiveLanes
         lanes={lanes}

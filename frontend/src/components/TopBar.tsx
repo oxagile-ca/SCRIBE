@@ -15,6 +15,10 @@ interface Props {
   lastRefresh: string
   onRefresh: () => void
   isRefreshing: boolean
+  autoMode: { enabled: boolean; armed: boolean }
+  writeAllowed: boolean
+  onToggleAutoMode: (enabled: boolean) => void
+  onToggleArm: (armed: boolean) => void
 }
 
 function useBackendVersion() {
@@ -50,6 +54,7 @@ export default function TopBar({
   project, projects, onProjectChange, tickets,
   theme, onToggleTheme, onHuddle, on3x3, onCleanupEnv, lastRefresh,
   onRefresh, isRefreshing,
+  autoMode, writeAllowed, onToggleAutoMode, onToggleArm,
 }: Props) {
   const { version, restartedSinceMount } = useBackendVersion()
   const readyTickets = tickets.filter(t => t.statusCategory === 'ready_for_qa')
@@ -111,6 +116,26 @@ export default function TopBar({
         <button className="btn btn--ghost btn--small" onClick={onCleanupEnv} title="Reset stale snapshots back to k8s-stable / projd-stable">
           Clean Env
         </button>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                 title="Continuously QA Ready-for-QA tickets in the background">
+            <input type="checkbox" checked={autoMode.enabled}
+                   onChange={e => onToggleAutoMode(e.target.checked)} />
+            Auto Mode
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4,
+                          cursor: writeAllowed ? 'pointer' : 'not-allowed',
+                          color: autoMode.armed ? 'var(--warning, #f5a524)' : 'var(--text-dim)' }}
+                 title={writeAllowed ? 'When ON, auto mode attaches evidence to the live Linear board'
+                                     : 'Write permission is off for this instance'}>
+            <input type="checkbox" checked={autoMode.armed} disabled={!writeAllowed}
+                   onChange={e => {
+                     if (e.target.checked && !window.confirm('Arm auto-publish? Auto mode will attach evidence to the LIVE Linear board.')) return
+                     onToggleArm(e.target.checked)
+                   }} />
+            Auto-publish
+          </label>
+        </span>
         <button className="btn btn--accent" onClick={onHuddle}>Daily Huddle</button>
         <button className="btn btn--warning" onClick={on3x3}>Weekly 3x3</button>
         <button className="btn btn--ghost btn--small" onClick={onToggleTheme}>

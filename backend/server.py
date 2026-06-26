@@ -31,6 +31,7 @@ from instance_config import (
 )
 import linear_client
 import config_io
+import ticket_difficulty
 from status_map import resolve_status_mapping, categorize_status
 
 # Load onboarding-generated secrets (.secrets.env) into the environment at startup so
@@ -375,6 +376,9 @@ async def api_tickets(project: str = Query(default=DEFAULT_PROJECT)):
     for t in tickets:
         t["statusCategory"] = categorize_status(t.get("status", ""), mapping)
         t["evidence"] = check_evidence(t["key"])
+        label, dscore = ticket_difficulty.compute_difficulty(t.get("description", ""))
+        t["difficulty"] = label
+        t["difficultyScore"] = dscore
     return tickets
 
 

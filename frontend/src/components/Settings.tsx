@@ -49,7 +49,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
     setPostmanMsg(r.ok ? `Stored — ${r.endpointCount} endpoints parsed` : `Error: ${r.error}`)
   }
 
-  const it = a.issueTracker, vcs = a.vcs, env = a.environments, kn = a.knowledge, api = a.api
+  const it = a.issueTracker, vcs = a.vcs, env = a.environments, kn = a.knowledge
 
   return (
     <Modal
@@ -102,8 +102,8 @@ export default function Settings({ onClose }: { onClose: () => void }) {
 
         <section>
           <h4>API / Postman</h4>
-          <Field label="Base URL"><input value={api.baseUrl || ''} onChange={(e) => set('api', { ...api, baseUrl: e.target.value })} /></Field>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Collection: {api.postmanCollectionPath || '(none)'}</div>
+          <Field label="Base URL"><input value={a.api?.baseUrl || ''} onChange={(e) => set('api', { baseUrl: e.target.value, postmanCollectionPath: a.api?.postmanCollectionPath || '' })} /></Field>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Collection: {a.api?.postmanCollectionPath || '(none)'}</div>
           <input type="file" accept="application/json,.json" onChange={onPostman} />
           {postmanMsg && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{postmanMsg}</div>}
         </section>

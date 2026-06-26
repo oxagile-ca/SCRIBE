@@ -65,7 +65,7 @@ export interface OnboardingAnswers {
     token: string
     access: Access
   }
-  api: {
+  api?: {
     baseUrl: string
     postmanCollectionPath: string
   }
@@ -108,7 +108,6 @@ export function emptyAnswers(): OnboardingAnswers {
       alwaysCheck: [],
     },
     knowledge: { provider: 'none', link: '', token: '', access: { read: true, write: false } },
-    api: { baseUrl: '', postmanCollectionPath: '' },
     anthropicKey: '',
   }
 }

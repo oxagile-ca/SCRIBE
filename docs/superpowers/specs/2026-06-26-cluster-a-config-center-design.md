@@ -39,7 +39,7 @@ Cluster A adds a **merge-aware edit path** (so a blank secret field means "keep"
 
 1. **UI:** a single-page **Settings screen** (sectioned), opened from a header **⚙ gear** as a full-screen modal (consistent with the app's existing modal pattern — there is no router). It reuses the wizard's field components, pre-fills from current config, and saves in one action.
 2. **#5 / #11 depth:** **config-management only.** Edit the repo URL list and the read/write toggles; they persist (Cluster C's Linear gate already honors `write`). Do **not** build `github_client` and do **not** add broad access-flag enforcement in this cluster.
-3. **#3 Postman:** a file picker **uploads + stores** the collection, sets `api.postmanCollectionPath`, **re-parses** it (`_parse_postman_endpoints`), and regenerates the skill's API-surface so it reflects the new collection.
+3. **#3 Postman:** a file picker **uploads + stores** the collection, sets `api.postmanCollectionPath`, and **re-parses** it (`_parse_postman_endpoints`) to validate the JSON and report the discovered endpoint count. It does **not** rewrite `SKILL.md` on upload — the API Surface refreshes on the next full skill regeneration. (Rationale: `render_skill` rebuilds the whole skill from `productQA`, which is not persisted to the config, so an on-upload regen would blank the live instance's hand-tuned Product Context. Avoided.)
 4. **Secret editing:** fields show **"•••• set" / "not set"** (never the real value). **Blank = keep** the existing secret; a non-blank value **replaces** it in `.secrets.env` (hot-reloaded, no restart).
 5. **`productQA` excluded:** it is not persisted to `instance.config.json` (it only seeds `patterns.yml` at onboarding), so it is not round-trippable and the Settings screen omits it.
 6. **Invariant preserved:** real secrets never land in `instance.config.json` — only `${secret:KEY}` refs.
@@ -62,7 +62,7 @@ A pure reader of `.secrets.env` (KEY=VALUE) that returns a dict **without** muta
 Writes only `instance.config.json` + `.secrets.env` (the config-write half of `write_outputs`). `write_outputs` is refactored to call it (DRY). The edit endpoint uses it, then `load_secrets_env()` to hot-reload.
 
 **Unit 4 — Postman upload handler.**
-Saves the uploaded `.json` to `default_config_dir()/{appSlug}.postman_collection.json`, validates it parses as JSON, sets `config.api.postmanCollectionPath`, writes config, re-parses with `_parse_postman_endpoints` (returns the discovered endpoint count), and regenerates the skill's API surface by re-running the existing skill-generation path with the current config. (Skill-regen entry point confirmed during planning — see Open risks.)
+Saves the uploaded `.json` to `default_config_dir()/{appSlug}.postman_collection.json`, validates it parses as JSON (reject otherwise without changing the path), sets `config.api.postmanCollectionPath`, writes config via Unit 3, and re-parses with `_parse_postman_endpoints` to return the discovered endpoint count. It does **not** rewrite `SKILL.md` (see Decision 3).
 
 **Unit 5 — `server.py` endpoints.**
 - `GET /api/config` → `{ answers: config_to_answers(cfg), secretsSet: secrets_set_map(...) }` (secret-safe; pre-fills the form).
@@ -87,8 +87,8 @@ Open Settings → GET /api/config → pre-fill (non-secrets from config; secrets
   → user edits fields / toggles R/W / edits repo list
   → Save → PUT /api/config → merge_and_build (blank secret = keep existing ref+value)
          → write_config_and_secrets → load_secrets_env (hot reload) → ok
-Postman: pick .json → POST /api/config/upload-postman → store + set path + re-parse + regen skill
-         → { endpointCount } shown in the form
+Postman: pick .json → POST /api/config/upload-postman → store + set path + write config + re-parse
+         → { endpointCount } shown in the form (SKILL.md not rewritten on upload)
 ```
 
 ## Error handling
@@ -114,5 +114,6 @@ Postman: pick .json → POST /api/config/upload-postman → store + set path + r
 
 ## Open risks
 
-- **Skill API-surface regeneration entry point.** The Postman re-parse must refresh the skill's API Surface. The exact existing function to regenerate the skill from the current config (vs from wizard `answers`) is confirmed during planning; fallback is to reuse `run_onboarding`'s generation with `config_to_answers(config)` as input. Low risk, bounded to Unit 4.
-- **Edit validation reuse.** `validate_answers` is onboarding-oriented (may require tokens). The edit path needs validation that permits blank-but-already-set secrets; plan adds an edit-specific validator rather than reusing `validate_answers` verbatim.
+- **Edit validation reuse.** `validate_answers` (onboarding.py:49-76) is already **token-agnostic** — it only enforces structural rules (productName, issueTracker.type, vcs.type, environments.mode + mode-specific URL/cmd requirements) and never requires any secret. So the edit path can reuse `validate_answers` verbatim; the blank-secret = keep behavior is handled entirely in `merge_and_build`, not in validation. (Resolved — no separate validator needed.)
+- **`python-multipart` dependency.** FastAPI `UploadFile`/`File` requires `python-multipart`, which is NOT currently in `requirements.txt`. The Postman-upload task adds it (`python-multipart==0.0.9`) and the `UploadFile, File` imports to `server.py`.
+- **Changing an integration's type with a blank token.** If the user switches, e.g., issueTracker.type jira→linear and leaves the token blank, the secret key changes (JIRA_TOKEN→LINEAR_TOKEN) and there is no existing LINEAR_TOKEN to restore, so the token is left empty (no ref) — correct behavior (a new tracker needs a new token), documented for the implementer.

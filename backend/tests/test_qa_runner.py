@@ -4,7 +4,7 @@ import qa_runner
 
 def test_build_qa_command_exact_template():
     cmd = qa_runner.build_qa_command("INV-660", "https://app.example.com", "/qa-evidence-beeventory")
-    assert cmd == "/qa-evidence-beeventory INV-660 run:qa-feature env:https://app.example.com --headless --auto-approve"
+    assert cmd == "/qa-evidence-beeventory INV-660 run:qa-feature env:https://app.example.com --headless --auto-approve --isolated"
 
 
 def test_build_runner_argv_mirrors_council(monkeypatch):

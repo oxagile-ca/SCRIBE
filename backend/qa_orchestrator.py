@@ -91,6 +91,13 @@ async def run_and_finalize(ticket_key, env_url, *, armed, manual=False, model=No
         else:
             yield ev
 
+    summary_path = os.path.join(EVIDENCE_DIR, ticket_key, "runs", run_name, "summary.json")
+    if not os.path.exists(summary_path):
+        yield {"type": "done", "success": False, "report_url": "", "pdf": None,
+               "attached": False, "skipped_reason": None,
+               "error": "QA run captured no evidence (summary.json missing) — likely browser blocked or did not execute Phase 2"}
+        return
+
     ok, msg, report_url = generate_html_report(ticket_key, run_name)
     if not ok:
         yield {"type": "done", "success": False, "report_url": "", "pdf": None,

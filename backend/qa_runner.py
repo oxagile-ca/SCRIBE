@@ -18,7 +18,7 @@ def _claude_bin() -> str:
 
 def build_qa_command(ticket_key: str, env_url: str, skill_cmd: str) -> str:
     """The exact template agents.run_test uses today (agents.py:587-588)."""
-    return f"{skill_cmd} {ticket_key} run:qa-feature env:{env_url} --headless --auto-approve"
+    return f"{skill_cmd} {ticket_key} run:qa-feature env:{env_url} --headless --auto-approve --isolated"
 
 
 def build_runner_argv(command: str, model: str | None) -> list[str]:

@@ -20,8 +20,13 @@ def test_resolve_env_url_prefers_arg_then_static():
     assert qa_orchestrator.resolve_env_url(cfg, "") == "https://static.example"
 
 
-def test_run_and_finalize_happy_path(monkeypatch):
+def test_run_and_finalize_happy_path(monkeypatch, tmp_path):
     # Stub every collaborator so we test orchestration only.
+    # Create summary.json so the new guard passes.
+    run_dir = tmp_path / "INV-9" / "runs" / "run-1"
+    run_dir.mkdir(parents=True)
+    (run_dir / "summary.json").write_text('{"score": 94, "verdict": "PASS"}', encoding="utf-8")
+
     async def fake_qa_run(ticket_key, env_url, **kw):
         yield {"type": "log", "data": "x"}
         yield {"type": "qa_complete", "success": True, "run_name": "run-1", "error": None}
@@ -29,8 +34,8 @@ def test_run_and_finalize_happy_path(monkeypatch):
     monkeypatch.setattr(qa_orchestrator, "generate_html_report",
                         lambda k, r: (True, "ok", f"/evidence/{k}/runs/{r}/index.html"))
     monkeypatch.setattr(qa_orchestrator, "read_run_summary", lambda k, r: {"score": 94, "verdict": "PASS"})
-    monkeypatch.setattr(qa_orchestrator, "EVIDENCE_DIR", "/ev")
-    async def fake_pdf(html, **kw): return "/ev/INV-9/runs/run-1/evidence.pdf"
+    monkeypatch.setattr(qa_orchestrator, "EVIDENCE_DIR", str(tmp_path))
+    async def fake_pdf(html, **kw): return str(tmp_path / "INV-9" / "runs" / "run-1" / "evidence.pdf")
     monkeypatch.setattr(qa_orchestrator.pdf_export, "export", fake_pdf)
     monkeypatch.setattr(qa_orchestrator, "load_instance_config",
                         lambda: {"issueTracker": {"access": {"write": True}}})
@@ -49,6 +54,37 @@ def test_run_and_finalize_happy_path(monkeypatch):
     assert done["success"] is True
     assert done["attached"] is True
     assert done["report_url"].endswith("index.html")
+
+
+def test_run_and_finalize_fails_when_no_summary(monkeypatch, tmp_path):
+    """When summary.json is absent (browser blocked / Phase 2 skipped), yield done failure."""
+    generate_called = []
+
+    async def fake_qa_run(ticket_key, env_url, **kw):
+        yield {"type": "log", "data": "x"}
+        yield {"type": "qa_complete", "success": True, "run_name": "run-1", "error": None}
+    monkeypatch.setattr(qa_orchestrator.qa_runner, "run", fake_qa_run)
+
+    def fake_generate(k, r):
+        generate_called.append((k, r))
+        return (True, "ok", f"/evidence/{k}/runs/{r}/index.html")
+    monkeypatch.setattr(qa_orchestrator, "generate_html_report", fake_generate)
+    monkeypatch.setattr(qa_orchestrator, "EVIDENCE_DIR", str(tmp_path))
+    monkeypatch.setattr(qa_orchestrator, "load_instance_config",
+                        lambda: {"issueTracker": {"access": {"write": True}}})
+
+    async def collect():
+        out = []
+        async for ev in qa_orchestrator.run_and_finalize("INV-9", "https://x", armed=True):
+            out.append(ev)
+        return out
+    events = asyncio.run(collect())
+    done = events[-1]
+    assert done["type"] == "done"
+    assert done["success"] is False
+    err = done.get("error", "")
+    assert "summary" in err.lower() or "evidence" in err.lower()
+    assert generate_called == []
 
 
 def test_run_and_finalize_qa_failure_stops_early(monkeypatch):

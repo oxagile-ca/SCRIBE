@@ -69,6 +69,7 @@ def test_secrets_set_map_reports_presence():
     assert m["vcs.token"] is True
     assert m["environments.testAuth.password"] is True
     assert m["publish.slackWebhook"] is False
+    assert m["knowledge.token"] is False
     assert m["anthropicKey"] is False
 
 
@@ -78,6 +79,7 @@ def test_merge_blank_token_keeps_existing_ref_and_value():
     assert cfg["issueTracker"]["token"] == "${secret:LINEAR_TOKEN}"  # ref restored
     assert secrets["LINEAR_TOKEN"] == "lt"                            # value kept
     assert cfg["vcs"]["token"] == "${secret:GITHUB_TOKEN}"
+    assert cfg["environments"]["testAuth"]["password"] == "${secret:TEST_LOGIN_PASSWORD}"
     # config never contains a real secret value
     assert "lt" not in json_str(cfg) and "gh" not in json_str(cfg)
 
@@ -96,6 +98,16 @@ def test_merge_preserves_identity_on_productname_edit():
     cfg, _ = config_io.merge_and_build(answers, _CFG, _SECRETS)
     assert cfg["appSlug"] == "beeventory"               # NOT recomputed
     assert cfg["skillCommand"] == "/qa-evidence-beeventory"
+
+
+def test_config_to_answers_blanks_publish_slack_ref():
+    cfg = dict(_CFG)
+    cfg["publish"] = {"slackWebhook": "${secret:SLACK_WEBHOOK}",
+                      "confluence": {"baseUrl": "", "spaceKey": "", "parentPage": "",
+                                     "token": "${secret:CONFLUENCE_TOKEN}"}}
+    a = config_io.config_to_answers(cfg)
+    assert a["publish"]["slackWebhook"] == ""
+    assert a["publish"]["confluence"]["token"] == ""
 
 
 def json_str(d):

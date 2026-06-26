@@ -75,8 +75,9 @@ def config_to_answers(config: dict) -> dict:
     if not it.get("statusMapping"):
         it["statusMapping"] = {"ready_for_qa": ["Ready for QA"], "in_qa": ["In QA"]}
     for _id, path, _key in _secret_specs(cfg):
-        if _dig(answers, path) is not None:
-            _put(answers, path, "")
+        parent = _dig(answers, path[:-1])
+        if isinstance(parent, dict) and path[-1] in parent:
+            parent[path[-1]] = ""
     return answers
 
 

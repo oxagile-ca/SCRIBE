@@ -1,0 +1,362 @@
+---
+jira_key: INV-631
+title: "Beeventory HMS - Core Flows & Data Persistence"
+kind: qa-feature
+env: https://xin-np.wbee.ca/
+created: 2026-06-26
+description: |
+  QA evidence for INV-631: Core reservation, check-in/check-out, folio/invoice rendering,
+  and customer management flows. Tests verify end-to-end data persistence through
+  save/reload cycles and proper bucket isolation.
+
+acceptance_criteria:
+  - id: AC-1
+    text: "Create Reservation stepper completes with valid data: find rooms by date range, select room, enter guest info, add notes, confirm."
+    source: description
+  - id: AC-2
+    text: "Check In action transitions booking from CONFIRMED to CHECKIN and reflects on dashboard."
+    source: description
+  - id: AC-3
+    text: "Check Out action transitions booking from CHECKIN to CHECKED_OUT and finalizes stay."
+    source: description
+  - id: AC-4
+    text: "Booking data persists after Save: reload page and verify all fields (guest name, dates, notes, room) match before-save values."
+    source: description
+  - id: AC-5
+    text: "Calendar view displays booking bars correctly positioned by date, sorted by room ascending, color-coded by status."
+    source: description
+  - id: AC-6
+    text: "Customer notes append with descending timestamp order (newest top) and show (user_id) as author name."
+    source: description
+  - id: AC-7
+    text: "Folio and Invoice render with correct line items, tax breakdown (PST Room/Non-Room, GST, MRDT), and totals matching subtotal math."
+    source: description
+  - id: AC-8
+    text: "Bucket isolation enforced: user cannot view/edit bookings from other hotel buckets."
+    source: description
+  - id: AC-9
+    text: "Booking notes validation rejects punctuation (commas, periods, slashes) per spec SD4.1.2; graceful error on 300+ char notes."
+    source: description
+  - id: AC-10
+    text: "Search bookings by date range returns correct overlap results: insiders, outsiders, left-siders, right-siders."
+    source: description
+
+test_cases:
+  - id: TC-0631-001
+    title: "Create Reservation - Happy Path"
+    type: automated
+    priority: P0
+    evidence_required: [screenshot, video]
+    spec: "tests/e2e/booking.spec.ts"
+    steps:
+      - "Navigate to /create-reservation"
+      - "Search available rooms: date range Totem Lodge, 3 days"
+      - "Select Queen room"
+      - "Enter guest: John Doe, john@example.com, +1-403-123-4567"
+      - "Add booking notes: Guest prefers high floor"
+      - "Review details and confirm"
+      - "Verify booking appears on Dashboard + Calendar"
+    tags: ["@INV-631", "@reservation", "@create", "@e2e"]
+    notes: "Core create flow; file:src/pages/CreateReservation.tsx:45-120"
+    annotations_hint: "Highlight stepper progress bar, room selection card, guest info form fields, confirm button"
+
+  - id: TC-0631-002
+    title: "Booking Data Persists After Save (Draft Round-Trip)"
+    type: automated
+    priority: P0
+    evidence_required: [screenshot, network]
+    spec: "tests/e2e/booking.spec.ts"
+    steps:
+      - "Open existing booking BK_SZ67RSQS"
+      - "Edit guest name: change to 'Jane Smith'"
+      - "Click Save"
+      - "Wait for save success indicator (toast/badge)"
+      - "Hard-reload page (Ctrl+Shift+R, not soft nav)"
+      - "Assert guest name field = 'Jane Smith' (verify persisted)"
+      - "Check network tab: PUT /api/v1/booking returned 200"
+    tags: ["@INV-631", "@persistence", "@draft", "@data-validation"]
+    notes: "Document Lifecycle Gate D1-D2: Save action + draft round-trip; file:src/components/BookingDetails.tsx:78-95"
+    annotations_hint: "Mark Save button, success toast, reload operation, after-reload name field"
+
+  - id: TC-0631-003
+    title: "Check In - Status Transition & Dashboard Visibility"
+    type: automated
+    priority: P0
+    evidence_required: [screenshot]
+    spec: "tests/e2e/dashboard.spec.ts"
+    steps:
+      - "Open Dashboard Check In tab"
+      - "Verify tab filters by status CONFIRMED only"
+      - "Click 'Check In' button on booking BK_SZ67RSQS"
+      - "Verify booking moves from Check In tab to Checked Out tab"
+      - "Verify calendar bar color changes to CHECKIN shade"
+      - "Re-fetch /api/v1/booking?booking_id=BK_SZ67RSQS to confirm status=CHECKIN"
+    tags: ["@INV-631", "@checkin", "@status-transition", "@dashboard"]
+    notes: "Status workflow CONFIRMED→CHECKIN; file:src/components/Dashboard.tsx:156-190"
+    annotations_hint: "Highlight Check In tab, booking row, color change on calendar"
+
+  - id: TC-0631-004
+    title: "Check Out - Status Transition & Booking Finalization"
+    type: automated
+    priority: P0
+    evidence_required: [screenshot]
+    spec: "tests/e2e/dashboard.spec.ts"
+    steps:
+      - "Open Dashboard Check Out tab"
+      - "Verify tab filters by status CHECKIN + item.end = today"
+      - "Click 'Check Out' button on a CHECKIN booking"
+      - "Verify booking status changes to CHECKED_OUT"
+      - "Verify checkout date timestamp is recorded"
+      - "Verify API call: POST /api/v1/booking/checkout returned 200"
+    tags: ["@INV-631", "@checkout", "@status-transition", "@finalization"]
+    notes: "Status workflow CHECKIN→CHECKED_OUT; file:src/components/Dashboard.tsx:191-220"
+    annotations_hint: "Highlight Check Out tab, button click, status update"
+
+  - id: TC-0631-005
+    title: "Calendar Week View - Room Sort Ascending, Bars Positioned by Date"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot]
+    spec: "tests/e2e/calendar.spec.ts"
+    steps:
+      - "Navigate to /calendar"
+      - "Switch to Week view"
+      - "Verify rooms sorted ascending: e.g. Room 120, Room 229, Room 1000"
+      - "Verify booking bar for BK_SZ67RSQS ends at checkout column (not bleeding into next)"
+      - "Verify bar start-inclusive and end-exclusive: checkin on day N, checkout on day N+3 means 3 cells filled"
+      - "Verify color-coding: CONFIRMED=blue, CHECKIN=orange, CHECKED_OUT=gray"
+    tags: ["@INV-631", "@calendar", "@week-view", "@layout"]
+    notes: "Calendar bar alignment + sort regression check; file:src/components/Calendar.tsx:45-180"
+    annotations_hint: "Draw boxes around each booking bar, highlight room order, show date boundaries"
+
+  - id: TC-0631-006
+    title: "Customer Notes - Append & Descending Order"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot, network]
+    spec: "tests/e2e/customer.spec.ts"
+    steps:
+      - "Open Customer Details: /customer/CUST_123"
+      - "Scroll to Notes section"
+      - "Add customer note: 'Guest has mobility needs'"
+      - "Click Save"
+      - "Verify note appears at top (descending timestamp order)"
+      - "Verify author shows as (user_id) not username"
+      - "Reload page; assert note persists in same order"
+    tags: ["@INV-631", "@customer-notes", "@persistence", "@order"]
+    notes: "Known workaround: Cognito profile API can't lookup by id; file:src/components/CustomerDetails.tsx:220-280"
+    annotations_hint: "Highlight notes section, newest note at top, timestamp display"
+
+  - id: TC-0631-007
+    title: "Booking Notes Validation - Punctuation Rejection"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot]
+    spec: "tests/e2e/booking.spec.ts"
+    steps:
+      - "Open Reservation Details: /reservation/BK_SZ67RSQS"
+      - "In Booking Notes field, type: 'Room 123, guest arrives at 3 PM. Needs: WiFi/parking'"
+      - "Attempt Save"
+      - "Verify error message: 'Notes contain invalid characters: comma, period, slash'"
+      - "Clear field, type valid notes: 'Room 123 guest arrives at 3 PM Needs WiFi and parking'"
+      - "Verify Save succeeds"
+    tags: ["@INV-631", "@validation", "@notes", "@error-handling"]
+    notes: "Backend regex per SD4.1.2: only letters, numbers, spaces, apostrophe, dash; file:src/validators/noteValidator.ts:12-35"
+    annotations_hint: "Show error message, invalid character callout, corrected valid text"
+
+  - id: TC-0631-008
+    title: "Folio Render - Line Items & Tax Breakdown"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot]
+    spec: "tests/e2e/folio.spec.ts"
+    steps:
+      - "Open Reservation Details: /reservation/BK_SZ67RSQS"
+      - "Click 'Print Folio' button"
+      - "Navigate to /reservation/BK_SZ67RSQS/folio"
+      - "Verify Folio renders with guest name, room details, dates"
+      - "Verify line items show room charge + taxes: PST Room 8%, PST Non-Room 7%, GST 5%, MRDT 3%"
+      - "Verify math: Subtotal + PST + GST + MRDT = Total"
+      - "Verify Total and Balance Due display"
+    tags: ["@INV-631", "@folio", "@render", "@tax-calculation"]
+    notes: "Tax split per Canadian spec; file:src/pages/FolioRender.tsx:50-140"
+    annotations_hint: "Highlight line item rows, tax breakdown section, total calculation"
+
+  - id: TC-0631-009
+    title: "Invoice Render - Full Round-Trip Math Verification"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot, network]
+    spec: "tests/e2e/invoice.spec.ts"
+    steps:
+      - "Open Reservation Details: /reservation/BK_SZ67RSQS"
+      - "Fetch Sales Order: GET /api/v1/so?booking_id=BK_SZ67RSQS"
+      - "Click 'Print Invoice' button"
+      - "Navigate to /reservation/BK_SZ67RSQS/invoice"
+      - "Verify Invoice Number is present and unique"
+      - "Verify line items match SO response (room charge, deposits, taxes)"
+      - "Verify running Balance calculation: (item1) → (item1+item2) → ... → Total"
+      - "Verify math: Subtotal + PST + GST + MRDT - Deposits = Balance Due"
+    tags: ["@INV-631", "@invoice", "@render", "@accounting"]
+    notes: "Open issue: running balance reconciliation (INV-631); file:src/pages/InvoiceRender.tsx:60-180"
+    annotations_hint: "Mark line items, running balance column, final total and due"
+
+  - id: TC-0631-010
+    title: "Search Bookings - Overlap Logic (Insiders, Outsiders, Left-Siders, Right-Siders)"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot, network]
+    spec: "tests/e2e/search.spec.ts"
+    steps:
+      - "Navigate to /search"
+      - "Search for rooms available May 20-25 (no bookings in range)"
+      - "Verify: insiders (booking start > search_start AND booking end < search_end) return 0"
+      - "Setup test bookings: May 10-22, May 22-30, May 15-27"
+      - "Re-search May 20-25"
+      - "Verify: outsiders (booking starts before AND ends after) = May 15-27"
+      - "Verify: left-siders (booking starts before AND ends inside) = May 10-22"
+      - "Verify: right-siders (booking starts inside AND ends after) = May 22-30"
+    tags: ["@INV-631", "@search", "@overlap", "@booking-logic"]
+    notes: "4-case overlap matrix per domain spec; file:src/utils/bookingOverlap.ts:10-60"
+    annotations_hint: "Table showing each overlap case and matching bookings"
+
+  - id: TC-0631-011
+    title: "Bucket Isolation - Cross-Bucket Access Denied"
+    type: automated
+    priority: P0
+    evidence_required: [network]
+    spec: "tests/e2e/auth.spec.ts"
+    steps:
+      - "Login as user in Totem Lodge bucket"
+      - "Attempt API call: GET /api/v1/booking?bucket_id=aleeda_bucket_id&booking_id=BK_OTHER"
+      - "Verify response: 403 Forbidden (or implicit 404)"
+      - "Attempt UI navigation: /calendar (should show Totem only, never Aleeda rooms)"
+      - "Verify sessionStorage contains only Totem token scope"
+    tags: ["@INV-631", "@security", "@multi-tenant", "@bucket-isolation"]
+    notes: "Multi-tenant bucket scope enforcement; file:src/middleware/bucketAuth.ts:8-40"
+    annotations_hint: "Network response 403, scoped data in UI"
+
+  - id: TC-0631-012
+    title: "Calendar Month View - Consistency with Week View"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot]
+    spec: "tests/e2e/calendar.spec.ts"
+    steps:
+      - "Navigate /calendar"
+      - "Switch to Month view"
+      - "Verify rooms sorted ascending (same order as week view)"
+      - "Verify same booking bars appear with identical positioning"
+      - "Verify status colors match week view"
+      - "Verify no bars bleed past end-date column"
+    tags: ["@INV-631", "@calendar", "@month-view", "@consistency"]
+    notes: "Regression check for calendar consistency; file:src/components/Calendar.tsx:181-320"
+    annotations_hint: "Compare month vs week room rows, bar positions"
+
+  - id: TC-UV-1
+    title: "Console Error Scan (Universal Validation)"
+    type: automated
+    priority: P1
+    evidence_required: [network]
+    spec: "tests/universal/console.spec.ts"
+    steps:
+      - "Monitor console.error and uncaught pageerror events"
+      - "Navigate through all pages: dashboard, calendar, customers, create-reservation, search"
+      - "Record any errors"
+      - "Filter against allowlist: evidence/INV-631/console-allowlist.txt"
+    tags: ["@universal", "@console", "@smoke"]
+    notes: "Phase 2.6: Universal Validation Suite"
+    annotations_hint: N/A
+
+  - id: TC-UV-2
+    title: "Network Error Scan (Universal Validation)"
+    type: automated
+    priority: P1
+    evidence_required: [network]
+    spec: "tests/universal/network.spec.ts"
+    steps:
+      - "Record full session HAR"
+      - "Filter for non-2xx responses"
+      - "Exclude known third-party allowlist (analytics, beacons)"
+      - "Report any 4xx/5xx from app-owned endpoints"
+    tags: ["@universal", "@network", "@smoke"]
+    notes: "Phase 2.6: Universal Validation Suite"
+    annotations_hint: N/A
+
+  - id: TC-UV-3
+    title: "Broken Asset Scan (Universal Validation)"
+    type: automated
+    priority: P1
+    evidence_required: [network]
+    spec: "tests/universal/assets.spec.ts"
+    steps:
+      - "Walk DOM for <img>, <source>, background-image URLs on all pages"
+      - "HEAD-fetch each; assert 200 + content-length > 0"
+      - "Report any 404 / broken images"
+    tags: ["@universal", "@assets", "@smoke"]
+    notes: "Phase 2.6: Universal Validation Suite"
+    annotations_hint: N/A
+
+  - id: TC-UV-4
+    title: "Document Lifecycle Smoke (Universal Validation)"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot, network]
+    spec: "tests/universal/lifecycle-smoke.spec.ts"
+    steps:
+      - "Open booking detail page"
+      - "Make no-op edit: set guest name to current value (mark dirty)"
+      - "Save and verify persistence (Gates D1-D2)"
+      - "Reload and confirm field matches"
+    tags: ["@universal", "@lifecycle", "@smoke"]
+    notes: "Phase 2.6: Universal Validation Suite - booking document round-trip"
+    annotations_hint: N/A
+
+  - id: TC-UV-5
+    title: "Accessibility Scan (Universal Validation)"
+    type: automated
+    priority: P1
+    evidence_required: [network]
+    spec: "tests/universal/a11y.spec.ts"
+    steps:
+      - "Run axe-core on: dashboard, calendar, customer details, create-reservation, folio, invoice"
+      - "Fail on serious or critical violations"
+      - "Compare against baseline if available; fail only on NEW violations"
+    tags: ["@universal", "@a11y", "@smoke"]
+    notes: "Phase 2.6: Universal Validation Suite"
+    annotations_hint: N/A
+
+  - id: TC-UV-6
+    title: "Snapshot Drift Check (Universal Validation)"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot]
+    spec: "tests/universal/visual-regression.spec.ts"
+    steps:
+      - "If baseline-stable run exists, capture same screenshots"
+      - "Diff via qa-markup; flag pixel_delta_pct ≥ 0.5% outside PR-affected regions"
+      - "Mark as needs-review, not auto-fail"
+    tags: ["@universal", "@visual", "@smoke"]
+    notes: "Phase 2.6: Universal Validation Suite"
+    annotations_hint: N/A
+
+runs: []
+
+confidence:
+  headline: null
+  band: null
+  coverage: null
+  execution: null
+  corroboration: null
+  explanation: null
+  - run_id: run-qa-feature-claude-1
+    kind: qa-feature
+    env: https://xin-np.wbee.ca/
+    executor: Claude AI (Haiku 4.5)
+    started: 2026-06-26T20:07:31Z
+    status: in_progress
+    test_count: 18
+    tc_breakdown:
+      automated: 18
+      manual: 0
+      hybrid: 0

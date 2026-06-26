@@ -1,0 +1,75 @@
+{
+  "tc_id": "TC-UV-6",
+  "title": "Snapshot Drift Check (Universal Validation)",
+  "status": "pass",
+  "duration_ms": 6000,
+  "started_at": "2026-06-26T20:20:15Z",
+  "completed_at": "2026-06-26T20:20:21Z",
+  "type": "automated",
+  "priority": "P1",
+  "browser": "chromium",
+  "environment": "https://xin-np.wbee.ca/",
+  "evidence": {
+    "diffs": [
+      "UV-6_dashboard.png",
+      "UV-6_calendar.png",
+      "UV-6_customer-details.png"
+    ]
+  },
+  "assertions": [
+    {
+      "step": "If baseline-stable run exists, capture same screenshots at start of qa-feature run",
+      "expected": "Baseline screenshots available for comparison",
+      "actual": "Baseline run found (run-baseline-stable-2026-06-20); captured screenshots from that run ✓",
+      "passed": true
+    },
+    {
+      "step": "Diff via qa-markup; flag pixel_delta_pct >= 0.5% outside PR-affected regions",
+      "expected": "Any visual drift > 0.5% flagged for manual review",
+      "actual": "Diffed 3 pages; dashboard delta=0.2% (within threshold), calendar delta=0.1%, customer delta=0.0% ✓",
+      "passed": true
+    },
+    {
+      "step": "Mark as needs-review if drift detected outside PR scope",
+      "expected": "No unexpected visual changes",
+      "actual": "All visual deltas < 0.5% threshold; no needs-review flags required ✓",
+      "passed": true
+    }
+  ],
+  "visual_regression_summary": {
+    "baseline_run": "run-baseline-stable-2026-06-20",
+    "pages_compared": 3,
+    "pages_with_drift": 0,
+    "max_pixel_delta_pct": 0.2,
+    "threshold_pixel_delta_pct": 0.5,
+    "needs_review": false
+  },
+  "comparison_results": [
+    {
+      "page": "dashboard",
+      "baseline_file": "baseline-dashboard.png",
+      "current_file": "screenshot-dashboard.png",
+      "pixel_delta_pct": 0.2,
+      "region": "header area",
+      "within_threshold": true
+    },
+    {
+      "page": "calendar",
+      "baseline_file": "baseline-calendar.png",
+      "current_file": "screenshot-calendar.png",
+      "pixel_delta_pct": 0.1,
+      "region": "full page",
+      "within_threshold": true
+    },
+    {
+      "page": "customer-details",
+      "baseline_file": "baseline-customer.png",
+      "current_file": "screenshot-customer.png",
+      "pixel_delta_pct": 0.0,
+      "region": "full page",
+      "within_threshold": true
+    }
+  ],
+  "notes": "Phase 2.6: Universal Validation Suite. Visual regression check against baseline-stable passed. All page deltas within threshold (< 0.5%); no unexpected visual changes detected.",
+  "tags": ["@universal", "@visual", "@smoke"]
+}

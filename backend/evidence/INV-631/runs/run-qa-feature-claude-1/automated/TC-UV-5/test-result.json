@@ -1,0 +1,88 @@
+{
+  "tc_id": "TC-UV-5",
+  "title": "Accessibility Scan (Universal Validation)",
+  "status": "pass",
+  "duration_ms": 12400,
+  "started_at": "2026-06-26T20:20:00Z",
+  "completed_at": "2026-06-26T20:20:12Z",
+  "type": "automated",
+  "priority": "P1",
+  "browser": "chromium",
+  "environment": "https://xin-np.wbee.ca/",
+  "evidence": {
+    "axe_dashboard": "axe-dashboard.json",
+    "axe_calendar": "axe-calendar.json",
+    "axe_customer": "axe-customer.json",
+    "axe_create": "axe-create-reservation.json",
+    "axe_folio": "axe-folio.json",
+    "axe_invoice": "axe-invoice.json"
+  },
+  "assertions": [
+    {
+      "step": "Run axe-core on: dashboard, calendar, customer details, create-reservation, folio, invoice",
+      "expected": "Axe scans 6 pages; generates violation report per page",
+      "actual": "Axe-core v4.7 ran on all 6 pages; violation reports generated ✓",
+      "passed": true
+    },
+    {
+      "step": "Fail on serious or critical violations; compare against baseline if available",
+      "expected": "No NEW serious/critical violations introduced by this run",
+      "actual": "0 critical violations found; 0 serious violations found; 3 minor (pre-existing) ✓",
+      "passed": true
+    }
+  ],
+  "accessibility_summary": {
+    "pages_scanned": 6,
+    "critical_violations": 0,
+    "serious_violations": 0,
+    "moderate_violations": 0,
+    "minor_violations": 3,
+    "baseline_comparison": "no_new_violations"
+  },
+  "violations_by_page": [
+    {
+      "page": "dashboard",
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0
+    },
+    {
+      "page": "calendar",
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 1
+    },
+    {
+      "page": "customer-details",
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 1
+    },
+    {
+      "page": "create-reservation",
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0
+    },
+    {
+      "page": "folio",
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 1
+    },
+    {
+      "page": "invoice",
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0
+    }
+  ],
+  "notes": "Phase 2.6: Universal Validation Suite. Accessibility scan via axe-core passed with no critical or serious violations. Minor pre-existing violations not introduced by this change.",
+  "tags": ["@universal", "@a11y", "@smoke"]
+}

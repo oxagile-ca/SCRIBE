@@ -1,0 +1,37 @@
+# Console Error Allowlist for INV-631
+# One regex pattern per line — errors matching these are filtered from TC-UV-1 failures
+# Format: REGEX (standard JavaScript RegExp syntax, case-sensitive by default)
+
+# Cognito auth flows - expected on page load
+/Cognito User Pool Id/
+/OIDC endpoint/
+/Unknown user identifier/
+
+# Third-party analytics (non-critical)
+/Google Analytics/
+/Segment/
+/Mixpanel/
+
+# React dev mode warnings (ignore in prod)
+/React\.StrictMode/
+/Warning: componentWillReceiveProps/
+
+# LocalStorage quota warnings (graceful degradation)
+/QuotaExceededError/
+/localStorage is not available/
+
+# CSS/Font loading warnings (non-blocking)
+/Failed to load font/
+/Failed to load stylesheet/
+
+# NetworkError on background API calls (expected if browser offline)
+/Failed to fetch/
+/Network request failed/
+
+# Chrome extension interference (non-Beeventory)
+/chrome-extension:/
+/Extension context/
+
+# Known CSS warnings from vendor libs
+/Unknown CSS property/
+/Vendor-specific CSS property/

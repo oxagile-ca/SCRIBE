@@ -16,6 +16,7 @@ import CleanupEnvModal from './components/CleanupEnvModal'
 import Toast from './components/Toast'
 import ChatPanel from './components/ChatPanel'
 import Settings from './components/Settings'
+import FeatureBreakdown from './components/FeatureBreakdown'
 
 const POLL_INTERVAL = 60_000
 
@@ -1095,6 +1096,7 @@ export default function App() {
         evidenceHistory={evidenceHistory}
         needsBuildDeploy={needsBuildDeploy}
       />
+      <FeatureBreakdown tickets={tickets} />
       <Queue
         tickets={tickets}
         activeLaneKeys={activeLaneKeys}

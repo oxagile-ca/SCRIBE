@@ -31,3 +31,9 @@ def test_export_returns_none_when_no_browser(monkeypatch, tmp_path):
     import asyncio
     result = asyncio.run(pdf_export.export(str(html)))
     assert result is None
+
+
+def test_find_browser_env_override(monkeypatch):
+    monkeypatch.setenv("SCRIBE_CHROME_PATH", r"C:\custom\chrome.exe")
+    monkeypatch.setattr(pdf_export.os.path, "exists", lambda p: p == r"C:\custom\chrome.exe")
+    assert pdf_export.find_browser() == r"C:\custom\chrome.exe"

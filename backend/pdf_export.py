@@ -65,6 +65,10 @@ async def export(html_path: str, pdf_path: str | None = None, timeout_s: int = 6
                 proc.kill()
             except ProcessLookupError:
                 pass
+            try:
+                await proc.wait()
+            except Exception:
+                pass
             return None
     except Exception:
         return None

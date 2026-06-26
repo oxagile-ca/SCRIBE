@@ -72,6 +72,10 @@ async def attach_latest(ticket_key: str):
                "skipped_reason": "no evidence run found", "error": None}
         return
     ok, msg, report_url = generate_html_report(ticket_key, run_name)
+    if not ok:
+        yield {"type": "done", "success": False, "attached": False,
+               "skipped_reason": f"report failed: {msg}", "error": None}
+        return
     html_path = os.path.join(EVIDENCE_DIR, ticket_key, "runs", run_name, "index.html")
     import pdf_export
     pdf_path = await pdf_export.export(html_path)
@@ -88,10 +92,10 @@ async def attach_latest(ticket_key: str):
 
 
 async def _process(ticket_key: str, env_url: str) -> None:
+    _active.add(ticket_key)
     state = get_state()
     stream_id = str(uuid.uuid4())
     stream = _streams.create(stream_id) if _streams else None
-    _active.add(ticket_key)
     try:
         async for ev in qa_orchestrator.run_and_finalize(
             ticket_key, env_url, armed=state["armed"], manual=False):

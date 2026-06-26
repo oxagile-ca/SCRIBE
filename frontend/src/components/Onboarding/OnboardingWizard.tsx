@@ -1,14 +1,14 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import {
   OnboardingAnswers,
   emptyAnswers,
-  Access,
   IssueType,
   VcsType,
   EnvMode,
   KnowledgeProvider,
 } from '../../onboardingSchema'
 import { submitOnboarding } from '../../api'
+import { AccessChecks, ListTextarea, Field, linesToArr } from './fields'
 
 const STEPS = [
   'Company & product',
@@ -22,10 +22,6 @@ const STEPS = [
   'Review & generate',
 ]
 
-// ---- small helpers -----------------------------------------------------------
-const linesToArr = (s: string) => s.split('\n').map((l) => l.trim()).filter(Boolean)
-const arrToLines = (a: string[]) => a.join('\n')
-
 // Per-provider default status names. The user can override; if left as-is the backend
 // applies these (and its own defaults) when normalizing statuses.
 const STATUS_DEFAULTS: Record<IssueType, { ready_for_qa: string[]; in_qa: string[] }> = {
@@ -33,58 +29,6 @@ const STATUS_DEFAULTS: Record<IssueType, { ready_for_qa: string[]; in_qa: string
   linear: { ready_for_qa: ['Ready for testing'], in_qa: ['In QA'] },
   azure: { ready_for_qa: ['Ready for QA'], in_qa: ['In QA'] },
   github: { ready_for_qa: [], in_qa: [] },
-}
-
-function AccessChecks({ value, onChange }: { value: Access; onChange: (a: Access) => void }) {
-  return (
-    <div className="ob-access">
-      <span className="ob-access-label">Access:</span>
-      <label>
-        <input type="checkbox" checked={value.read} onChange={(e) => onChange({ ...value, read: e.target.checked })} /> read
-      </label>
-      <label>
-        <input type="checkbox" checked={value.write} onChange={(e) => onChange({ ...value, write: e.target.checked })} /> write
-      </label>
-    </div>
-  )
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="ob-field">
-      <span>{label}</span>
-      {children}
-    </label>
-  )
-}
-
-// Multi-line list input. Keeps the RAW text in local state so newlines (and blank
-// in-progress lines) survive typing; only parses to an array on change. Binding the
-// textarea straight to arrToLines(array) would strip the trailing newline every
-// keystroke, making it impossible to type a second line.
-function ListTextarea({
-  value,
-  onChange,
-  rows = 3,
-  placeholder,
-}: {
-  value: string[]
-  onChange: (v: string[]) => void
-  rows?: number
-  placeholder?: string
-}) {
-  const [text, setText] = useState(() => arrToLines(value))
-  return (
-    <textarea
-      rows={rows}
-      placeholder={placeholder}
-      value={text}
-      onChange={(e) => {
-        setText(e.target.value)
-        onChange(linesToArr(e.target.value))
-      }}
-    />
-  )
 }
 
 // Key pages: "Name | /route" per line. Same raw-text-in-local-state approach.

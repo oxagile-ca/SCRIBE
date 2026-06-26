@@ -119,6 +119,43 @@ export async function startTest(ticketKey: string, envUrl: string): Promise<stri
   return data.streamId
 }
 
+export async function startQaRun(ticketKey: string, envUrl = ''): Promise<string> {
+  const res = await fetch(`${BASE}/qa-run/${ticketKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ envUrl }),
+  })
+  if (!res.ok) throw new Error(`Failed to start QA run: ${res.status}`)
+  return (await res.json()).streamId
+}
+
+export async function attachToLinear(ticketKey: string): Promise<string> {
+  const res = await fetch(`${BASE}/attach/${ticketKey}`, { method: 'POST' })
+  if (!res.ok) throw new Error(`Failed to start attach: ${res.status}`)
+  return (await res.json()).streamId
+}
+
+export interface AutomationState {
+  writeAllowed: boolean
+  autoMode: { enabled: boolean; armed: boolean }
+}
+
+export async function getAutomation(): Promise<AutomationState> {
+  const res = await fetch(`${BASE}/automation`)
+  if (!res.ok) throw new Error(`getAutomation failed: ${res.status}`)
+  return res.json()
+}
+
+export async function setAutomation(patch: { enabled?: boolean; armed?: boolean }): Promise<AutomationState> {
+  const res = await fetch(`${BASE}/automation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) throw new Error(`setAutomation failed: ${res.status}`)
+  return res.json()
+}
+
 export type EnvInUseError = {
   kind: 'env_in_use'
   env: string

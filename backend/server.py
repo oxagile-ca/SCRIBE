@@ -8,7 +8,7 @@ import time
 
 from typing import Any, Dict, List
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -24,7 +24,7 @@ import bitbucket_client as bb
 from chat import chat_stream
 from streams import StreamRegistry, replay_events_from_disk, END_MARKER
 from pipeline_store import PipelineStore
-from onboarding import validate_answers, run_onboarding, write_config_and_secrets
+from onboarding import validate_answers, run_onboarding, write_config_and_secrets, save_postman_collection
 from instance_config import (
     load_instance_config, load_secrets_env, default_config_dir,
     default_skills_root, default_instances_root, read_secrets_file,
@@ -288,6 +288,21 @@ async def api_config_put(answers: Dict[str, Any]):
     paths = write_config_and_secrets(new_config, new_secrets, default_config_dir())
     load_secrets_env(paths["secrets"])  # hot-reload edited tokens — no restart
     return {"ok": True}
+
+
+@app.post("/api/config/upload-postman")
+async def api_upload_postman(file: UploadFile = File(...)):
+    """Store an uploaded Postman collection, set its path, re-parse for a count (#3)."""
+    cfg = load_instance_config()
+    if not cfg:
+        return JSONResponse(status_code=404, content={"ok": False, "error": "not onboarded"})
+    content = await file.read()
+    try:
+        cfg, count = save_postman_collection(content, cfg, default_config_dir())
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"ok": False, "error": str(e)})
+    write_config_and_secrets(cfg, read_secrets_file(), default_config_dir())
+    return {"ok": True, "endpointCount": count, "path": cfg["api"]["postmanCollectionPath"]}
 
 
 @app.get("/api/environments")

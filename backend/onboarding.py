@@ -216,6 +216,25 @@ def _parse_postman_endpoints(path: str) -> dict:
     return groups
 
 
+def save_postman_collection(content: bytes, config: dict, config_dir: str) -> tuple[dict, int]:
+    """Validate the bytes are a JSON Postman collection, store under config_dir as
+    {appSlug}.postman_collection.json, set config.api.postmanCollectionPath, and return
+    (config, endpoint_count). Raises ValueError on invalid JSON. Does NOT rewrite the skill."""
+    try:
+        json.loads(content.decode("utf-8"))
+    except Exception as e:
+        raise ValueError(f"not a valid JSON Postman collection: {e}")
+    slug = config.get("appSlug") or "app"
+    os.makedirs(config_dir, exist_ok=True)
+    dest = os.path.join(config_dir, f"{slug}.postman_collection.json")
+    with open(dest, "wb") as fh:
+        fh.write(content)
+    config.setdefault("api", {})
+    config["api"]["postmanCollectionPath"] = dest
+    groups = _parse_postman_endpoints(dest)
+    return config, sum(len(v) for v in groups.values())
+
+
 def _api_surface_block(answers: dict) -> str:
     """Generate the '## API Surface (generated)' section from answers['api'].
     Returns '' when no API is configured (so the marker renders empty)."""

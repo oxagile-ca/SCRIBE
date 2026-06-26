@@ -424,6 +424,20 @@ def build_patterns(answers: dict) -> dict:
     return {"rules": rules, "baseline_always_on": list(qa.get("alwaysCheck") or [])}
 
 
+def write_config_and_secrets(config: dict, secrets: dict, config_dir: str) -> dict:
+    """Write instance.config.json + .secrets.env to config_dir; return their paths.
+    Shared by write_outputs (full onboarding) and the Config Center edit path."""
+    os.makedirs(config_dir, exist_ok=True)
+    config_path = os.path.join(config_dir, "instance.config.json")
+    secrets_path = os.path.join(config_dir, ".secrets.env")
+    with open(config_path, "w", encoding="utf-8") as fh:
+        json.dump(config, fh, indent=2)
+    with open(secrets_path, "w", encoding="utf-8") as fh:
+        for key, value in secrets.items():
+            fh.write(f"{key}={value}\n")
+    return {"config": config_path, "secrets": secrets_path}
+
+
 def write_outputs(
     config: dict,
     secrets: dict,
@@ -459,12 +473,7 @@ def write_outputs(
         with open(paths["liveApiHelper"], "w", encoding="utf-8") as fh:
             fh.write(_live_api_helper_js(api_base))
 
-    with open(paths["config"], "w", encoding="utf-8") as fh:
-        json.dump(config, fh, indent=2)
-
-    with open(paths["secrets"], "w", encoding="utf-8") as fh:
-        for key, value in secrets.items():
-            fh.write(f"{key}={value}\n")
+    write_config_and_secrets(config, secrets, config_dir)
 
     with open(paths["skill"], "w", encoding="utf-8") as fh:
         fh.write(skill_text)

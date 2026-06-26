@@ -397,6 +397,35 @@
   transition: all 0.15s var(--ease);
 }
 .queue__sort-dir:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ─── Queue group-by ──── */
+.queue__group-by {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.queue__group {
+  margin-top: 6px;
+}
+.queue__group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin: 8px 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  position: sticky;
+  top: 0;
+}
+.queue__group-count {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
 .queue__list {
   background: var(--bg-card);
   border: 1px solid var(--border);

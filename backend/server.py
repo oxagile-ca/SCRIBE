@@ -293,7 +293,7 @@ async def api_config_put(answers: Dict[str, Any]):
 @app.post("/api/config/upload-postman")
 async def api_upload_postman(file: UploadFile = File(...)):
     """Store an uploaded Postman collection, set its path, re-parse for a count (#3)."""
-    cfg = load_instance_config()
+    cfg = load_instance_config(os.path.join(default_config_dir(), "instance.config.json"))
     if not cfg:
         return JSONResponse(status_code=404, content={"ok": False, "error": "not onboarded"})
     content = await file.read()

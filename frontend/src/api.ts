@@ -443,7 +443,7 @@ export async function updateConfig(answers: OnboardingAnswers): Promise<{ ok: bo
   return res.json().catch(() => ({ ok: false, errors: [`status ${res.status}`] }))
 }
 
-export async function uploadPostman(file: File): Promise<{ ok: boolean; endpointCount?: number; error?: string }> {
+export async function uploadPostman(file: File): Promise<{ ok: boolean; endpointCount?: number; error?: string; path?: string }> {
   const form = new FormData()
   form.append('file', file)
   // NOTE: do NOT set Content-Type — the browser sets the multipart boundary.

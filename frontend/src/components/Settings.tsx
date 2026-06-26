@@ -46,7 +46,12 @@ export default function Settings({ onClose }: { onClose: () => void }) {
     if (!f) return
     setPostmanMsg('Uploading…')
     const r = await uploadPostman(f)
-    setPostmanMsg(r.ok ? `Stored — ${r.endpointCount} endpoints parsed` : `Error: ${r.error}`)
+    if (r.ok) {
+      set('api', { postmanCollectionPath: r.path || a?.api?.postmanCollectionPath || '' })
+      setPostmanMsg(`Stored — ${r.endpointCount} endpoints parsed`)
+    } else {
+      setPostmanMsg(`Error: ${r.error}`)
+    }
   }
 
   const it = a.issueTracker, vcs = a.vcs, env = a.environments, kn = a.knowledge

@@ -24,12 +24,13 @@ import bitbucket_client as bb
 from chat import chat_stream
 from streams import StreamRegistry, replay_events_from_disk, END_MARKER
 from pipeline_store import PipelineStore
-from onboarding import validate_answers, run_onboarding
+from onboarding import validate_answers, run_onboarding, write_config_and_secrets
 from instance_config import (
     load_instance_config, load_secrets_env, default_config_dir,
-    default_skills_root, default_instances_root,
+    default_skills_root, default_instances_root, read_secrets_file,
 )
 import linear_client
+import config_io
 from status_map import resolve_status_mapping, categorize_status
 
 # Load onboarding-generated secrets (.secrets.env) into the environment at startup so
@@ -257,6 +258,36 @@ async def api_onboarding(answers: Dict[str, Any]):
     except Exception as e:  # noqa: BLE001 — surface any generation failure to the wizard
         return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
     return {"ok": True, **result}
+
+
+@app.get("/api/config")
+async def api_config_get():
+    """Current config in the onboarding-form shape, secrets blanked (#1)."""
+    cfg_path = os.path.join(default_config_dir(), "instance.config.json")
+    cfg = load_instance_config(cfg_path)
+    if not cfg:
+        return JSONResponse(status_code=404, content={"ok": False, "error": "not onboarded"})
+    secrets = read_secrets_file()
+    return {
+        "ok": True,
+        "answers": config_io.config_to_answers(cfg),
+        "secretsSet": config_io.secrets_set_map(cfg, secrets),
+    }
+
+
+@app.put("/api/config")
+async def api_config_put(answers: Dict[str, Any]):
+    """Edit config (#2/#5/#11): merge (blank secret = keep), write, hot-reload secrets."""
+    errors = validate_answers(answers)
+    if errors:
+        return JSONResponse(status_code=400, content={"ok": False, "errors": errors})
+    cfg_path = os.path.join(default_config_dir(), "instance.config.json")
+    existing = load_instance_config(cfg_path) or {}
+    existing_secrets = read_secrets_file()
+    new_config, new_secrets = config_io.merge_and_build(answers, existing, existing_secrets)
+    paths = write_config_and_secrets(new_config, new_secrets, default_config_dir())
+    load_secrets_env(paths["secrets"])  # hot-reload edited tokens — no restart
+    return {"ok": True}
 
 
 @app.get("/api/environments")

@@ -1,4 +1,6 @@
 import asyncio
+import json
+import os
 import qa_orchestrator
 
 
@@ -58,3 +60,46 @@ def test_run_and_finalize_qa_failure_stops_early(monkeypatch):
     events = asyncio.run(collect())
     assert events[-1]["type"] == "done"
     assert events[-1]["success"] is False
+
+
+def test_read_run_summary_nested_confidence(tmp_path, monkeypatch):
+    """read_run_summary extracts score from confidence.headline (newer format)."""
+    # Newer format: top-level score + confidence dict (as seen in INV-643)
+    summary_data = {
+        "ticket": "INV-999",
+        "score": 91,
+        "verdict": "PASS — all good. Confidence 91/100.",
+        "confidence": {"headline": 91, "band": "high", "explanation": "looks good"},
+    }
+    run_dir = tmp_path / "INV-999" / "runs" / "run-001"
+    run_dir.mkdir(parents=True)
+    (run_dir / "summary.json").write_text(json.dumps(summary_data), encoding="utf-8")
+    monkeypatch.setattr(qa_orchestrator, "EVIDENCE_DIR", str(tmp_path))
+
+    result = qa_orchestrator.read_run_summary("INV-999", "run-001")
+    assert result["score"] == 91
+    assert result["verdict"] == "PASS"
+
+
+def test_read_run_summary_bare_confidence(tmp_path, monkeypatch):
+    """read_run_summary extracts score when confidence is a bare int (older format, e.g. INV-620)."""
+    summary_data = {
+        "ticket": "INV-620",
+        "verdict": "PASS-WITH-ISSUES",
+        "confidence": 93,
+    }
+    run_dir = tmp_path / "INV-620" / "runs" / "run-001"
+    run_dir.mkdir(parents=True)
+    (run_dir / "summary.json").write_text(json.dumps(summary_data), encoding="utf-8")
+    monkeypatch.setattr(qa_orchestrator, "EVIDENCE_DIR", str(tmp_path))
+
+    result = qa_orchestrator.read_run_summary("INV-620", "run-001")
+    assert result["score"] == 93
+    assert result["verdict"] == "PASS-WITH-ISSUES"
+
+
+def test_read_run_summary_missing_file(tmp_path, monkeypatch):
+    """read_run_summary returns {score: None, verdict: None} when file is absent."""
+    monkeypatch.setattr(qa_orchestrator, "EVIDENCE_DIR", str(tmp_path))
+    result = qa_orchestrator.read_run_summary("INV-NOPE", "run-000")
+    assert result == {"score": None, "verdict": None}

@@ -13,6 +13,7 @@ from agents import generate_html_report, EVIDENCE_DIR
 from instance_config import load_instance_config
 
 _STATE_KEY = "automode"
+_PROCESSED_KEY = "automode_processed"
 _store = None
 _streams = None
 _active: set[str] = set()
@@ -36,6 +37,7 @@ def get_state() -> dict:
 
 
 def set_state(*, enabled=None, armed=None) -> None:
+    was_enabled = get_state()["enabled"]
     cur = get_state()
     if enabled is not None:
         cur["enabled"] = bool(enabled)
@@ -43,10 +45,31 @@ def set_state(*, enabled=None, armed=None) -> None:
         cur["armed"] = bool(armed)
     if _store:
         _store.set_meta(_STATE_KEY, cur)
+    if enabled and not was_enabled:
+        reset_processed()
 
 
-def eligible_tickets(tickets: list[dict]) -> list[dict]:
-    ready = [t for t in tickets if t.get("statusCategory") == "ready_for_qa"]
+def get_processed() -> set:
+    raw = _store.get_meta(_PROCESSED_KEY, None) if _store else None
+    return set(raw) if isinstance(raw, list) else set()
+
+
+def mark_processed(ticket_key: str) -> None:
+    if not _store:
+        return
+    cur = get_processed()
+    cur.add(ticket_key)
+    _store.set_meta(_PROCESSED_KEY, sorted(cur))
+
+
+def reset_processed() -> None:
+    if _store:
+        _store.set_meta(_PROCESSED_KEY, [])
+
+
+def eligible_tickets(tickets: list[dict], skip=frozenset()) -> list[dict]:
+    ready = [t for t in tickets
+             if t.get("statusCategory") == "ready_for_qa" and t.get("key") not in skip]
     ready.sort(key=lambda t: _PRIORITY_ORDER.get(t.get("priority", ""), 5))
     return ready
 
@@ -108,6 +131,7 @@ async def _process(ticket_key: str, env_url: str) -> None:
         if stream:
             stream.end()
         _active.discard(ticket_key)
+        mark_processed(ticket_key)
 
 
 async def run_loop() -> None:
@@ -127,7 +151,8 @@ async def run_loop() -> None:
                 mapping = resolve_status_mapping(cfg, issue.get("type") or "jira")
                 for t in tickets:
                     t["statusCategory"] = categorize_status(t.get("status", ""), mapping)
-                for t in eligible_tickets(tickets):
+                skip = get_processed() | _active
+                for t in eligible_tickets(tickets, skip=skip):
                     if len(_active) >= CONCURRENCY:
                         break
                     if t["key"] in _active:

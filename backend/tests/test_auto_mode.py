@@ -25,3 +25,22 @@ def test_eligible_filters_and_sorts():
     ]
     out = auto_mode.eligible_tickets(tickets)
     assert [t["key"] for t in out] == ["INV-2", "INV-1"]  # only ready_for_qa, priority desc
+
+
+def test_eligible_skips_processed():
+    tickets = [
+        {"key": "INV-1", "statusCategory": "ready_for_qa", "priority": "High"},
+        {"key": "INV-2", "statusCategory": "ready_for_qa", "priority": "High"},
+    ]
+    out = auto_mode.eligible_tickets(tickets, skip={"INV-1"})
+    assert [t["key"] for t in out] == ["INV-2"]
+
+
+def test_processed_roundtrip_and_reset_on_enable():
+    auto_mode.configure(_FakeStore(), None)
+    assert auto_mode.get_processed() == set()
+    auto_mode.mark_processed("INV-5")
+    assert "INV-5" in auto_mode.get_processed()
+    # enabling auto mode (False->True) clears the processed set for a fresh session
+    auto_mode.set_state(enabled=True)
+    assert auto_mode.get_processed() == set()

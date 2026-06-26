@@ -1,13 +1,14 @@
 import asyncio
 import json
 import os
+import re
 import subprocess
 import uuid
 import time
 
 from typing import Any, Dict, List
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -842,6 +843,8 @@ async def api_test(req: TestRequest):
 @app.post("/api/qa-run/{key}")
 async def api_qa_run(key: str, req: QaRunRequest):
     """Close the copy-paste gap (#9): run qa-evidence server-side, then report+pdf+gated attach."""
+    if not re.match(r"^[A-Z][A-Z0-9]*-\d+$", key):
+        raise HTTPException(status_code=400, detail="invalid ticket key")
     stream_id = str(uuid.uuid4())
     streams.create(stream_id)
     state = auto_mode.get_state()
@@ -855,6 +858,8 @@ async def api_qa_run(key: str, req: QaRunRequest):
 @app.post("/api/attach/{key}")
 async def api_attach(key: str):
     """Manual 'Attach to Linear' for the latest run — write-flag only, no arm needed."""
+    if not re.match(r"^[A-Z][A-Z0-9]*-\d+$", key):
+        raise HTTPException(status_code=400, detail="invalid ticket key")
     stream_id = str(uuid.uuid4())
     streams.create(stream_id)
     asyncio.create_task(_run_stream(stream_id, auto_mode.attach_latest(key)))
@@ -864,7 +869,7 @@ async def api_attach(key: str):
 @app.get("/api/automation")
 async def api_automation_get():
     cfg = load_instance_config() or {}
-    write_allowed = bool((cfg.get("issueTracker") or {}).get("access", {}).get("write", False))
+    write_allowed = bool(((cfg.get("issueTracker") or {}).get("access") or {}).get("write", False))
     return {"writeAllowed": write_allowed, "autoMode": auto_mode.get_state()}
 
 
@@ -872,7 +877,7 @@ async def api_automation_get():
 async def api_automation_set(req: AutomationRequest):
     auto_mode.set_state(enabled=req.enabled, armed=req.armed)
     cfg = load_instance_config() or {}
-    write_allowed = bool((cfg.get("issueTracker") or {}).get("access", {}).get("write", False))
+    write_allowed = bool(((cfg.get("issueTracker") or {}).get("access") or {}).get("write", False))
     return {"writeAllowed": write_allowed, "autoMode": auto_mode.get_state()}
 
 

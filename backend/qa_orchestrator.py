@@ -16,7 +16,7 @@ from config import QA_EVIDENCE_MODEL
 
 def compute_attach_gate(cfg: dict, *, armed: bool, manual: bool) -> bool:
     """Automatic attaches need the arm switch; a manual click needs only write."""
-    write_flag = bool(((cfg or {}).get("issueTracker") or {}).get("access", {}).get("write", False))
+    write_flag = bool((((cfg or {}).get("issueTracker") or {}).get("access") or {}).get("write", False))
     return write_flag and (manual or armed)
 
 
@@ -28,12 +28,49 @@ def resolve_env_url(cfg: dict, env_url: str) -> str:
 
 
 def read_run_summary(ticket_key: str, run_name: str) -> dict:
-    """Best-effort {score, verdict} from the run's summary.json."""
+    """Best-effort {score, verdict} from the run's summary.json.
+
+    Handles multiple summary shapes found in the wild:
+    - Newer format: top-level ``score`` int + ``confidence`` dict with ``headline``.
+    - Older format: ``confidence`` as a bare int (no top-level ``score``).
+    - Fallback: ``score_breakdown.headline``.
+    Never raises — returns {score: None, verdict: None} on any error.
+    """
     path = os.path.join(EVIDENCE_DIR, ticket_key, "runs", run_name, "summary.json")
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f) or {}
-        return {"score": data.get("score"), "verdict": data.get("verdict")}
+
+        # --- score extraction ---
+        score = data.get("score")
+        # If score is a tally dict {pass, fail, total, pct, ...} normalise to int
+        if isinstance(score, dict):
+            pct = score.get("pct")
+            if pct is not None:
+                score = round(pct)
+            else:
+                total = score.get("total") or 0
+                passed = score.get("pass") or 0
+                score = round(100 * passed / total) if total else None
+        # Fall back through confidence shapes
+        if score is None:
+            raw_conf = data.get("confidence")
+            if isinstance(raw_conf, dict):
+                score = raw_conf.get("headline")
+            elif isinstance(raw_conf, (int, float)):
+                score = raw_conf
+        if score is None:
+            score_bd = data.get("score_breakdown")
+            if isinstance(score_bd, dict):
+                score = score_bd.get("headline")
+
+        # --- verdict extraction ---
+        verdict = data.get("verdict") or data.get("verdict_reason") or None
+        # Normalise to the first word (e.g. "PASS — explanation…" -> "PASS")
+        if verdict:
+            verdict = verdict.split()[0] if verdict else None
+
+        return {"score": score, "verdict": verdict}
     except Exception:
         return {"score": None, "verdict": None}
 

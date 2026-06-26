@@ -31,3 +31,9 @@ def test_qa_run_returns_stream_id(monkeypatch):
     res = client.post("/api/qa-run/INV-1", json={"envUrl": "https://x"})
     assert res.status_code == 200
     assert "streamId" in res.json()
+
+
+def test_qa_run_rejects_bad_key():
+    client = TestClient(server.app)
+    res = client.post("/api/qa-run/not a key", json={"envUrl": "x"})
+    assert res.status_code == 400

@@ -25,10 +25,12 @@ def test_six_acs_is_hard():
 
 
 def test_long_description_bumps_score_over_bucket():
-    # 5 ACs (Medium) + a long body (>1200 chars) bumps +1 → 6 → Hard
+    # 5 ACs (Medium) + a long body (>1200 chars) closes the AC section, then the
+    # length-bump (+1) tips score to 6 → Hard.
     body = "x" * 1300
-    desc = "Acceptance Criteria\n" + "\n".join(f"- criterion number {i} here" for i in range(5)) + "\n" + body
+    desc = "Acceptance Criteria\n" + "\n".join(f"- criterion number {i} here" for i in range(5)) + "\n\n" + body
     label, score = td.compute_difficulty(desc)
+    assert td.count_acceptance_criteria(desc) == 5
     assert score >= 6 and label == "Hard"
 
 

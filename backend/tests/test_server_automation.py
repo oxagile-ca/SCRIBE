@@ -13,14 +13,20 @@ def test_automation_get_returns_shape():
 
 def test_automation_post_sets_state():
     client = TestClient(server.app)
-    res = client.post("/api/automation", json={"enabled": True, "armed": False})
-    assert res.status_code == 200
-    assert res.json()["autoMode"]["enabled"] is True
-    # reset
-    client.post("/api/automation", json={"enabled": False, "armed": False})
+    try:
+        res = client.post("/api/automation", json={"enabled": True, "armed": False})
+        assert res.status_code == 200
+        assert res.json()["autoMode"]["enabled"] is True
+    finally:
+        client.post("/api/automation", json={"enabled": False, "armed": False})
 
 
 def test_qa_run_returns_stream_id(monkeypatch):
+    import qa_orchestrator
+    async def _fake_finalize(*args, **kwargs):
+        yield {"type": "done", "success": True, "report_url": "", "pdf": None,
+               "attached": False, "skipped_reason": None, "error": None}
+    monkeypatch.setattr(qa_orchestrator, "run_and_finalize", _fake_finalize)
     client = TestClient(server.app)
     res = client.post("/api/qa-run/INV-1", json={"envUrl": "https://x"})
     assert res.status_code == 200

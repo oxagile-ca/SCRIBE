@@ -15,11 +15,14 @@ interface Props {
   onResume: (laneId: string) => void
   onOverrideCouncil: (laneId: string, reason: string) => Promise<void>
   onStartFromQuartermaster: (lane: Lane) => void
+  onRunQa: (laneId: string) => void
+  onAttachLinear: (laneId: string) => void
+  writeAllowed?: boolean
   evidenceHistory?: EvidenceHistoryItem[]
   needsBuildDeploy?: boolean
 }
 
-export default function ActiveLanes({ lanes, onCancel, onStartNext, onCheckEvidence, onCheckDeploy, onRunCommand, onGenerateReport, onResume, onOverrideCouncil, onStartFromQuartermaster, evidenceHistory = [], needsBuildDeploy = true }: Props) {
+export default function ActiveLanes({ lanes, onCancel, onStartNext, onCheckEvidence, onCheckDeploy, onRunCommand, onGenerateReport, onResume, onOverrideCouncil, onStartFromQuartermaster, onRunQa, onAttachLinear, writeAllowed = false, evidenceHistory = [], needsBuildDeploy = true }: Props) {
   const emptySlots = MAX_LANES - lanes.length
 
   return (
@@ -30,7 +33,7 @@ export default function ActiveLanes({ lanes, onCancel, onStartNext, onCheckEvide
           ? { ...lane, reportUrl: freshEvidence.reportUrl }
           : lane
         return (
-          <LaneCard key={lane.id} lane={laneWithFreshReport} onCancel={onCancel} onCheckEvidence={onCheckEvidence} onCheckDeploy={onCheckDeploy} onRunCommand={onRunCommand} onGenerateReport={onGenerateReport} onResume={onResume} onOverrideCouncil={onOverrideCouncil} onStartFromQuartermaster={onStartFromQuartermaster} needsBuildDeploy={needsBuildDeploy} />
+          <LaneCard key={lane.id} lane={laneWithFreshReport} onCancel={onCancel} onCheckEvidence={onCheckEvidence} onCheckDeploy={onCheckDeploy} onRunCommand={onRunCommand} onGenerateReport={onGenerateReport} onResume={onResume} onOverrideCouncil={onOverrideCouncil} onStartFromQuartermaster={onStartFromQuartermaster} onRunQa={onRunQa} onAttachLinear={onAttachLinear} writeAllowed={writeAllowed} needsBuildDeploy={needsBuildDeploy} />
         )
       })}
       {emptySlots > 0 && (

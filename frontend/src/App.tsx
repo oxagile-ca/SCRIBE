@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Ticket, Lane, AgentName, AgentStatus } from './types'
-import { fetchTickets, startPipeline, fetchDevInfo, subscribeSSE, fetchPipelineStates, resumePipeline, checkEvidence, checkDeploy, runCommand, releaseEnv, fetchEnvLocks, generateReport, fetchEvidenceHistory, EvidenceHistoryItem, subscribeCouncil, overrideCouncil, retryAutoProvision, getOnboardingStatus } from './api'
+import { fetchTickets, startPipeline, fetchDevInfo, subscribeSSE, fetchPipelineStates, resumePipeline, checkEvidence, checkDeploy, runCommand, releaseEnv, fetchEnvLocks, generateReport, fetchEvidenceHistory, EvidenceHistoryItem, subscribeCouncil, overrideCouncil, retryAutoProvision, getOnboardingStatus, startQaRun, attachToLinear, getAutomation } from './api'
 import type { EnvInUseError } from './api'
 import { loadLanes, dumpLanes, reconcileLanesWithBackend } from './laneSchema'
 
@@ -57,6 +57,10 @@ export default function App() {
   // Ref mirror so the start callbacks read the current value (not a stale closure).
   const needsBuildDeployRef = useRef(true)
   useEffect(() => { needsBuildDeployRef.current = needsBuildDeploy }, [needsBuildDeploy])
+  const [writeAllowed, setWriteAllowed] = useState(false)
+  useEffect(() => {
+    getAutomation().then(a => setWriteAllowed(a.writeAllowed)).catch(() => {})
+  }, [])
   const [envLocks, setEnvLocks] = useState<EnvLocks>({})
   const [pipelineStates, setPipelineStates] = useState<Record<string, {
     ticketKey: string
@@ -451,6 +455,49 @@ export default function App() {
       sseCleanups.current[laneId] = cleanup
     } catch (err) {
       updateLaneAgent(laneId, 'builder', { state: 'failed', message: String(err) })
+    }
+  }, [lanes])
+
+  const handleRunQa = useCallback(async (laneId: string) => {
+    const lane = lanes.find(l => l.id === laneId)
+    if (!lane) return
+    laneCurrentAgent.current[laneId] = 'inspector'
+    updateLaneAgent(laneId, 'inspector', { state: 'active', progress: 10, message: 'Running QA server-side…' })
+    try {
+      const streamId = await startQaRun(lane.ticket.key, lane.env || '')
+      const cleanup = subscribeSSE(streamId, (event) => {
+        if (event.type === 'log') { appendLog(laneId, event.data ?? ''); updateLaneAgent(laneId, 'inspector', { message: event.data ?? '' }) }
+        else if (event.type === 'progress') updateLaneAgent(laneId, 'inspector', { progress: event.pct ?? 0, eta: event.eta ?? '' })
+        else if (event.type === 'done') {
+          const d = event as unknown as { success?: boolean; report_url?: string }
+          if (d.success) {
+            updateLaneAgent(laneId, 'inspector', { state: 'done', progress: 100, message: 'QA complete' })
+            setLanes(prev => prev.map(l => l.id === laneId ? { ...l, reportUrl: d.report_url || l.reportUrl } : l))
+          } else {
+            updateLaneAgent(laneId, 'inspector', { state: 'failed', message: 'QA run failed — see log' })
+          }
+        }
+      }, () => updateLaneAgent(laneId, 'inspector', { state: 'failed', message: 'Connection lost' }))
+      sseCleanups.current[laneId] = cleanup
+    } catch (err) {
+      updateLaneAgent(laneId, 'inspector', { state: 'failed', message: String(err) })
+    }
+  }, [lanes])
+
+  const handleAttachLinear = useCallback(async (laneId: string) => {
+    const lane = lanes.find(l => l.id === laneId)
+    if (!lane) return
+    try {
+      const streamId = await attachToLinear(lane.ticket.key)
+      subscribeSSE(streamId, (event) => {
+        if (event.type === 'log') appendLog(laneId, event.data ?? '')
+        else if (event.type === 'done') {
+          const d = event as unknown as { attached?: boolean; skipped_reason?: string }
+          appendLog(laneId, d.attached ? 'Attached to Linear ✓' : `Not attached: ${d.skipped_reason || 'error'}`)
+        }
+      }, () => {})
+    } catch (err) {
+      appendLog(laneId, `Attach failed: ${err}`)
     }
   }, [lanes])
 
@@ -1028,6 +1075,9 @@ export default function App() {
         onResume={handleResume}
         onOverrideCouncil={handleOverrideCouncil}
         onStartFromQuartermaster={handleStartFromQuartermaster}
+        onRunQa={handleRunQa}
+        onAttachLinear={handleAttachLinear}
+        writeAllowed={writeAllowed}
         evidenceHistory={evidenceHistory}
         needsBuildDeploy={needsBuildDeploy}
       />

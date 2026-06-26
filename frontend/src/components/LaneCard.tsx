@@ -27,10 +27,13 @@ interface Props {
   onResume: (laneId: string) => void
   onOverrideCouncil: (laneId: string, reason: string) => Promise<void>
   onStartFromQuartermaster: (lane: Lane) => void
+  onRunQa: (laneId: string) => void
+  onAttachLinear: (laneId: string) => void
+  writeAllowed?: boolean
   needsBuildDeploy?: boolean
 }
 
-export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeploy, onRunCommand, onGenerateReport, onResume, onOverrideCouncil, onStartFromQuartermaster, needsBuildDeploy = true }: Props) {
+export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeploy, onRunCommand, onGenerateReport, onResume, onOverrideCouncil, onStartFromQuartermaster, onRunQa, onAttachLinear, writeAllowed = false, needsBuildDeploy = true }: Props) {
   const [expandedAgent, setExpandedAgent] = useState<AgentName | null>(null)
   const [cmdInput, setCmdInput] = useState('')
   const [usage, setUsage] = useState<TicketUsage | null>(null)
@@ -175,14 +178,30 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
       )}
       {lane.qaCommand && (
         <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 11, color: 'var(--muted, #9aa3af)', marginBottom: 4 }}>Run this in Claude Code:</div>
-          <code
-            onClick={() => navigator.clipboard.writeText(lane.qaCommand!)}
-            title="Click to copy"
-            style={{ display: 'block', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: 'var(--bg, #15171c)', border: '1px solid var(--border, #2c313a)', borderRadius: 6, padding: '8px 10px', fontSize: 12, cursor: 'pointer', userSelect: 'all' }}
-          >
-            {lane.qaCommand}
-          </code>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button className="btn btn--primary btn--small" onClick={() => onRunQa(lane.id)}
+                    title="Run qa-evidence server-side (no terminal needed)">
+              Run QA
+            </button>
+            {reportUrl && writeAllowed && (
+              <button className="btn btn--secondary btn--small" onClick={() => onAttachLinear(lane.id)}
+                      title="Attach the evidence PDF + comment to this Linear issue">
+                Attach to Linear
+              </button>
+            )}
+          </div>
+          <details style={{ marginTop: 6 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 11, color: 'var(--muted, #9aa3af)' }}>
+              copy command (fallback)
+            </summary>
+            <code
+              onClick={() => navigator.clipboard.writeText(lane.qaCommand!)}
+              title="Click to copy"
+              style={{ display: 'block', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: 'var(--bg, #15171c)', border: '1px solid var(--border, #2c313a)', borderRadius: 6, padding: '8px 10px', fontSize: 12, cursor: 'pointer', userSelect: 'all', marginTop: 4 }}
+            >
+              {lane.qaCommand}
+            </code>
+          </details>
         </div>
       )}
       {/* Generate Report button — shown when evidence exists but index.html is missing */}

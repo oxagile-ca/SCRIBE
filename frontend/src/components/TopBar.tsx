@@ -19,6 +19,7 @@ interface Props {
   writeAllowed: boolean
   onToggleAutoMode: (enabled: boolean) => void
   onToggleArm: (armed: boolean) => void
+  onOpenSettings: () => void
 }
 
 function useBackendVersion() {
@@ -54,7 +55,7 @@ export default function TopBar({
   project, projects, onProjectChange, tickets,
   theme, onToggleTheme, onHuddle, on3x3, onCleanupEnv, lastRefresh,
   onRefresh, isRefreshing,
-  autoMode, writeAllowed, onToggleAutoMode, onToggleArm,
+  autoMode, writeAllowed, onToggleAutoMode, onToggleArm, onOpenSettings,
 }: Props) {
   const { version, restartedSinceMount } = useBackendVersion()
   const readyTickets = tickets.filter(t => t.statusCategory === 'ready_for_qa')
@@ -141,6 +142,7 @@ export default function TopBar({
         <button className="btn btn--ghost btn--small" onClick={onToggleTheme}>
           {theme === 'dark' ? '☽ Dark' : '☀ Light'}
         </button>
+        <button className="btn btn--ghost btn--small" onClick={onOpenSettings} title="Settings — Config Center">⚙</button>
       </div>
     </div>
   )

@@ -9,6 +9,7 @@ import json
 import os
 
 from agents import EVIDENCE_DIR  # ~/evidence
+import config
 
 
 def _claude_bin() -> str:
@@ -48,6 +49,7 @@ async def run(ticket_key, env_url, *, model=None, idle_timeout_s=300, total_time
     cfg = load_instance_config() or {}
     skill_cmd = cfg.get("skillCommand") or "/qa-evidence"
     command = build_qa_command(ticket_key, env_url, skill_cmd)
+    model = model or getattr(config, "QA_EVIDENCE_MODEL", None)
     argv = build_runner_argv(command, model)
 
     baseline = list_runs(ticket_key)
@@ -64,10 +66,10 @@ async def run(ticket_key, env_url, *, model=None, idle_timeout_s=300, total_time
         yield {"type": "qa_complete", "success": False, "run_name": None, "error": f"spawn failed: {e}"}
         return
 
-    start = asyncio.get_event_loop().time()
+    start = asyncio.get_running_loop().time()
     try:
         while True:
-            if asyncio.get_event_loop().time() - start > total_timeout_s:
+            if asyncio.get_running_loop().time() - start > total_timeout_s:
                 error = f"QA run exceeded {total_timeout_s}s"
                 killed = True
                 break

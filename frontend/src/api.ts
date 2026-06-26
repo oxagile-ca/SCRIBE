@@ -1,4 +1,5 @@
 import { Ticket, SSEEvent, CouncilStatus, CouncilVerdict, CouncilOverride, TicketUsage, UsageSummary } from './types'
+import type { OnboardingAnswers } from './onboardingSchema'
 
 const BASE = '/api'
 
@@ -419,4 +420,33 @@ export function subscribeSSE(
     cancelled = true
     source?.close()
   }
+}
+
+export interface ConfigResponse {
+  ok: boolean
+  answers: OnboardingAnswers
+  secretsSet: Record<string, boolean>
+}
+
+export async function getConfig(): Promise<ConfigResponse> {
+  const res = await fetch(`${BASE}/config`)
+  if (!res.ok) throw new Error(`getConfig failed: ${res.status}`)
+  return res.json()
+}
+
+export async function updateConfig(answers: OnboardingAnswers): Promise<{ ok: boolean; errors?: string[] }> {
+  const res = await fetch(`${BASE}/config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(answers),
+  })
+  return res.json().catch(() => ({ ok: false, errors: [`status ${res.status}`] }))
+}
+
+export async function uploadPostman(file: File): Promise<{ ok: boolean; endpointCount?: number; error?: string }> {
+  const form = new FormData()
+  form.append('file', file)
+  // NOTE: do NOT set Content-Type — the browser sets the multipart boundary.
+  const res = await fetch(`${BASE}/config/upload-postman`, { method: 'POST', body: form })
+  return res.json().catch(() => ({ ok: false, error: `status ${res.status}` }))
 }

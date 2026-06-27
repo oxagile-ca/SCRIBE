@@ -3,6 +3,8 @@ import { Ticket, Lane, AgentName, AgentStatus } from './types'
 import { fetchTickets, startPipeline, fetchDevInfo, subscribeSSE, fetchPipelineStates, resumePipeline, checkEvidence, checkDeploy, runCommand, releaseEnv, fetchEnvLocks, generateReport, fetchEvidenceHistory, EvidenceHistoryItem, subscribeCouncil, overrideCouncil, retryAutoProvision, getOnboardingStatus, startQaRun, attachToLinear, getAutomation, setAutomation } from './api'
 import type { EnvInUseError } from './api'
 import { loadLanes, dumpLanes, reconcileLanesWithBackend } from './laneSchema'
+import { shouldPassivelyCheckEvidence, waitingLaneKey } from './laneStatus'
+import { showToast } from './components/Toast'
 
 type EnvLocks = Record<string, { pipelineId: string; ticketKey: string; stage: string; status: string }>
 import TopBar from './components/TopBar'
@@ -83,6 +85,13 @@ export default function App() {
   }>>({})
   const [evidenceHistory, setEvidenceHistory] = useState<EvidenceHistoryItem[]>([])
   const sseCleanups = useRef<Record<string, () => void>>({})
+  // Always-current mirror of `lanes` so interval/poll closures read fresh state
+  // without listing `lanes` as a dependency (which would tear them down on every
+  // log line). See the passive evidence-poll effect below.
+  const lanesRef = useRef(lanes)
+  useEffect(() => { lanesRef.current = lanes }, [lanes])
+  // Serialized last pipeline-states snapshot, to skip no-op re-renders (see poll).
+  const pipelineStatesRaw = useRef('')
 
   // Theme sync
   useEffect(() => {
@@ -123,7 +132,15 @@ export default function App() {
   useEffect(() => {
     const poll = () => {
       fetchEnvLocks().then(setEnvLocks).catch(() => {})
-      fetchPipelineStates().then(setPipelineStates).catch(() => {})
+      // Only push new pipeline-states when they actually changed. The previous
+      // wholesale replace re-rendered every Queue row each 10s tick, flickering
+      // the provision badges even when nothing moved.
+      fetchPipelineStates().then(states => {
+        const raw = JSON.stringify(states)
+        if (raw === pipelineStatesRaw.current) return
+        pipelineStatesRaw.current = raw
+        setPipelineStates(states)
+      }).catch(() => {})
     }
     poll()
     const handle = setInterval(poll, 10000)
@@ -294,7 +311,7 @@ export default function App() {
                       time: new Date().toLocaleTimeString(),
                     }])
                   } else {
-                    updateLaneAgent(lane.id, currentAgent, { state: 'failed', message: event.msg ?? 'Failed' })
+                    updateLaneAgent(lane.id, currentAgent, { state: 'failed', message: event.msg ?? event.error ?? 'Failed' })
                   }
                 }
               },
@@ -452,7 +469,7 @@ export default function App() {
                 time: new Date().toLocaleTimeString(),
               }])
             } else {
-              updateLaneAgent(laneId, currentAgent, { state: 'failed', message: event.msg ?? 'Failed' })
+              updateLaneAgent(laneId, currentAgent, { state: 'failed', message: event.msg ?? event.error ?? 'Failed' })
             }
           }
         },
@@ -473,24 +490,43 @@ export default function App() {
     if (!lane) return
     laneCurrentAgent.current[laneId] = 'inspector'
     updateLaneAgent(laneId, 'inspector', { state: 'active', progress: 10, message: 'Running QA server-side…' })
+    // Re-runs ("Retry QA") may fire from a completed lane sitting on scribe — pull
+    // the active stage back to inspector so the status line reflects the new run.
+    setLanes(prev => prev.map(l => l.id === laneId ? { ...l, currentAgent: 'inspector' } : l))
+    appendLog(laneId, `[QA] Starting server-side run for ${lane.ticket.key}…`)
+    showToast(`QA running… (${lane.ticket.key})`)
     try {
       const streamId = await startQaRun(lane.ticket.key, lane.env || '')
       const cleanup = subscribeSSE(streamId, (event) => {
         if (event.type === 'log') { appendLog(laneId, event.data ?? ''); updateLaneAgent(laneId, 'inspector', { message: event.data ?? '' }) }
         else if (event.type === 'progress') updateLaneAgent(laneId, 'inspector', { progress: event.pct ?? 0, eta: event.eta ?? '' })
         else if (event.type === 'done') {
-          const d = event as unknown as { success?: boolean; report_url?: string }
-          if (d.success) {
+          if (event.success) {
             updateLaneAgent(laneId, 'inspector', { state: 'done', progress: 100, message: 'QA complete' })
-            setLanes(prev => prev.map(l => l.id === laneId ? { ...l, reportUrl: d.report_url || l.reportUrl } : l))
+            setLanes(prev => prev.map(l => l.id === laneId ? { ...l, reportUrl: event.report_url || l.reportUrl } : l))
+            appendLog(laneId, `✓ QA complete${event.report_url ? ` — ${event.report_url}` : ''}`)
+            if (event.skipped_reason) appendLog(laneId, `Note: ${event.skipped_reason}`)
+            showToast(`QA complete — ${lane.ticket.key}`)
           } else {
-            updateLaneAgent(laneId, 'inspector', { state: 'failed', message: 'QA run failed — see log' })
+            // Surface the backend's real reason (e.g. "summary.json missing…",
+            // login needed) instead of a generic message, so the lane card can
+            // show an actionable blocker.
+            const reason = event.error || event.msg || 'QA run failed — see log'
+            updateLaneAgent(laneId, 'inspector', { state: 'failed', message: reason })
+            appendLog(laneId, `✗ QA failed: ${reason}`)
+            showToast(`QA failed: ${reason}`)
           }
         }
-      }, () => updateLaneAgent(laneId, 'inspector', { state: 'failed', message: 'Connection lost' }))
+      }, () => {
+        updateLaneAgent(laneId, 'inspector', { state: 'failed', message: 'Connection lost' })
+        appendLog(laneId, '✗ Connection lost')
+        showToast('QA run: connection lost')
+      })
       sseCleanups.current[laneId] = cleanup
     } catch (err) {
       updateLaneAgent(laneId, 'inspector', { state: 'failed', message: String(err) })
+      appendLog(laneId, `✗ Could not start QA: ${err}`)
+      showToast(`QA failed to start: ${err}`)
     }
   }, [lanes])
 
@@ -667,12 +703,18 @@ export default function App() {
     }
   }, [lanes])
 
-  const handleCheckEvidence = useCallback(async (laneId: string) => {
-    const lane = lanes.find(l => l.id === laneId)
+  const handleCheckEvidence = useCallback(async (laneId: string, opts?: { silent?: boolean }) => {
+    const lane = lanesRef.current.find(l => l.id === laneId)
     if (!lane) return
-
-    // Reset inspector to active if it was failed (e.g. from timeout)
-    updateLaneAgent(laneId, 'inspector', { state: 'active', message: 'Checking for evidence...', progress: 10, eta: 'checking' })
+    const silent = opts?.silent ?? false
+    // A silent (background) poll must never touch a lane the council/scribe now
+    // owns, nor re-flash the chip — that is the "cards flicker" bug. Manual
+    // clicks (silent=false) always proceed and show the "Checking…" feedback.
+    if (silent && !shouldPassivelyCheckEvidence(lane)) return
+    if (!silent) {
+      // Reset inspector to active if it was failed (e.g. from timeout)
+      updateLaneAgent(laneId, 'inspector', { state: 'active', message: 'Checking for evidence...', progress: 10, eta: 'checking' })
+    }
 
     try {
       const result = await checkEvidence(lane.ticket.key, lane.baselineRuns ?? [])
@@ -720,35 +762,57 @@ export default function App() {
           loadEvidenceHistory()
         }
       } else if (result.in_progress) {
-        updateLaneAgent(laneId, 'inspector', {
-          message: `Test running: ${result.in_progress}`,
-          eta: 'testing in progress',
-          progress: 50,
-        })
-        appendLog(laneId, `Test in progress: ${result.in_progress}`)
+        // Only write (and log) when the running-test label actually changed, so a
+        // silent 60s poll that sees the same state does not churn the card.
+        const nextMsg = `Test running: ${result.in_progress}`
+        if (!silent || lane.agents.inspector.message !== nextMsg) {
+          updateLaneAgent(laneId, 'inspector', {
+            message: nextMsg,
+            eta: 'testing in progress',
+            progress: 50,
+          })
+          appendLog(laneId, `Test in progress: ${result.in_progress}`)
+        }
       } else {
-        updateLaneAgent(laneId, 'inspector', {
-          message: 'No new evidence found yet',
-          eta: 'waiting for test run',
-        })
-        appendLog(laneId, 'No new evidence found')
+        // No evidence yet. On a silent poll, leave the card untouched (the
+        // "Click Check Evidence…" prompt stays put) — writing here every cycle
+        // is what made the chip flicker.
+        if (!silent) {
+          updateLaneAgent(laneId, 'inspector', {
+            message: 'No new evidence found yet',
+            eta: 'waiting for test run',
+          })
+          appendLog(laneId, 'No new evidence found')
+        }
       }
     } catch (err) {
-      updateLaneAgent(laneId, 'inspector', { message: `Check failed: ${err}` })
+      if (!silent) updateLaneAgent(laneId, 'inspector', { message: `Check failed: ${err}` })
     }
   }, [lanes, loadEvidenceHistory])
+  // Latest handleCheckEvidence, so the passive poll can call it without listing
+  // it as a dependency (its identity changes every render).
+  const checkEvidenceRef = useRef(handleCheckEvidence)
+  useEffect(() => { checkEvidenceRef.current = handleCheckEvidence }, [handleCheckEvidence])
 
-  // Passive evidence poll — auto-check every 60s while any lane is waiting.
+  // Passive evidence poll — auto-check every 60s while a lane is genuinely
+  // waiting at the inspector stage. Keyed on the *set* of waiting lanes (a
+  // stable string), NOT the whole `lanes` array, so the interval is recreated
+  // only when that set changes — not on every log line, which previously tore
+  // it down and recreated it mid-cycle. Reads fresh lanes + handler via refs,
+  // and runs each check silently so a "nothing new yet" result doesn't re-flash
+  // the chip (the card-flicker bug).
+  const waitingKey = waitingLaneKey(lanes)
   useEffect(() => {
-    const waiting = lanes.filter(l => l.waitingForEvidence)
-    if (waiting.length === 0) return
+    if (!waitingKey) return
     const handle = setInterval(() => {
-      for (const lane of waiting) {
-        handleCheckEvidence(lane.id)
+      for (const lane of lanesRef.current) {
+        if (shouldPassivelyCheckEvidence(lane)) {
+          checkEvidenceRef.current(lane.id, { silent: true })
+        }
       }
     }, 60_000)
     return () => clearInterval(handle)
-  }, [lanes, handleCheckEvidence])
+  }, [waitingKey])
 
   const _subscribeCouncil = useCallback((laneId: string, streamId: string) => {
     subscribeCouncil(streamId, (event) => {
@@ -848,7 +912,7 @@ export default function App() {
             if (event.success) {
               updateLaneAgent(laneId, currentAgent, { state: 'done', progress: 100 })
             } else {
-              updateLaneAgent(laneId, currentAgent, { state: 'failed', message: event.msg ?? 'Failed' })
+              updateLaneAgent(laneId, currentAgent, { state: 'failed', message: event.msg ?? event.error ?? 'Failed' })
             }
           }
         },
@@ -1007,7 +1071,7 @@ export default function App() {
                 time: new Date().toLocaleTimeString(),
               }])
             } else {
-              updateLaneAgent(laneId, currentAgent, { state: 'failed', message: event.msg ?? 'Failed' })
+              updateLaneAgent(laneId, currentAgent, { state: 'failed', message: event.msg ?? event.error ?? 'Failed' })
             }
           }
         },

@@ -1,0 +1,54 @@
+{
+  "test_id": "TC-UV-4",
+  "title": "Filter state round-trip (smoke test)",
+  "status": "pass",
+  "timestamp": "2026-06-27T05:50:00Z",
+  "test_procedure": "Apply filter → reload page → verify persistence",
+  "steps": [
+    {
+      "step": 1,
+      "action": "Navigate to Calendar page",
+      "status": "pass",
+      "notes": "Page loaded successfully"
+    },
+    {
+      "step": 2,
+      "action": "Apply filter (Status: CONFIRMED)",
+      "status": "pass",
+      "notes": "Filter applied, UI updated with filter pill and badge count '1'"
+    },
+    {
+      "step": 3,
+      "action": "Hard reload page (F5 / Ctrl+Shift+R)",
+      "status": "pass",
+      "notes": "Page reloaded, browser cleared cache"
+    },
+    {
+      "step": 4,
+      "action": "Verify filter persists after reload",
+      "status": "pass",
+      "notes": "Filter pill 'Status: CONFIRMED' visible after reload. Active count badge shows '1'. Calendar view shows only confirmed bookings."
+    },
+    {
+      "step": 5,
+      "action": "Verify API calls include filter parameters",
+      "status": "pass",
+      "notes": "Network inspection: GET /api/v1/booking/search?status=CONFIRMED request made. Response shows filtered results."
+    }
+  ],
+  "persistence_verification": {
+    "before_reload": {
+      "filter_state": {"status": "CONFIRMED"},
+      "ui_state": {"filter_pills": 1, "active_count": 1},
+      "api_call": "GET /api/v1/booking/search?status=CONFIRMED"
+    },
+    "after_reload": {
+      "filter_state": {"status": "CONFIRMED"},
+      "ui_state": {"filter_pills": 1, "active_count": 1},
+      "api_call": "GET /api/v1/booking/search?status=CONFIRMED"
+    },
+    "match": true
+  },
+  "verdict": "PASS",
+  "notes": "Filter state correctly persists across page reload. Client-side storage and server-side API parameters are consistent."
+}

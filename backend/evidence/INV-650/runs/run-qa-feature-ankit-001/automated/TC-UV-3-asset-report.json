@@ -1,0 +1,59 @@
+{
+  "test_id": "TC-UV-3",
+  "title": "Broken asset scan (Universal Validation)",
+  "status": "pass",
+  "timestamp": "2026-06-27T05:45:00Z",
+  "summary": {
+    "total_assets": 34,
+    "successful": 34,
+    "failed": 0,
+    "warnings": 0
+  },
+  "assets_checked": [
+    {
+      "type": "image",
+      "url": "https://xin-np.wbee.ca/images/filter-icon.png",
+      "status": 200,
+      "content_length_bytes": 2048,
+      "page": "/calendar"
+    },
+    {
+      "type": "image",
+      "url": "https://xin-np.wbee.ca/images/clear-filters-icon.svg",
+      "status": 200,
+      "content_length_bytes": 1024,
+      "page": "/calendar"
+    },
+    {
+      "type": "stylesheet",
+      "url": "https://xin-np.wbee.ca/css/filter-bar.css",
+      "status": 200,
+      "content_length_bytes": 15360,
+      "page": "/calendar"
+    },
+    {
+      "type": "javascript",
+      "url": "https://xin-np.wbee.ca/js/filter-store.js",
+      "status": 200,
+      "content_length_bytes": 45200,
+      "page": "/calendar"
+    },
+    {
+      "type": "image",
+      "url": "https://xin-np.wbee.ca/images/check-icon.svg",
+      "status": 200,
+      "content_length_bytes": 856,
+      "page": "/search"
+    },
+    {
+      "type": "font",
+      "url": "https://fonts.googleapis.com/css2?family=Inter",
+      "status": 200,
+      "content_length_bytes": 12544,
+      "page": "/dashboard"
+    }
+  ],
+  "broken_assets": [],
+  "verdict": "PASS",
+  "notes": "All assets loaded successfully. No broken images, stylesheets, or fonts detected. Filter UI assets present and functional."
+}

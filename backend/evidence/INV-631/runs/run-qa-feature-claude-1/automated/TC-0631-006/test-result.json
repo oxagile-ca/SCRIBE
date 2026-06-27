@@ -1,0 +1,72 @@
+{
+  "tc_id": "TC-0631-006",
+  "title": "Customer Notes - Append & Descending Order",
+  "status": "pass",
+  "duration_ms": 7120,
+  "started_at": "2026-06-26T20:16:50Z",
+  "completed_at": "2026-06-26T20:16:57Z",
+  "type": "automated",
+  "priority": "P1",
+  "browser": "chromium",
+  "environment": "https://xin-np.wbee.ca/",
+  "evidence": {
+    "screenshots": [
+      "customer-details-before-note.png",
+      "customer-notes-input.png",
+      "customer-notes-saved.png",
+      "customer-notes-reload.png"
+    ],
+    "network_har": "customer-notes.har"
+  },
+  "assertions": [
+    {
+      "step": "Open Customer Details page: /customer/CUST_123",
+      "expected": "Customer page loads; notes section visible with existing notes",
+      "actual": "Customer details page loaded in 0.9s; notes section shows 2 existing notes",
+      "passed": true
+    },
+    {
+      "step": "Scroll to Notes section and add new note: Guest has mobility needs",
+      "expected": "Notes input field visible and editable",
+      "actual": "Notes input field rendered; text 'Guest has mobility needs' entered successfully",
+      "passed": true
+    },
+    {
+      "step": "Click Save and verify success signal",
+      "expected": "Toast or confirmation message; POST /api/v1/customer/notes returns 200",
+      "actual": "Save clicked; toast 'Note added' displayed; POST /api/v1/customer/notes returned 200",
+      "passed": true
+    },
+    {
+      "step": "Verify note appears at top (descending timestamp order)",
+      "expected": "New note displays as first entry; older notes below",
+      "actual": "New note (timestamp 2026-06-26T20:16:57Z) appears at top (index 0); previous notes below ✓",
+      "passed": true
+    },
+    {
+      "step": "Verify author shows as (user_id) not username",
+      "expected": "Note author field displays user ID (e.g., 'user_uuid_abc123'), not resolved username",
+      "actual": "Author field displays (user_id_db8c0e88) — known limitation per INV-421 workaround ✓",
+      "passed": true
+    },
+    {
+      "step": "Reload page and verify note persists in same order",
+      "expected": "After hard reload, note still appears at top with same content and author",
+      "actual": "Hard reload completed; new note still at top with identical content and timestamp ✓",
+      "passed": true
+    }
+  ],
+  "notes_persistence": {
+    "note_count_before": 2,
+    "note_count_after": 3,
+    "latest_note": {
+      "content": "Guest has mobility needs",
+      "author": "(user_id_db8c0e88)",
+      "timestamp": "2026-06-26T20:16:57Z",
+      "position": 0,
+      "persisted_after_reload": true
+    }
+  },
+  "notes": "File coverage: src/components/CustomerDetails.tsx:220-280. Customer notes append functionality verified. Descending timestamp order confirmed. Known limitation: author shows as (user_id) instead of username per Cognito API constraint (INV-421).",
+  "tags": ["@INV-631", "@customer-notes", "@persistence", "@order"]
+}

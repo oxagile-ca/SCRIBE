@@ -53,6 +53,25 @@ def load_secrets_env(path: str | None = None) -> dict:
     return loaded
 
 
+def read_secrets_file(path: str | None = None) -> dict:
+    """Parse a KEY=VALUE .secrets.env into a dict WITHOUT touching os.environ.
+    The merge-aware config edit path needs a side-effect-free read."""
+    path = path or os.path.join(default_config_dir(), ".secrets.env")
+    out: dict = {}
+    if not os.path.exists(path):
+        return out
+    with open(path, encoding="utf-8") as fh:
+        for raw in fh:
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key, value = key.strip(), value.strip()
+            if key and value:
+                out[key] = value
+    return out
+
+
 def _backend_dir() -> str:
     """Absolute path of this backend package (where .secrets.env and
     instance.config.json ship). Used as the cwd-independent fallback so launching

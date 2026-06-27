@@ -1,13 +1,14 @@
 import asyncio
 import json
 import os
+import re
 import subprocess
 import uuid
 import time
 
 from typing import Any, Dict, List
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -23,12 +24,14 @@ import bitbucket_client as bb
 from chat import chat_stream
 from streams import StreamRegistry, replay_events_from_disk, END_MARKER
 from pipeline_store import PipelineStore
-from onboarding import validate_answers, run_onboarding
+from onboarding import validate_answers, run_onboarding, write_config_and_secrets, save_postman_collection
 from instance_config import (
     load_instance_config, load_secrets_env, default_config_dir,
-    default_skills_root, default_instances_root,
+    default_skills_root, default_instances_root, read_secrets_file,
 )
 import linear_client
+import config_io
+import ticket_difficulty
 from status_map import resolve_status_mapping, categorize_status
 
 # Load onboarding-generated secrets (.secrets.env) into the environment at startup so
@@ -90,6 +93,10 @@ pipeline_states = pipeline_store.all_states()
 import council
 council.configure(streams, pipeline_store)
 
+import qa_orchestrator
+import auto_mode
+auto_mode.configure(pipeline_store, streams)
+
 import auto_provision
 auto_provision.pipeline_store = pipeline_store
 auto_provision.streams_mod = streams
@@ -108,6 +115,11 @@ async def _start_auto_provision_loop():
         return
     asyncio.create_task(auto_provision.run_loop())
     asyncio.create_task(_parent_env_keepalive_loop())
+
+
+@app.on_event("startup")
+async def _start_auto_mode_loop():
+    asyncio.create_task(auto_mode.run_loop())
 
 
 async def _parent_env_keepalive_loop():
@@ -249,6 +261,51 @@ async def api_onboarding(answers: Dict[str, Any]):
     return {"ok": True, **result}
 
 
+@app.get("/api/config")
+async def api_config_get():
+    """Current config in the onboarding-form shape, secrets blanked (#1)."""
+    cfg_path = os.path.join(default_config_dir(), "instance.config.json")
+    cfg = load_instance_config(cfg_path)
+    if not cfg:
+        return JSONResponse(status_code=404, content={"ok": False, "error": "not onboarded"})
+    secrets = read_secrets_file()
+    return {
+        "ok": True,
+        "answers": config_io.config_to_answers(cfg),
+        "secretsSet": config_io.secrets_set_map(cfg, secrets),
+    }
+
+
+@app.put("/api/config")
+async def api_config_put(answers: Dict[str, Any]):
+    """Edit config (#2/#5/#11): merge (blank secret = keep), write, hot-reload secrets."""
+    errors = validate_answers(answers)
+    if errors:
+        return JSONResponse(status_code=400, content={"ok": False, "errors": errors})
+    cfg_path = os.path.join(default_config_dir(), "instance.config.json")
+    existing = load_instance_config(cfg_path) or {}
+    existing_secrets = read_secrets_file()
+    new_config, new_secrets = config_io.merge_and_build(answers, existing, existing_secrets)
+    paths = write_config_and_secrets(new_config, new_secrets, default_config_dir())
+    load_secrets_env(paths["secrets"])  # hot-reload edited tokens — no restart
+    return {"ok": True}
+
+
+@app.post("/api/config/upload-postman")
+async def api_upload_postman(file: UploadFile = File(...)):
+    """Store an uploaded Postman collection, set its path, re-parse for a count (#3)."""
+    cfg = load_instance_config(os.path.join(default_config_dir(), "instance.config.json"))
+    if not cfg:
+        return JSONResponse(status_code=404, content={"ok": False, "error": "not onboarded"})
+    content = await file.read()
+    try:
+        cfg, count = save_postman_collection(content, cfg, default_config_dir())
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"ok": False, "error": str(e)})
+    write_config_and_secrets(cfg, read_secrets_file(), default_config_dir())
+    return {"ok": True, "endpointCount": count, "path": cfg["api"]["postmanCollectionPath"]}
+
+
 @app.get("/api/environments")
 async def api_environments():
     return ENVIRONMENTS
@@ -319,6 +376,9 @@ async def api_tickets(project: str = Query(default=DEFAULT_PROJECT)):
     for t in tickets:
         t["statusCategory"] = categorize_status(t.get("status", ""), mapping)
         t["evidence"] = check_evidence(t["key"])
+        label, dscore = ticket_difficulty.compute_difficulty(t.get("description", ""))
+        t["difficulty"] = label
+        t["difficultyScore"] = dscore
     return tickets
 
 
@@ -797,6 +857,15 @@ class PipelineRequest(BaseModel):
     envUrl: str = ""
 
 
+class QaRunRequest(BaseModel):
+    envUrl: str = ""
+
+
+class AutomationRequest(BaseModel):
+    enabled: bool | None = None
+    armed: bool | None = None
+
+
 @app.post("/api/build")
 async def api_build(req: BuildRequest):
     stream_id = str(uuid.uuid4())
@@ -819,6 +888,47 @@ async def api_test(req: TestRequest):
     streams.create(stream_id)
     asyncio.create_task(_run_stream(stream_id, run_test(req.ticketKey, req.envUrl)))
     return {"streamId": stream_id}
+
+
+@app.post("/api/qa-run/{key}")
+async def api_qa_run(key: str, req: QaRunRequest):
+    """Close the copy-paste gap (#9): run qa-evidence server-side, then report+pdf+gated attach."""
+    if not re.match(r"^[A-Z][A-Z0-9]*-\d+$", key):
+        raise HTTPException(status_code=400, detail="invalid ticket key")
+    stream_id = str(uuid.uuid4())
+    streams.create(stream_id)
+    state = auto_mode.get_state()
+    asyncio.create_task(_run_stream(
+        stream_id,
+        qa_orchestrator.run_and_finalize(key, req.envUrl, armed=state["armed"], manual=False),
+    ))
+    return {"streamId": stream_id}
+
+
+@app.post("/api/attach/{key}")
+async def api_attach(key: str):
+    """Manual 'Attach to Linear' for the latest run — write-flag only, no arm needed."""
+    if not re.match(r"^[A-Z][A-Z0-9]*-\d+$", key):
+        raise HTTPException(status_code=400, detail="invalid ticket key")
+    stream_id = str(uuid.uuid4())
+    streams.create(stream_id)
+    asyncio.create_task(_run_stream(stream_id, auto_mode.attach_latest(key)))
+    return {"streamId": stream_id}
+
+
+@app.get("/api/automation")
+async def api_automation_get():
+    cfg = load_instance_config() or {}
+    write_allowed = bool(((cfg.get("issueTracker") or {}).get("access") or {}).get("write", False))
+    return {"writeAllowed": write_allowed, "autoMode": auto_mode.get_state()}
+
+
+@app.post("/api/automation")
+async def api_automation_set(req: AutomationRequest):
+    auto_mode.set_state(enabled=req.enabled, armed=req.armed)
+    cfg = load_instance_config() or {}
+    write_allowed = bool(((cfg.get("issueTracker") or {}).get("access") or {}).get("write", False))
+    return {"writeAllowed": write_allowed, "autoMode": auto_mode.get_state()}
 
 
 class ChatSendRequest(BaseModel):

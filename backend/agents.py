@@ -585,7 +585,11 @@ async def run_test(ticket_key, env_url):
     from instance_config import load_instance_config
     _cfg = load_instance_config() or {}
     skill_cmd = _cfg.get("skillCommand") or "/qa-evidence"
-    qa_cmd = f"{skill_cmd} {ticket_key} run:qa-feature env:{env_url} --headless --auto-approve"
+    # Build via the server-side runner's helper so the copy-paste command can't
+    # drift from it again — it was missing --isolated, which left runs blocked on
+    # "browser already in use". Lazy import avoids the agents<->qa_runner cycle.
+    from qa_runner import build_qa_command
+    qa_cmd = build_qa_command(ticket_key, env_url, skill_cmd)
 
     # Record what evidence exists NOW so check_new_evidence can compare
     runs_path = os.path.join(EVIDENCE_DIR, ticket_key, "runs")

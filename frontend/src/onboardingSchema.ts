@@ -65,6 +65,10 @@ export interface OnboardingAnswers {
     token: string
     access: Access
   }
+  api?: {
+    baseUrl: string
+    postmanCollectionPath: string
+  }
   anthropicKey: string
 }
 

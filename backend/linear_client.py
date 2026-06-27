@@ -23,10 +23,14 @@ query Issues($filter: IssueFilter, $after: String) {
       identifier
       title
       description
+      priority
       priorityLabel
+      createdAt
       updatedAt
       state { name type }
       assignee { displayName name }
+      parent { identifier title }
+      labels { nodes { name } }
     }
     pageInfo { hasNextPage endCursor }
   }
@@ -52,16 +56,22 @@ def _short(name: str | None) -> str:
 def _map_issue(node: dict) -> dict:
     state = node.get("state") or {}
     assignee = node.get("assignee") or {}
+    parent = node.get("parent") or None
+    label_nodes = ((node.get("labels") or {}).get("nodes")) or []
     return {
         "key": node.get("identifier", ""),
         "summary": node.get("title", ""),
         "status": state.get("name", ""),
         "priority": node.get("priorityLabel") or "Medium",
+        "priorityValue": node.get("priority"),
         "assignee": _short(assignee.get("displayName") or assignee.get("name")),
         "qaAssignee": "",
         "description": node.get("description") or "",
         "flagged": False,
         "staleDays": 0,
+        "createdAt": node.get("createdAt") or "",
+        "parent": {"key": parent.get("identifier", ""), "title": parent.get("title", "")} if parent else None,
+        "labels": [n.get("name", "") for n in label_nodes if n.get("name")],
         "devInfo": [],
         "evidence": {"status": "none", "score": None, "time": "", "reportPath": ""},
     }

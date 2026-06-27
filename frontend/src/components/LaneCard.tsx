@@ -1,9 +1,22 @@
 import { useState, useEffect } from 'react'
-import { Lane, AgentName, TicketUsage } from '../types'
+import { Lane, AgentName, AgentState, TicketUsage } from '../types'
 import AgentDetail from './AgentDetail'
 import { CouncilPanel } from './CouncilPanel'
 import { getTicketUsage } from '../api'
 import { UsageBreakdown } from './UsageBreakdown'
+import { classifyBlocker } from '../laneStatus'
+
+// Plain-English word + colour for each agent state, used by the always-visible
+// status line so the user can always tell what a lane is doing.
+const STATE_WORD: Record<AgentState, string> = {
+  idle: 'waiting', active: 'working…', done: 'done', failed: 'blocked',
+}
+const STATE_COLOR: Record<AgentState, string> = {
+  idle: 'var(--text-dim)',
+  active: 'var(--accent, #4f9eff)',
+  done: 'var(--success, #4ade80)',
+  failed: 'var(--danger, #fc8181)',
+}
 
 const FULL_AGENT_ORDER: AgentName[] = ['quartermaster', 'builder', 'shipper', 'inspector', 'scribe']
 // Apps that are already deployed (static / local / deployed modes) skip build & deploy:
@@ -27,10 +40,13 @@ interface Props {
   onResume: (laneId: string) => void
   onOverrideCouncil: (laneId: string, reason: string) => Promise<void>
   onStartFromQuartermaster: (lane: Lane) => void
+  onRunQa: (laneId: string) => void
+  onAttachLinear: (laneId: string) => void
+  writeAllowed?: boolean
   needsBuildDeploy?: boolean
 }
 
-export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeploy, onRunCommand, onGenerateReport, onResume, onOverrideCouncil, onStartFromQuartermaster, needsBuildDeploy = true }: Props) {
+export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeploy, onRunCommand, onGenerateReport, onResume, onOverrideCouncil, onStartFromQuartermaster, onRunQa, onAttachLinear, writeAllowed = false, needsBuildDeploy = true }: Props) {
   const [expandedAgent, setExpandedAgent] = useState<AgentName | null>(null)
   const [cmdInput, setCmdInput] = useState('')
   const [usage, setUsage] = useState<TicketUsage | null>(null)
@@ -63,6 +79,13 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
   const showCheckEvidence = (currentAgent === 'inspector' && agents.inspector.state !== 'done') || scribeStuck
   // Show "Re-check Evidence" button at scribe stage too (allows retrying after pipeline completes)
   const showRecheckAtScribe = currentAgent === 'scribe' && agents.scribe.state === 'done'
+
+  // Current-stage status (always shown) + any blocker that stops the run.
+  const current = agents[currentAgent]
+  const failedAgent = AGENT_ORDER.map(n => agents[n]).find(a => a?.state === 'failed')
+  const blocker = failedAgent ? classifyBlocker(failedAgent.message || '') : null
+  // QA has finished for this ticket (inspector done) → offer a re-run.
+  const qaComplete = agents.inspector.state === 'done'
 
   return (
     <div className={`lane-card${isComplete ? ' lane-card--complete' : ''}`}>
@@ -145,9 +168,38 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
           </button>
         </div>
       )}
-      {agents[currentAgent]?.eta && (
-        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
-          {STAGE_LABELS[currentAgent]}: {agents[currentAgent]?.message || agents[currentAgent]?.eta}
+      {/* Always-visible current status so the user knows what is happening,
+          not just when an ETA happens to be set. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, marginTop: 6, justifyContent: 'center' }}>
+        <span style={{
+          width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+          background: STATE_COLOR[current?.state ?? 'idle'],
+        }} />
+        <span style={{ color: STATE_COLOR[current?.state ?? 'idle'], fontWeight: 700 }}>
+          {STAGE_LABELS[currentAgent]}: {STATE_WORD[current?.state ?? 'idle']}
+        </span>
+        {(current?.message || current?.eta) && (
+          <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}
+                title={current?.message || current?.eta}>
+            — {current?.message || current?.eta}
+          </span>
+        )}
+      </div>
+      {/* Blocker banner — tells the user WHY the run can't continue and what to do. */}
+      {blocker && (
+        <div role="alert" style={{
+          marginTop: 8, padding: '8px 10px', borderRadius: 6, fontSize: 11,
+          background: 'rgba(252,129,129,0.12)', border: '1px solid var(--danger, #fc8181)',
+        }}>
+          <div style={{ fontWeight: 700, color: 'var(--danger, #fc8181)' }}>
+            ⛔ Blocked: {blocker.label}
+          </div>
+          {failedAgent?.message && (
+            <div style={{ color: 'var(--text-muted)', marginTop: 2, wordBreak: 'break-word' }}>
+              {failedAgent.message}
+            </div>
+          )}
+          <div style={{ color: 'var(--text)', marginTop: 3 }}>→ {blocker.hint}</div>
         </div>
       )}
       {(currentAgent === 'shipper' && agents.shipper.state !== 'done') && (
@@ -175,14 +227,41 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
       )}
       {lane.qaCommand && (
         <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 11, color: 'var(--muted, #9aa3af)', marginBottom: 4 }}>Run this in Claude Code:</div>
-          <code
-            onClick={() => navigator.clipboard.writeText(lane.qaCommand!)}
-            title="Click to copy"
-            style={{ display: 'block', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: 'var(--bg, #15171c)', border: '1px solid var(--border, #2c313a)', borderRadius: 6, padding: '8px 10px', fontSize: 12, cursor: 'pointer', userSelect: 'all' }}
-          >
-            {lane.qaCommand}
-          </code>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button className="btn btn--primary btn--small" onClick={() => onRunQa(lane.id)}
+                    title={qaComplete ? 'Re-run the server-side QA from scratch for this ticket' : 'Run qa-evidence server-side (no terminal needed)'}>
+              {qaComplete ? 'Retry QA' : 'Run QA'}
+            </button>
+            {reportUrl && writeAllowed && (
+              <button className="btn btn--secondary btn--small" onClick={() => onAttachLinear(lane.id)}
+                      title="Attach the evidence PDF + comment to this Linear issue">
+                Attach to Linear
+              </button>
+            )}
+          </div>
+          <details style={{ marginTop: 6 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 11, color: 'var(--muted, #9aa3af)' }}>
+              copy command (fallback)
+            </summary>
+            <code
+              onClick={() => navigator.clipboard.writeText(lane.qaCommand!)}
+              title="Click to copy"
+              style={{ display: 'block', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: 'var(--bg, #15171c)', border: '1px solid var(--border, #2c313a)', borderRadius: 6, padding: '8px 10px', fontSize: 12, cursor: 'pointer', userSelect: 'all', marginTop: 4 }}
+            >
+              {lane.qaCommand}
+            </code>
+          </details>
+        </div>
+      )}
+      {/* Retry QA — for a finished run with no qaCommand block of its own
+          (e.g. a server-side run started via "Run QA"), so a completed ticket
+          can always be re-tested without dismissing and restarting it. */}
+      {qaComplete && !lane.qaCommand && (
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>
+          <button className="btn btn--secondary btn--small" onClick={() => onRunQa(lane.id)}
+                  title="Re-run the server-side QA from scratch for this ticket">
+            Retry QA
+          </button>
         </div>
       )}
       {/* Generate Report button — shown when evidence exists but index.html is missing */}

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "esbuild tests/laneStatus.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/scribe-tests.mjs && node node_modules/.cache/scribe-tests.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

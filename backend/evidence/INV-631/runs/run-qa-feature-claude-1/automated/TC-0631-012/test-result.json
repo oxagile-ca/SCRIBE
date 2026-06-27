@@ -1,0 +1,79 @@
+{
+  "tc_id": "TC-0631-012",
+  "title": "Calendar Month View - Consistency with Week View",
+  "status": "pass",
+  "duration_ms": 5890,
+  "started_at": "2026-06-26T20:18:30Z",
+  "completed_at": "2026-06-26T20:18:35Z",
+  "type": "automated",
+  "priority": "P1",
+  "browser": "chromium",
+  "environment": "https://xin-np.wbee.ca/",
+  "evidence": {
+    "screenshots": [
+      "calendar-week-view.png",
+      "calendar-month-view.png",
+      "calendar-room-sort-comparison.png",
+      "calendar-bar-position-comparison.png"
+    ]
+  },
+  "assertions": [
+    {
+      "step": "Navigate /calendar and verify Week view displays correctly",
+      "expected": "Week view shows 7 columns (Mon-Sun); rooms sorted ascending",
+      "actual": "Week view loaded; 7 date columns; rooms in order: 120, 229, 1000, 1200 (ascending) ✓",
+      "passed": true
+    },
+    {
+      "step": "Switch to Month view",
+      "expected": "Month view displays full calendar grid; same room sort order maintained",
+      "actual": "Month view loaded; 4 weeks displayed; rooms in same order: 120, 229, 1000, 1200 (ascending) ✓",
+      "passed": true
+    },
+    {
+      "step": "Verify rooms sorted ascending in Month view (consistent with Week view)",
+      "expected": "Room order identical in both views",
+      "actual": "Room header order in Month view = Room header order in Week view ✓ (consistent)",
+      "passed": true
+    },
+    {
+      "step": "Verify same booking bars appear with identical positioning",
+      "expected": "Bar positions for same booking identical in both views (same date range, same cells)",
+      "actual": "BK_ABC123 (Jun 27-30) appears in same cell range in both views; no position variance ✓",
+      "passed": true
+    },
+    {
+      "step": "Verify status colors match week view",
+      "expected": "Bar colors identical: blue (CONFIRMED), orange (CHECKIN), gray (CHECKED_OUT)",
+      "actual": "Month view bar colors match Week view: CONFIRMED=blue, CHECKIN=orange, CHECKED_OUT=gray ✓",
+      "passed": true
+    },
+    {
+      "step": "Verify no bars bleed past end-date column",
+      "expected": "Bar ends exactly at checkout date; no overflow",
+      "actual": "All bars in Month view end cleanly at checkout date boundary; no bleed ✓",
+      "passed": true
+    }
+  ],
+  "view_consistency": {
+    "week_view_rooms": ["120", "229", "1000", "1200"],
+    "month_view_rooms": ["120", "229", "1000", "1200"],
+    "rooms_match": true,
+    "sample_booking": {
+      "id": "BK_ABC123",
+      "week_view_cells": ["Jun_27", "Jun_28", "Jun_29"],
+      "month_view_cells": ["Jun_27", "Jun_28", "Jun_29"],
+      "cells_match": true,
+      "color_week": "#0066CC",
+      "color_month": "#0066CC",
+      "colors_match": true
+    }
+  },
+  "regression_checks": {
+    "sticky_headers": "pass",
+    "bar_alignment": "pass",
+    "room_sort": "pass"
+  },
+  "notes": "File coverage: src/components/Calendar.tsx:181-320. Calendar Month view consistency verified. Room sort order, bar positioning, and status colors match Week view. No regression detected.",
+  "tags": ["@INV-631", "@calendar", "@month-view", "@consistency"]
+}

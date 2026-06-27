@@ -52,3 +52,16 @@ yarn.lock
 
 # uvicorn run log
 *.out
+
+# Local Claude tooling — per-machine skill copies + git worktrees, never commit.
+.claude/
+
+# Playwright MCP local profile/state.
+.playwright-mcp/
+
+# QA test-auth env file — holds Cognito test-login creds. NEVER commit.
+.env.qa
+
+# Loose screenshots dropped at the backend root by ad-hoc QA runs (committed
+# evidence lives under backend/evidence/<TICKET>/, not here).
+backend/*.png

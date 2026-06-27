@@ -397,6 +397,35 @@
   transition: all 0.15s var(--ease);
 }
 .queue__sort-dir:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ─── Queue group-by ──── */
+.queue__group-by {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.queue__group {
+  margin-top: 6px;
+}
+.queue__group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin: 8px 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  position: sticky;
+  top: 0;
+}
+.queue__group-count {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
 .queue__list {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -771,4 +800,71 @@
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* ─── Feature Breakdown (hero) ──── */
+.feature-breakdown {
+  padding: 0 24px 16px;
+}
+.feature-breakdown__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.feature-breakdown__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.feature-breakdown__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  box-shadow: var(--shadow-sm);
+  font-size: 12px;
+}
+.feature-breakdown__name {
+  flex: 1;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feature-breakdown__count {
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.feature-breakdown__bar {
+  width: 120px;
+  height: 8px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.feature-breakdown__bar-fill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 999px;
+}
+.feature-breakdown__cov {
+  color: var(--text-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  min-width: 64px;
+  text-align: right;
+}
+.feature-breakdown__toggle {
+  margin-top: 8px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
 }

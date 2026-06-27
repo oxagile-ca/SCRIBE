@@ -15,11 +15,17 @@ export interface Ticket {
   status: string
   statusCategory?: 'ready_for_qa' | 'in_qa' | 'other'
   priority: string
+  priorityValue?: number
   assignee: string
   qaAssignee: string
   description: string
   flagged: boolean
   staleDays: number
+  createdAt?: string
+  parent?: { key: string; title: string } | null
+  labels?: string[]
+  difficulty?: 'Easy' | 'Medium' | 'Hard'
+  difficultyScore?: number
   devInfo: DevInfo[]
   evidence: EvidenceStatus
 }
@@ -127,4 +133,10 @@ export interface SSEEvent {
   baseline_runs?: string[]
   env?: string
   services?: { service: string; snapshot: string }[]
+  // Emitted by qa_orchestrator.run_and_finalize on the `done` event so the UI
+  // can show WHY a run failed / what was skipped, instead of a generic message.
+  error?: string | null
+  skipped_reason?: string | null
+  report_url?: string
+  attached?: boolean
 }

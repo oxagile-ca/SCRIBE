@@ -1,0 +1,178 @@
+---
+ticket: INV-653
+title: Invoice render — Hotel Room charge shows INV-653.00 with running Balance never reconciling to Total
+type: bug-fix
+priority: p1
+environment: https://xin-np.wbee.ca/
+product: Beeventory HMS
+created_at: '2026-06-28T12:00:00Z'
+last_updated: '2026-06-28T12:30:00Z'
+
+acceptance_criteria:
+  - id: AC-1
+    text: Invoice line items display correctly with room charges and tax breakdown
+    source: description
+  - id: AC-2
+    text: Running balance reconciles correctly through invoice (Subtotal + Taxes - Deposits = Total)
+    source: description
+  - id: AC-3
+    text: Tax breakdown shows correct split (PST Room 8% + PST Non-Room 7% + GST 5% + MRDT 3%)
+    source: derived
+  - id: AC-4
+    text: Invoice number displays and invoice renders without errors
+    source: derived
+
+test_cases:
+  - id: TC-0653-001
+    title: Create booking and verify sales order generation
+    type: manual
+    priority: p0
+    evidence_required:
+      - screenshot
+      - manual-note
+    steps:
+      - Navigate to Create Reservation
+      - Find and select an available room (check Totem Lodge bucket)
+      - Enter guest name and contact info
+      - Complete reservation
+      - Verify booking appears on calendar
+    tags:
+      - "@INV-653"
+      - "@booking"
+    notes: "file:src/pages/reservation.tsx (lines 1-50) — room selection and booking creation flow"
+    status: manual
+
+  - id: TC-0653-002
+    title: Generate and render invoice with correct line items and tax math
+    type: manual
+    priority: p0
+    evidence_required:
+      - screenshot
+      - manual-note
+    steps:
+      - Navigate to Reservation Details for the booking created in TC-0653-001
+      - Scroll to Invoice section
+      - Click Generate Invoice or View Invoice button
+      - Verify invoice page loads with Invoice Number
+      - Capture screenshot of full invoice (all line items visible)
+      - Verify that:
+        - Hotel Room charge line item is present
+        - Tax breakdown shows all four tax types (PST Room, PST Non-Room, GST, MRDT)
+        - Running balance column updates correctly per line
+        - Final Total = Subtotal + all taxes - any deposits
+    tags:
+      - "@INV-653"
+      - "@invoice"
+      - "@finance"
+    notes: "file:src/pages/invoice.tsx (invoice render path) — validates line item display + running balance reconciliation"
+    annotations_hint: "Point to invoice table, running balance column, total row. Annotate tax breakdown section."
+    status: manual
+
+  - id: TC-0653-003
+    title: Verify invoice print functionality and document persistence
+    type: manual
+    priority: p1
+    evidence_required:
+      - screenshot
+      - manual-note
+    steps:
+      - From the invoice page, click Print button
+      - Verify print dialog invokes (window.print())
+      - Cancel print (do not print to paper)
+      - Reload the page (hard refresh, F5)
+      - Verify invoice data is still present (document lifecycle round-trip)
+      - Verify all line items and totals persisted through reload
+    tags:
+      - "@INV-653"
+      - "@invoice"
+      - "@print"
+    notes: "file:src/pages/invoice.tsx — validates persistence via D1-D5 gates (Phase 2.5)"
+    status: manual
+
+  - id: TC-UV-1
+    title: Console error scan
+    type: automated
+    priority: p0
+    evidence_required:
+      - screenshot
+    tags:
+      - "@universal-validation"
+    status: automated
+
+  - id: TC-UV-2
+    title: Network error scan
+    type: automated
+    priority: p0
+    evidence_required:
+      - screenshot
+    tags:
+      - "@universal-validation"
+    status: automated
+
+  - id: TC-UV-3
+    title: Broken image / asset scan
+    type: automated
+    priority: p0
+    evidence_required:
+      - screenshot
+    tags:
+      - "@universal-validation"
+    status: automated
+
+  - id: TC-UV-4
+    title: Document lifecycle smoke
+    type: automated
+    priority: p0
+    evidence_required:
+      - screenshot
+    tags:
+      - "@universal-validation"
+    status: automated
+
+  - id: TC-UV-5
+    title: Accessibility scan
+    type: automated
+    priority: p0
+    evidence_required:
+      - screenshot
+    tags:
+      - "@universal-validation"
+    status: automated
+
+  - id: TC-UV-6
+    title: Snapshot drift check (visual regression)
+    type: automated
+    priority: p0
+    evidence_required:
+      - screenshot
+    tags:
+      - "@universal-validation"
+    status: automated
+
+runs:
+  - run_id: run-qa-feature-ankit-002
+    kind: qa-feature
+    executor: qa-ankit
+    env: https://xin-np.wbee.ca/
+    started_at: '2026-06-28T12:30:00Z'
+    headless: true
+    auto_approve: true
+    status: in-progress
+    phase: 2
+    phase_description: Execute tests (headless blocker — manual intervention required)
+
+confidence:
+  headline: 0
+  band: not-ready
+  coverage: 0
+  execution: 0
+  corroboration: 0
+  explanation: |
+    Headless automation cannot interact with the interactive room selection UI in the Create
+    Reservation stepper. This blocks all invoice test cases (TC-0653-002, TC-0653-003) because
+    there is no existing test booking to render an invoice from.
+
+    **Gap:** No invoice rendering evidence collected.
+
+    **Workaround:** Run with interactive browser (non-headless) or provide an existing booking
+    number in the test environment for direct invoice page navigation.

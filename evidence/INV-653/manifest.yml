@@ -1,0 +1,139 @@
+---
+ticket: INV-653
+title: Invoice render — Hotel Room charge shows INV-653.00 with running Balance never reconciling to Total
+type: bug-fix
+priority: p1
+environment: https://xin-np.wbee.ca/
+product: Beeventory HMS
+
+acceptance_criteria:
+  - id: AC-1
+    text: Invoice line items display correctly with room charges and tax breakdown
+    source: description
+  - id: AC-2
+    text: Running balance reconciles correctly through invoice (Subtotal + Taxes - Deposits = Total)
+    source: description
+  - id: AC-3
+    text: Tax breakdown shows correct split (PST Room 8% + PST Non-Room 7% + GST 5% + MRDT 3%)
+    source: derived
+  - id: AC-4
+    text: Invoice number displays and invoice renders without errors
+    source: derived
+
+test_cases:
+  - id: TC-0653-001
+    title: Create booking and verify sales order generation
+    type: manual
+    priority: p0
+    evidence_required:
+      - screenshot
+      - manual-note
+    steps:
+      - Navigate to Create Reservation
+      - Find and select an available room (check Totem Lodge bucket)
+      - Enter guest name and contact info
+      - Complete reservation
+      - Verify booking appears on calendar
+    tags:
+      - "@INV-653"
+      - "@booking"
+    notes: "file:src/pages/reservation.tsx (lines 1-50)"
+
+  - id: TC-0653-002
+    title: Generate and render invoice with correct line items and tax math
+    type: manual
+    priority: p0
+    evidence_required:
+      - screenshot
+    steps:
+      - Navigate to Reservation Details for the booking created in TC-0653-001
+      - Scroll to Invoice section
+      - Click Generate Invoice or View Invoice button
+      - Verify invoice page loads with Invoice Number
+      - Capture screenshot of full invoice (all line items visible)
+      - Verify that:
+        - Hotel Room charge line item is present
+        - Tax breakdown shows all four tax types (PST Room, PST Non-Room, GST, MRDT)
+        - Running balance column updates correctly per line
+        - Final Total = Subtotal + all taxes - any deposits
+    tags:
+      - "@INV-653"
+      - "@invoice"
+      - "@finance"
+    notes: "file:src/pages/invoice.tsx (invoice render path) — validates line item display + running balance reconciliation"
+    annotations_hint: "Point to invoice table, running balance column, total row. Annotate tax breakdown section."
+
+  - id: TC-0653-003
+    title: Verify invoice print functionality and document persistence
+    type: manual
+    priority: p1
+    evidence_required:
+      - screenshot
+      - manual-note
+    steps:
+      - From the invoice page, click Print button
+      - Verify print dialog invokes (window.print())
+      - Cancel print (do not print to paper)
+      - Reload the page (hard refresh, F5)
+      - Verify invoice data is still present (document lifecycle round-trip)
+      - Verify all line items and totals persisted through reload
+    tags:
+      - "@INV-653"
+      - "@print"
+      - "@persistence"
+    notes: "file:src/pages/invoice.tsx (print handler + persistence check)"
+
+  - id: TC-UV-1
+    title: Console error scan
+    type: automated
+    priority: p0
+    evidence_required:
+      - network
+    tags:
+      - "@universal-validation"
+    notes: "Run throughout test session, detect uncaught console.error and pageerror events"
+
+  - id: TC-UV-4
+    title: Document lifecycle smoke — invoice save/publish round-trip
+    type: manual
+    priority: p0
+    evidence_required:
+      - screenshot
+      - manual-note
+    steps:
+      - Navigate to an invoice
+      - Verify it renders (read-only, no edit expected for invoice)
+      - Hard-reload the page
+      - Verify invoice data persists
+      - Check that generated_at timestamp and Invoice Number are stable
+    tags:
+      - "@universal-validation"
+      - "@persistence"
+    notes: "Invoice is read-only, so this validates render persistence rather than edit persistence"
+
+run_kind: qa-feature
+environment_url: https://xin-np.wbee.ca/
+headless: true
+auto_approve: true
+runs:
+  - id: run-qa-feature-qa-ankit-001
+    kind: qa-feature
+    status: needs-review
+    verdict: HEADLESS_BLOCKER
+    environment: https://xin-np.wbee.ca/
+    executor: qa-ankit
+    started: 2026-06-28T14:56:00Z
+    ended: 2026-06-28T14:59:30Z
+    notes: |
+      Authentication and dashboard validation successful.
+      Blocked on headless room selection in Create Reservation stepper.
+      See summary.md for full analysis and recommendations.
+    results:
+      passed: 0
+      failed: 0
+      incomplete: 3
+      skipped: 0
+confidence:
+  headline: 0
+  band: not-ready
+  explanation: "Cannot test invoice feature without a booking. Create Reservation stepper requires interactive room selection which is not possible in headless mode. Recommend providing pre-existing booking data or running with interactive browser."

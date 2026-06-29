@@ -63,6 +63,16 @@ def test_config_to_answers_blanks_secrets_and_shapes_company():
     assert "${secret" not in a["issueTracker"]["token"]
 
 
+def test_config_to_answers_defaults_statusmapping_per_tracker():
+    """A Linear config with no statusMapping must default to the Linear status
+    names (so the QA queue matches the live 'Ready for Testing' status), not the
+    generic Jira 'Ready for QA' placeholder."""
+    a = config_io.config_to_answers(_CFG)  # _CFG: type=linear, no statusMapping
+    rfq = a["issueTracker"]["statusMapping"]["ready_for_qa"]
+    assert any(s.strip().lower() == "ready for testing" for s in rfq), rfq
+    assert rfq != ["Ready for QA"], "still the generic Jira placeholder"
+
+
 def test_secrets_set_map_reports_presence():
     m = config_io.secrets_set_map(_CFG, _SECRETS)
     assert m["issueTracker.token"] is True

@@ -26,8 +26,10 @@ const STEPS = [
 // applies these (and its own defaults) when normalizing statuses.
 const STATUS_DEFAULTS: Record<IssueType, { ready_for_qa: string[]; in_qa: string[] }> = {
   jira: { ready_for_qa: ['Ready for QA'], in_qa: ['In QA'] },
-  linear: { ready_for_qa: ['Ready for testing'], in_qa: ['In QA'] },
-  azure: { ready_for_qa: ['Ready for QA'], in_qa: ['In QA'] },
+  // Keep in sync with backend status_map.DEFAULT_STATUS_MAP — Linear's QA status is
+  // "Ready for Testing", so a generic "Ready for QA" placeholder empties the queue.
+  linear: { ready_for_qa: ['Ready for Testing', 'Ready for QA', 'QA Ready', 'Ready for Test'], in_qa: ['In QA', 'In Testing', 'Testing', 'QA'] },
+  azure: { ready_for_qa: ['Ready for QA'], in_qa: ['In QA', 'Testing'] },
   github: { ready_for_qa: [], in_qa: [] },
 }
 

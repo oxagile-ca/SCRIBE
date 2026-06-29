@@ -13,7 +13,7 @@ def test_categorize_status_is_case_insensitive():
 
 def test_resolve_uses_provider_default_when_no_config():
     m = resolve_status_mapping({}, "linear")
-    assert "Ready for testing" in m["ready_for_qa"]
+    assert "Ready for Testing" in m["ready_for_qa"]  # matches the real Linear status casing
     j = resolve_status_mapping(None, "jira")
     assert "Ready for QA" in j["ready_for_qa"]
 

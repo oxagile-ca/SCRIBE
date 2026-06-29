@@ -11,6 +11,7 @@ from onboarding import (
     build_instance_config, _ref,
     ISSUE_SECRET_KEY, VCS_SECRET_KEY, KNOWLEDGE_SECRET_KEY,
 )
+from status_map import DEFAULT_STATUS_MAP
 
 
 def _secret_specs(config: dict) -> list[tuple[str, tuple, str]]:
@@ -73,7 +74,12 @@ def config_to_answers(config: dict) -> dict:
     }
     it = answers["issueTracker"]
     if not it.get("statusMapping"):
-        it["statusMapping"] = {"ready_for_qa": ["Ready for QA"], "in_qa": ["In QA"]}
+        # Default to the provider's own status names (status_map is the source of
+        # truth) so a Linear instance gets "Ready for testing" — not a generic Jira
+        # placeholder that silently empties the QA queue.
+        prov = it.get("type") or "jira"
+        default_map = DEFAULT_STATUS_MAP.get(prov) or {"ready_for_qa": [], "in_qa": []}
+        it["statusMapping"] = copy.deepcopy(default_map)
     for _id, path, _key in _secret_specs(cfg):
         parent = _dig(answers, path[:-1])
         if isinstance(parent, dict) and path[-1] in parent:

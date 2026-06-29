@@ -1,0 +1,20 @@
+{
+  "request": {"method": "GET", "path": "/api/v1/so/invoice", "query": "booking_id=8"},
+  "status": 200,
+  "ok": true,
+  "booking_number": "BK_J755DICT",
+  "asserted": {
+    "location.name": {"value": "Totem Lodge", "pass": true},
+    "location.address_line1": {"value": "1335 Park Avenue", "pass": true},
+    "location.address_line2": {"value": null, "pass": true, "note": "null is valid - no second address line"},
+    "location.city": {"value": "Prince Rupert", "pass": true},
+    "location.state_prov": {"value": "BC", "pass": true},
+    "location.country": {"value": "CA", "pass": true},
+    "location.postal_zip": {"value": "V8J 1K3", "pass": true},
+    "location.phone_number": {"value": "18005500178", "pass": true},
+    "location.mobile_number": {"value": "2506246761", "pass": true},
+    "location.email": {"value": "info@totemlodge.com", "pass": true, "note": "NEW field from INV-661"},
+    "location.website": {"value": "www.totemlodge.com", "pass": true, "note": "NEW field from INV-661"}
+  },
+  "verdict": "All 11 location fields present. No previously-existing fields missing or null when they should not be."
+}

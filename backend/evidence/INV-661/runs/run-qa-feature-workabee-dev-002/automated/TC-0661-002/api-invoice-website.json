@@ -1,0 +1,14 @@
+{
+  "request": {"method": "GET", "path": "/api/v1/so/invoice", "query": "booking_id=8"},
+  "status": 200,
+  "ok": true,
+  "booking_number": "BK_J755DICT",
+  "responseKeys": ["invoice", "terms", "customer", "location", "booking"],
+  "asserted": {
+    "location.website": {
+      "present": true,
+      "value": "www.totemlodge.com",
+      "pass": true
+    }
+  }
+}

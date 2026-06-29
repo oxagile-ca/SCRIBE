@@ -1,0 +1,194 @@
+ticket: INV-661
+title: "[SD5.3.4] Get Invoice - location, email, website"
+scope: api
+booking_dependent: true
+product: Beeventory
+
+pr_context:
+  url: "https://github.com/Workabee-Technologies/xinventory-services/pull/189"
+  diff_found: false
+  note: "PR#189 covers INV-655 INV-657 INV-661 INV-660 INV-659 INV-658 - adds email/website to invoice, folio, location endpoints"
+
+acceptance_criteria:
+  - id: AC-1
+    text: "Location payload includes the email & website fields in GET /so/invoice response"
+    source: description
+  - id: AC-2
+    text: "Existing location fields are unaffected"
+    source: description
+
+test_cases:
+  - id: TC-0661-001
+    title: "GET /so/invoice returns location.email field"
+    type: automated
+    priority: P0
+    ac: AC-1
+    evidence_required: [screenshot, api]
+    spec: TBD
+    steps:
+      - "Authenticate to xin-np.wbee.ca as workabee-dev"
+      - "Navigate to a reservation with a sales order (seed booking_id)"
+      - "Call GET /api/v1/so/invoice?booking_id=<id> via browser JS"
+      - "Assert response.location.email is present and non-null"
+    tags: ["@INV-661"]
+    notes: "PR#189 - xinventory-services: location payload email field added. Endpoint: GET /so/invoice"
+    annotations_hint: "Highlight the location.email field value in the API response JSON"
+
+  - id: TC-0661-002
+    title: "GET /so/invoice returns location.website field"
+    type: automated
+    priority: P0
+    ac: AC-1
+    evidence_required: [screenshot, api]
+    spec: TBD
+    steps:
+      - "Authenticate to xin-np.wbee.ca as workabee-dev"
+      - "Navigate to a reservation with a sales order"
+      - "Call GET /api/v1/so/invoice?booking_id=<id> via browser JS"
+      - "Assert response.location.website is present and non-null"
+    tags: ["@INV-661"]
+    notes: "PR#189 - xinventory-services: location payload website field added. Endpoint: GET /so/invoice"
+    annotations_hint: "Highlight the location.website field value in the API response JSON"
+
+  - id: TC-0661-003
+    title: "Existing location fields remain present and unaffected"
+    type: automated
+    priority: P0
+    ac: AC-2
+    evidence_required: [screenshot, api]
+    spec: TBD
+    steps:
+      - "Call GET /api/v1/so/invoice?booking_id=<id> via browser JS"
+      - "Assert location.name, location.address (or street), location.phone still present"
+      - "Assert no field previously present is now null or missing"
+    tags: ["@INV-661"]
+    notes: "PR#189 - regression check: existing location payload fields must be unaffected. Endpoint: GET /so/invoice"
+
+  - id: TC-0661-004
+    title: "Invoice render page displays location email"
+    type: automated
+    priority: P1
+    ac: AC-1
+    evidence_required: [screenshot]
+    spec: TBD
+    steps:
+      - "Navigate to /reservation/:booking_number/invoice"
+      - "Assert email address is visible in location header / company info section"
+    tags: ["@INV-661"]
+    notes: "UI surface for location.email data. Route: /reservation/:booking_number/invoice"
+    annotations_hint: "Circle the email field in the invoice location header"
+
+  - id: TC-0661-005
+    title: "Invoice render page displays location website"
+    type: automated
+    priority: P1
+    ac: AC-1
+    evidence_required: [screenshot]
+    spec: TBD
+    steps:
+      - "Navigate to /reservation/:booking_number/invoice"
+      - "Assert website URL is visible in location header / company info section"
+    tags: ["@INV-661"]
+    notes: "UI surface for location.website data. Route: /reservation/:booking_number/invoice"
+    annotations_hint: "Circle the website field in the invoice location header"
+
+  - id: TC-UV-1
+    title: "Console Error Scan"
+    type: automated
+    priority: P0
+    evidence_required: [console]
+    spec: universal
+    steps:
+      - "Collect all console.error and pageerror events across session"
+      - "Assert no non-allowlisted errors"
+    tags: ["@UV", "@INV-661"]
+    notes: "Universal validation suite - console error scan"
+
+  - id: TC-UV-2
+    title: "Network Error Scan"
+    type: automated
+    priority: P0
+    evidence_required: [network]
+    spec: universal
+    steps:
+      - "Record all network requests"
+      - "Assert no 4xx/5xx from xin-api-np.wbee.ca"
+    tags: ["@UV", "@INV-661"]
+    notes: "Universal validation suite - non-2xx network scan"
+
+  - id: TC-UV-3
+    title: "Broken Asset Scan"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot]
+    spec: universal
+    steps:
+      - "Collect all image/asset URLs on visited pages"
+      - "Assert all return 200"
+    tags: ["@UV", "@INV-661"]
+    notes: "Universal validation suite - broken images/assets"
+
+  - id: TC-UV-4
+    title: "Document Lifecycle Smoke"
+    type: manual
+    priority: P0
+    evidence_required: []
+    spec: universal
+    steps:
+      - "N/A - API-only ticket, no CMS document edits"
+    tags: ["@UV", "@INV-661"]
+    notes: "Exempt: API-only backend ticket, no document create/edit workflow"
+
+  - id: TC-UV-5
+    title: "Accessibility Scan"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot]
+    spec: universal
+    steps:
+      - "Run axe-core scan on dashboard and invoice render pages"
+      - "Assert no serious/critical violations"
+    tags: ["@UV", "@INV-661"]
+    notes: "Universal validation suite - accessibility audit"
+
+  - id: TC-UV-6
+    title: "Snapshot Drift Check"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot]
+    spec: universal
+    steps:
+      - "Compare against baseline-stable if available"
+      - "Flag pixel delta >= 0.5% outside PR-affected region"
+    tags: ["@UV", "@INV-661"]
+    notes: "Universal validation suite - visual regression. No baseline-stable run exists for INV-661."
+
+runs:
+  - id: run-qa-feature-workabee-dev-001
+    kind: qa-feature
+    env: https://xin-np.wbee.ca/
+    executor: workabee-dev
+    started: "2026-06-25T00:00:00.000Z"
+    note: "Prior incomplete run — no manifest, no summary.json. Evidence files present but run not finalized."
+
+  - id: run-qa-feature-workabee-dev-002
+    kind: qa-feature
+    env: https://xin-np.wbee.ca/
+    executor: workabee-dev
+    started: "2026-06-29T14:11:00.000Z"
+    finished: "2026-06-29T14:20:00.000Z"
+    verdict: PASS
+    confidence: 82
+    seed_booking: {booking_number: BK_J755DICT, booking_id: 8}
+    results:
+      TC-0661-001: {status: pass, note: "location.email='info@totemlodge.com' in GET /so/invoice"}
+      TC-0661-002: {status: pass, note: "location.website='www.totemlodge.com' in GET /so/invoice"}
+      TC-0661-003: {status: pass, note: "All 11 location fields present, no regression"}
+      TC-0661-004: {status: pass, note: "email visible in Invoice Preview dialog header"}
+      TC-0661-005: {status: pass, note: "website visible in Invoice Preview dialog header"}
+      TC-UV-1: {status: pass, note: "2 allowlisted errors (Cognito favicon 404, QA probe artifact)"}
+      TC-UV-2: {status: pass, note: "All 4 app API calls → 200"}
+      TC-UV-3: {status: blocked, note: "Skipped — no asset HEAD-check tooling headlessly"}
+      TC-UV-4: {status: pass, note: "Exempt — API-only ticket, see manual/TC-UV-4/exemption.md"}
+      TC-UV-5: {status: blocked, note: "Skipped — axe-core unavailable headlessly"}
+      TC-UV-6: {status: blocked, note: "Skipped — no baseline-stable run exists"}

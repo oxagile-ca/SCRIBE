@@ -1,0 +1,5 @@
+# Console error allowlist for INV-536
+# One regex per line
+# Cognito OAuth login page favicon - third-party, not app error
+favicon\.ico.*404
+xin-auth-np\.auth\.ca-central-1\.amazoncognito\.com.*404

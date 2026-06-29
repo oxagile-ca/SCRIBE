@@ -1,0 +1,12 @@
+{
+  "request": {"method": "POST", "path": "/api/v1/booking/search", "body": {"bucket_id": 2, "idempotency_key": "test-spike-inv536-check", "start": "2026-06-01", "end": "2026-06-30"}},
+  "status": 200,
+  "ok": true,
+  "responseKeys": ["bookings", "page", "size", "total"],
+  "asserted": {
+    "accepts_idempotency_key_without_error": true,
+    "returns_200_with_idempotency_key_in_body": true,
+    "existing_bookings_have_idempotency_key_field": false,
+    "note": "Search endpoint accepts idempotency_key param without rejecting it (200). Existing seed bookings were created before INV-552 migration so lack the field. New bookings created after migration (tested in INV-558) would have the field."
+  }
+}

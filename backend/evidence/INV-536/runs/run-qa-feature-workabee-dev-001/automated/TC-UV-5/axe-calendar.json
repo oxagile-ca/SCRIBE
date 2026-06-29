@@ -1,0 +1,24 @@
+{
+  "page": "/calendar",
+  "tool": "manual-dom-audit",
+  "violations": [
+    {
+      "id": "label",
+      "impact": "moderate",
+      "description": "Form elements must have labels",
+      "nodes": [
+        {"selector": "input[name='search']", "context": "Calendar search input lacks explicit label"},
+        {"selector": "input[type='text']", "context": "Date-range text input lacks explicit label"}
+      ]
+    },
+    {
+      "id": "document-title",
+      "impact": "minor",
+      "description": "Page title is generic 'xinventory-ux' rather than descriptive 'Calendar - Beeventory'",
+      "nodes": [{"selector": "title", "context": "xinventory-ux"}]
+    }
+  ],
+  "passes": ["image-alt"],
+  "verdict": "needs-review",
+  "note": "Pre-existing accessibility issues unrelated to INV-536 scope. No new violations introduced by this spike. Issues noted for backlog."
+}

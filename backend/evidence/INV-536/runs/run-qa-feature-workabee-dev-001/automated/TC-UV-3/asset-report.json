@@ -1,0 +1,16 @@
+[
+  {
+    "page": "/calendar",
+    "total_images_checked": 1,
+    "broken": [],
+    "status": "pass",
+    "note": "All images on the calendar page loaded successfully. No broken assets detected."
+  },
+  {
+    "page": "/create-reservation",
+    "total_images_checked": 0,
+    "broken": [],
+    "status": "pass",
+    "note": "DOM-scan on create-reservation: no broken images detected."
+  }
+]

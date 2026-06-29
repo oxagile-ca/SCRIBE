@@ -65,7 +65,11 @@ export function streamLostUpdate(evidenceFound: boolean): StreamLostUpdate {
 export function evidenceIsComplete(ev?: EvidenceStatus | null): boolean {
   if (!ev) return false
   if (ev.status !== 'tested' && ev.status !== 'published') return false
-  return ev.score != null || !!ev.reportUrl || !!ev.reportPath
+  // Gate on `score`, not `reportUrl`: the backend reads score ONLY from the latest
+  // run's summary.json (no fallback), so it's null until THIS run writes its verdict.
+  // reportUrl/reportPath can resolve to a PRIOR run's leftover report during a
+  // re-run, which would wrongly read as complete while the new run is in progress.
+  return ev.score != null
 }
 
 export type BlockerKind = 'login' | 'data' | 'runner' | 'connection' | 'generic'

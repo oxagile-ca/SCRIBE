@@ -145,15 +145,15 @@ ok((streamLostUpdate(true).state as string) !== 'failed' && (streamLostUpdate(fa
   ok(evidenceIsComplete(undefined) === false, 'no evidence -> not complete')
   ok(evidenceIsComplete(ev({ status: 'none' })) === false, 'status none -> not complete')
   ok(evidenceIsComplete(ev({ status: 'manifest' })) === false, 'manifest only -> not complete')
-  // the bug: a run dir exists (status tested) but no result yet -> NOT complete
-  ok(evidenceIsComplete(ev({ status: 'tested', score: null, reportPath: '', reportUrl: '' })) === false,
-    'tested but no score/report (run still in progress) -> NOT complete')
+  // the bug: a run dir exists (status tested) but no verdict yet -> NOT complete
+  ok(evidenceIsComplete(ev({ status: 'tested', score: null })) === false,
+    'tested but no score (run still in progress) -> NOT complete')
+  // a re-run in progress can carry a PRIOR run's report URL; score is still null,
+  // so it must NOT read as complete
+  ok(evidenceIsComplete(ev({ status: 'tested', score: null, reportUrl: '/e/INV-1/index.html' })) === false,
+    'tested + stale report but no score (re-run in progress) -> NOT complete')
   ok(evidenceIsComplete(ev({ status: 'tested', score: 100 })) === true,
     'tested + score -> complete')
-  ok(evidenceIsComplete(ev({ status: 'tested', reportUrl: '/e/INV-1/runs/r/index.html' })) === true,
-    'tested + report url -> complete')
-  ok(evidenceIsComplete(ev({ status: 'tested', reportPath: '/e/.../index.html' })) === true,
-    'tested + report path -> complete')
   ok(evidenceIsComplete(ev({ status: 'published', score: 90 })) === true,
     'published + score -> complete')
 }

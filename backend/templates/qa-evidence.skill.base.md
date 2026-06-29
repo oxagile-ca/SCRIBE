@@ -143,10 +143,9 @@ browser session across tickets (see Phase 2.8 browser-session isolation).
 1. Parse ticket, run kind, env, optional flags. If required fields missing, STOP.
 2. Check reachability of `env:`. If non-200 and looks like a Deploy env,
    run `deploycli wake --env <extracted-from-url>` and retry.
-3. `git fetch origin`. If `test-evidence/<JIRA-KEY>` exists remotely:
-   `git worktree add .claude/worktrees/<JIRA-KEY> test-evidence/<JIRA-KEY>`.
-   Else: `git worktree add -b test-evidence/<JIRA-KEY> .claude/worktrees/<JIRA-KEY>`.
-4. Chdir into the worktree. All subsequent file writes happen there.
+3. **Do NOT create a git worktree or branch.** All run output goes to the absolute
+   `evidence_root` from `qa_targets` (`~/evidence/<JIRA-KEY>/runs/…`) — the path the
+   dashboard reads. Stay in the backend dir; never `chdir` into a repo checkout.
 
 ## Phase 1 — Build the manifest (first run only)
 
@@ -273,7 +272,7 @@ resolver exists, derive the same values from the instance config (`environments.
 
 **Use the absolute `evidence_root` for ALL run output** — the path the dashboard
 reads (the backend's `config.EVIDENCE_DIR`, i.e. `~/evidence`), NOT a relative
-`evidence/` under the cwd or a worktree. Writing elsewhere produces evidence the
+`evidence/` under the cwd. Writing elsewhere produces evidence the
 dashboard never registers.
 
 ### 2.1 Run scaffolding
@@ -581,9 +580,8 @@ in-page navigation cross-contaminate evidence and produce false verdicts
 
 For each ticket, open a **dedicated new browser window/tab** for its live
 verification and confine that ticket's navigation to it. Never reuse one
-shared window across tickets. This mirrors the per-ticket evidence-worktree
-isolation in Phase 0 and the per-env allocation in Phase -1: one ticket →
-one env → one evidence worktree → one browser window.
+shared window across tickets. This mirrors the per-env allocation in Phase -1:
+one ticket → one env → one browser window.
 
 **Evidence:** `automated/<TC>/live.png` for every UI / FE TC (and a
 `needs-review` note when a surface could not be reached live).
@@ -759,25 +757,11 @@ Fail → STOP, print numbered remediation list, exit non-zero.
 
 ## Phase 9 — Publish
 
-Per run kind (respect `skip-publish` flag if set):
-
-**`dev-local`** — commit + push to `test-evidence/<JIRA-KEY>`. Post Bitbucket
-PR comment: "Dev evidence captured, confidence: N/100, branch:
-test-evidence/<JIRA-KEY>". Skip Jira + Confluence.
-
-**`baseline-stable`** — commit + push silently.
-
-**`qa-feature`** — commit + push. Zip the ticket folder. Upload to Jira as
-attachment. Post Jira comment with verdict, confidence breakdown, traceability
-table, top 3 markup images. Create Confluence page under
-`<confluence_space_key>/<confluence_parent_page_title>` in DRAFT if confidence
-< `auto_publish_threshold`, else PUBLISHED.
-
-**`qa-main`** — commit + push. Append to existing Jira comment (don't
-replace). Promote Confluence page to PUBLISHED if currently DRAFT. Post to
-`<slack_channel>`: verdict + confidence + link (skip if config empty).
-
-**`ad-hoc`** — commit + push. Print summary to stdout. Notify runner only.
+Evidence is already at `~/evidence/<JIRA-KEY>/runs/<run-id>/` — the dashboard serves
+and reviews it directly; there is nothing to push. Linear attachment (if armed) is
+handled by the backend orchestrator, not here. Do NOT run any `git` commands (no
+commit, no push, no `test-evidence/*` branch), and do NOT upload to
+Jira/Confluence/Bitbucket/Slack. `skip-publish` is a no-op (nothing publishes either way).
 
 ## Phase 9.5 — Confluence-Ready HTML Report
 
@@ -869,15 +853,15 @@ timing without touching any dropdown manually.
 
 ## Phase 10 — Cleanup
 
-1. `git worktree remove .claude/worktrees/<JIRA-KEY>`
-2. Print final summary with all links.
+1. Print final summary with all links.
 
 ## Autonomous rules
 
 - No approval between phases except Phase 1 (manifest) and Phase 8 (gap remediation).
 - `evidence/**` writes proceed without confirmation.
-- Git commits + pushes to `test-evidence/**` proceed.
-- Merge conflicts → `git pull --rebase`, retry 3x, then ask user.
+- No git is used: evidence is written only under `evidence_root`
+  (`~/evidence/<KEY>/runs/…`). Never commit, push, or create `test-evidence/*`
+  branches or worktrees.
 
 ## Headless mode (`--headless --auto-approve`)
 
@@ -916,13 +900,12 @@ Headless invocation example:
 1. Manifest has new run entry
 2. Traceability has no empty cells for current run
 3. Confidence ≥ `min_confidence_gate`
-4. Publish targets succeeded
+4. Evidence written under `<evidence_root>/<JIRA-KEY>/runs/<run-id>/`
+   (`summary.json` + `index.html`)
 5. Final stdout ends with:
-✅ Evidence published for <JIRA-KEY> (run: <kind>)
+✅ Evidence captured for <JIRA-KEY> (run: <kind>)
 Verdict: <verdict>   Confidence: <N>/100
-Branch: test-evidence/<JIRA-KEY>
-Jira: <url>
-Confluence: <url>
+Evidence: <evidence_root>/<JIRA-KEY>/runs/<run-id>/
 
 ## Troubleshooting
 
@@ -934,7 +917,6 @@ Confluence: <url>
 | Confluence 403 | Token missing Confluence write scope. |
 | Gap gate blocks on manual TC | Share `pnpm qa-evidence capture` command with tester. |
 | Score stuck low | `qa-score show <JIRA-KEY>` — explanation shows weakest dimension. |
-| Merge conflicts repeat | Someone else pushed. Skill rebases 3×; beyond that, ask user. |
 
 ## Related skills / commands
 

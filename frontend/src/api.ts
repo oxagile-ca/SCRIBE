@@ -126,7 +126,13 @@ export async function startQaRun(ticketKey: string, envUrl = ''): Promise<string
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ envUrl }),
   })
-  if (!res.ok) throw new Error(`Failed to start QA run: ${res.status}`)
+  if (!res.ok) {
+    // Surface the backend's reason (e.g. the 409 "already in progress" guard)
+    // so the lane can react instead of showing a bare status code.
+    let detail = `Failed to start QA run: ${res.status}`
+    try { const j = await res.json(); if (j?.detail) detail = j.detail } catch { /* non-JSON */ }
+    throw new Error(detail)
+  }
   return (await res.json()).streamId
 }
 

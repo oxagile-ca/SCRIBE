@@ -4,6 +4,7 @@ import {
   shouldPassivelyCheckEvidence,
   waitingLaneKey,
   classifyBlocker,
+  streamLostUpdate,
 } from '../src/laneStatus'
 import type { Lane, AgentName, AgentStatus, CouncilStatus } from '../src/types'
 
@@ -119,6 +120,22 @@ for (const msg of ['log in', 'no branch', 'chrome', 'connection lost', 'boom']) 
   const b = classifyBlocker(msg)
   ok(!!b.label && !!b.hint, `blocker for "${msg}" has a label and a hint`)
 }
+
+// --- streamLostUpdate (dropped live stream != failed run) -------------------
+{
+  const found = streamLostUpdate(true)
+  eq(found.state, 'done', 'stream lost + evidence present -> done (not failed)')
+  eq(found.completed, true, 'stream lost + evidence present -> completed')
+  eq(found.waitingForEvidence, false, 'completed run stops waiting for evidence')
+  ok(/reconnect lost/i.test(found.message), 'completed message notes the lost reconnect')
+
+  const watching = streamLostUpdate(false)
+  eq(watching.state, 'active', 'stream lost + no evidence yet -> active/watching (not failed)')
+  eq(watching.completed, false, 'no evidence yet -> not completed')
+  eq(watching.waitingForEvidence, true, 'no evidence yet -> keep polling so it self-reconciles')
+}
+ok((streamLostUpdate(true).state as string) !== 'failed' && (streamLostUpdate(false).state as string) !== 'failed',
+  'a dropped live stream is NEVER reported as failed')
 
 // --- report -----------------------------------------------------------------
 console.log(`\nlaneStatus: ${passed} passed, ${failed} failed`)

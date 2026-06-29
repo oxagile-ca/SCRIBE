@@ -95,6 +95,7 @@ council.configure(streams, pipeline_store)
 
 import qa_orchestrator
 import auto_mode
+from qa_run_lock import qa_single_flight
 auto_mode.configure(pipeline_store, streams)
 
 import auto_provision
@@ -892,16 +893,33 @@ async def api_test(req: TestRequest):
 
 @app.post("/api/qa-run/{key}")
 async def api_qa_run(key: str, req: QaRunRequest):
-    """Close the copy-paste gap (#9): run qa-evidence server-side, then report+pdf+gated attach."""
+    """Close the copy-paste gap (#9): run qa-evidence server-side, then report+pdf+gated attach.
+
+    QA runs are serialized to ONE at a time: two concurrent headless runs (each a
+    Claude + Playwright MCP + Chromium) starve the box enough to drop the live SSE
+    stream. A second request is rejected with 409 until the active run finishes.
+    """
     if not re.match(r"^[A-Z][A-Z0-9]*-\d+$", key):
         raise HTTPException(status_code=400, detail="invalid ticket key")
+    if not qa_single_flight.try_acquire(key):
+        raise HTTPException(
+            status_code=409,
+            detail=(f"A QA run is already in progress ({qa_single_flight.active()}). "
+                    f"QA runs go one at a time — wait for it to finish, then retry."),
+        )
     stream_id = str(uuid.uuid4())
     streams.create(stream_id)
     state = auto_mode.get_state()
-    asyncio.create_task(_run_stream(
-        stream_id,
-        qa_orchestrator.run_and_finalize(key, req.envUrl, armed=state["armed"], manual=False),
-    ))
+
+    async def _guarded_run():
+        try:
+            async for ev in qa_orchestrator.run_and_finalize(
+                key, req.envUrl, armed=state["armed"], manual=False):
+                yield ev
+        finally:
+            qa_single_flight.release(key)
+
+    asyncio.create_task(_run_stream(stream_id, _guarded_run()))
     return {"streamId": stream_id}
 
 

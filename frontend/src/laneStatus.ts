@@ -30,6 +30,28 @@ export function waitingLaneKey(lanes: Lane[]): string {
   return lanes.filter(shouldPassivelyCheckEvidence).map(l => l.id).sort().join(',')
 }
 
+/**
+ * Decide a lane's state when its LIVE qa-run stream drops. A dropped stream is a
+ * client-side connection loss — the orchestrator keeps running server-side — so it
+ * must NOT be shown as a failed run. If evidence already exists for the ticket the
+ * run completed (we just lost the live feed): mark it done. Otherwise keep watching
+ * so the passive evidence poll reconciles it once evidence lands. Either way: never
+ * 'failed'.
+ */
+export interface StreamLostUpdate {
+  state: 'done' | 'active'
+  message: string
+  waitingForEvidence: boolean
+  completed: boolean
+}
+
+export function streamLostUpdate(evidenceFound: boolean): StreamLostUpdate {
+  if (evidenceFound) {
+    return { state: 'done', message: 'QA complete (stream reconnect lost)', waitingForEvidence: false, completed: true }
+  }
+  return { state: 'active', message: 'Stream lost — watching for evidence…', waitingForEvidence: true, completed: false }
+}
+
 export type BlockerKind = 'login' | 'data' | 'runner' | 'connection' | 'generic'
 
 export interface Blocker {

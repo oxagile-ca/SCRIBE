@@ -3,7 +3,7 @@ import { Ticket, Lane, AgentName, AgentStatus } from './types'
 import { fetchTickets, startPipeline, fetchDevInfo, subscribeSSE, fetchPipelineStates, resumePipeline, checkEvidence, checkDeploy, runCommand, releaseEnv, fetchEnvLocks, generateReport, fetchEvidenceHistory, EvidenceHistoryItem, subscribeCouncil, overrideCouncil, retryAutoProvision, getOnboardingStatus, startQaRun, attachToLinear, getAutomation, setAutomation } from './api'
 import type { EnvInUseError } from './api'
 import { loadLanes, dumpLanes, reconcileLanesWithBackend } from './laneSchema'
-import { shouldPassivelyCheckEvidence, waitingLaneKey } from './laneStatus'
+import { shouldPassivelyCheckEvidence, waitingLaneKey, streamLostUpdate } from './laneStatus'
 import { showToast } from './components/Toast'
 
 type EnvLocks = Record<string, { pipelineId: string; ticketKey: string; stage: string; status: string }>
@@ -517,14 +517,41 @@ export default function App() {
             showToast(`QA failed: ${reason}`)
           }
         }
-      }, () => {
-        updateLaneAgent(laneId, 'inspector', { state: 'failed', message: 'Connection lost' })
-        appendLog(laneId, '✗ Connection lost')
-        showToast('QA run: connection lost')
+      }, async () => {
+        // A dropped LIVE stream is NOT a failed run — the orchestrator keeps going
+        // server-side. Reconcile against on-disk evidence instead of hard-failing:
+        // if the run already produced evidence, mark it done; otherwise keep
+        // waiting so the passive evidence poll picks it up when it lands.
+        appendLog(laneId, '… live stream lost — reconciling against evidence')
+        let found = false
+        try {
+          const ev = await checkEvidence(lane.ticket.key, lane.baselineRuns ?? [])
+          found = !!ev.found
+          if (found) {
+            const reportUrl = ev.reportUrl || ev.evidence?.reportUrl || ''
+            setLanes(prev => prev.map(l => l.id === laneId ? { ...l, reportUrl: reportUrl || l.reportUrl } : l))
+            appendLog(laneId, `✓ Evidence present (score ${ev.score ?? 'N/A'})`)
+          }
+        } catch { /* fall through to watching state below */ }
+        const upd = streamLostUpdate(found)
+        setLanes(prev => prev.map(l => l.id === laneId ? { ...l, waitingForEvidence: upd.waitingForEvidence } : l))
+        updateLaneAgent(laneId, 'inspector', found
+          ? { state: 'done', progress: 100, message: upd.message, eta: '' }
+          : { state: 'active', message: upd.message, eta: 'reconnecting' })
+        showToast(found ? `QA complete — ${lane.ticket.key}` : `Stream lost — watching for evidence (${lane.ticket.key})`)
       })
       sseCleanups.current[laneId] = cleanup
     } catch (err) {
-      updateLaneAgent(laneId, 'inspector', { state: 'failed', message: String(err) })
+      const msg = String(err)
+      // Backend serializes QA runs (one at a time); a 409 is a polite "busy",
+      // not a failure of THIS lane — revert it cleanly instead of marking failed.
+      if (/already in progress/i.test(msg)) {
+        updateLaneAgent(laneId, 'inspector', { state: 'idle', progress: 0, message: '' })
+        appendLog(laneId, `⏳ ${msg}`)
+        showToast('A QA run is already in progress — runs go one at a time')
+        return
+      }
+      updateLaneAgent(laneId, 'inspector', { state: 'failed', message: msg })
       appendLog(laneId, `✗ Could not start QA: ${err}`)
       showToast(`QA failed to start: ${err}`)
     }

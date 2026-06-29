@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INV-506 QA Evidence — run-qa-feature-ankit-002</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f5f5f5; color: #222; }
+  .header { background: #1a1a2e; color: #fff; padding: 24px 32px; }
+  .header h1 { margin: 0 0 4px; font-size: 22px; }
+  .header p { margin: 0; opacity: .7; font-size: 14px; }
+  .verdict { display: inline-block; padding: 4px 14px; border-radius: 12px; font-weight: 700; font-size: 14px; margin-top: 10px; }
+  .PASS-WITH-ISSUES { background: #f59e0b; color: #fff; }
+  .container { max-width: 960px; margin: 24px auto; padding: 0 24px; }
+  .card { background: #fff; border-radius: 8px; padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .card h2 { margin: 0 0 16px; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+  .score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .score-box { text-align: center; padding: 16px; border-radius: 6px; }
+  .score-box.pass { background: #dcfce7; color: #166534; }
+  .score-box.fail { background: #fee2e2; color: #991b1b; }
+  .score-box.nr { background: #fef9c3; color: #854d0e; }
+  .score-box.conf { background: #dbeafe; color: #1e40af; }
+  .score-box .num { font-size: 32px; font-weight: 700; }
+  .score-box .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f9fafb; text-align: left; padding: 8px 12px; border-bottom: 2px solid #e5e7eb; font-size: 12px; text-transform: uppercase; }
+  td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  tr:hover td { background: #fafafa; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .badge.pass { background: #dcfce7; color: #166534; }
+  .badge.fail { background: #fee2e2; color: #991b1b; }
+  .badge.needs-review { background: #fef9c3; color: #854d0e; }
+  .badge.blocked { background: #f3e8ff; color: #6b21a8; }
+  .issue { padding: 10px 14px; border-left: 3px solid #f59e0b; background: #fffbeb; border-radius: 0 4px 4px 0; margin-bottom: 8px; font-size: 13px; }
+  .issue .sev { font-size: 11px; text-transform: uppercase; color: #92400e; font-weight: 600; }
+  .compare { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px 16px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>INV-506 — Folio &amp; Invoice Support, Framework</h1>
+  <p>run-qa-feature-ankit-002 · qa-feature · https://xin-np.wbee.ca/ · 2026-06-29</p>
+  <span class="verdict PASS-WITH-ISSUES">PASS-WITH-ISSUES</span>
+</div>
+<div class="container">
+
+  <div class="card">
+    <h2>Score Summary</h2>
+    <div class="score-grid">
+      <div class="score-box pass"><div class="num">12</div><div class="lbl">Pass</div></div>
+      <div class="score-box fail"><div class="num">0</div><div class="lbl">Fail</div></div>
+      <div class="score-box nr"><div class="num">3</div><div class="lbl">Needs Review</div></div>
+      <div class="score-box conf"><div class="num">85</div><div class="lbl">Confidence</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    ⟳ <strong>Run 2 of 2</strong> — Compared with <code>run-qa-feature-ankit-001</code> (2026-06-29, 82 confidence).
+    All primary ACs <strong>consistent</strong> across both runs. UV-3 improved to PASS this run (asset scan executed). Three minor issues persist unchanged.
+  </div>
+  <br>
+
+  <div class="card">
+    <h2>Test Cases</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>TC-0506-001</td><td>Folio renders via Reservation Detail</td><td><span class="badge pass">PASS</span></td><td>Folio Preview dialog full content rendered</td></tr>
+        <tr><td>TC-0506-002</td><td>Folio line items populated</td><td><span class="badge pass">PASS</span></td><td>326 Room | 07/15 | 07/17 | 1 | $119.00 — known defect FIXED ✓</td></tr>
+        <tr><td>TC-0506-003</td><td>Invoice renders via Reservation Detail</td><td><span class="badge pass">PASS</span></td><td>Invoice # TOTEWCLQEH, all sections rendered</td></tr>
+        <tr><td>TC-0506-004</td><td>Invoice Hotel Room charge is a dollar amount</td><td><span class="badge pass">PASS</span></td><td>$119.00 shown (not INV-506.00) — known defect FIXED ✓</td></tr>
+        <tr><td>TC-0506-005</td><td>Invoice running balance reconciles</td><td><span class="badge pass">PASS</span></td><td>$119+$9.52+$2.38+$5.95=$136.85; $136.85-$10=$126.85 ✓</td></tr>
+        <tr><td>TC-0506-006</td><td>Print Folio invokes window.print()</td><td><span class="badge pass">PASS</span></td><td>window.__printCalled=true confirmed</td></tr>
+        <tr><td>TC-0506-007</td><td>Print Invoice invokes window.print()</td><td><span class="badge pass">PASS</span></td><td>window.__printCalled=true confirmed</td></tr>
+        <tr><td>TC-0506-008</td><td>API GET /so/folio — valid payload</td><td><span class="badge pass">PASS</span></td><td>200, 3 line items, all required keys present</td></tr>
+        <tr><td>TC-0506-009</td><td>API GET /so/invoice — totals reconcile</td><td><span class="badge pass">PASS</span></td><td>200; 11900+1785=13685 ✓; 13685-1000=12685 ✓</td></tr>
+        <tr><td>TC-UV-1</td><td>Console error scan</td><td><span class="badge pass">PASS</span></td><td>0 first-party errors; 1 allowlisted Cognito favicon 404</td></tr>
+        <tr><td>TC-UV-2</td><td>Network error scan</td><td><span class="badge pass">PASS</span></td><td>All 10 API calls → 200</td></tr>
+        <tr><td>TC-UV-3</td><td>Broken image/asset scan</td><td><span class="badge pass">PASS</span></td><td>0 broken images on /reservation/BK_J755DICT</td></tr>
+        <tr><td>TC-UV-4</td><td>Document lifecycle smoke</td><td><span class="badge pass">PASS</span></td><td>Exempt — read-only display doc (see exemption.md)</td></tr>
+        <tr><td>TC-UV-5</td><td>Accessibility scan</td><td><span class="badge needs-review">NEEDS-REVIEW</span></td><td>axe-core unavailable in Playwright MCP</td></tr>
+        <tr><td>TC-UV-6</td><td>Snapshot drift check</td><td><span class="badge needs-review">NEEDS-REVIEW</span></td><td>run-001 is baseline candidate; visual diff deferred</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Open Issues (3 minor — consistent with run-001)</h2>
+    <div class="issue"><div class="sev">minor</div>MRDT rate is 2% in API/UI (both runs). Spec documents 3%. Likely property-configured for Totem Lodge. Clarify with dev team.</div>
+    <div class="issue"><div class="sev">minor</div>invoice.currency field returns empty string "" in both /so/folio and /so/invoice API responses. Expected "CAD".</div>
+    <div class="issue"><div class="sev">minor</div>invoice.total_deposits summary field = 0 in /so/invoice. Deposits correctly held as individual line items but summary field not populated.</div>
+  </div>
+
+  <div class="card">
+    <h2>Evidence Files</h2>
+    <table>
+      <thead><tr><th>TC</th><th>File</th></tr></thead>
+      <tbody>
+        <tr><td>TC-0506-001</td><td>automated/TC-0506-001/reservation-detail.png, folio-dialog.png</td></tr>
+        <tr><td>TC-0506-002</td><td>automated/TC-0506-002/folio-line-items.png</td></tr>
+        <tr><td>TC-0506-003</td><td>automated/TC-0506-003/invoice-dialog.png</td></tr>
+        <tr><td>TC-0506-004</td><td>automated/TC-0506-004/invoice-charge-amount.png</td></tr>
+        <tr><td>TC-0506-005</td><td>automated/TC-0506-005/invoice-balance-reconcile.png</td></tr>
+        <tr><td>TC-0506-006</td><td>automated/TC-0506-006/folio-print-confirmed.png</td></tr>
+        <tr><td>TC-0506-007</td><td>automated/TC-0506-007/invoice-print-confirmed.png</td></tr>
+        <tr><td>TC-0506-008</td><td>automated/TC-0506-008/api-folio.json</td></tr>
+        <tr><td>TC-0506-009</td><td>automated/TC-0506-009/api-invoice.json</td></tr>
+        <tr><td>TC-UV-1</td><td>automated/TC-UV-1/console-errors.json</td></tr>
+        <tr><td>TC-UV-2</td><td>automated/TC-UV-2/non-2xx.json</td></tr>
+        <tr><td>TC-UV-3</td><td>automated/TC-UV-3/asset-report.json</td></tr>
+        <tr><td>TC-UV-4</td><td>automated/TC-UV-4/publish-skipped.txt, manual/TC-UV-4/exemption.md</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>

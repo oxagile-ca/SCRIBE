@@ -1,0 +1,5 @@
+TC-UV-4 Document Lifecycle Smoke — EXEMPT
+Folio and Invoice are read-only display documents rendered from server data.
+There is no save/edit/publish flow on these pages.
+D1–D5 gates do not apply. Exemption confirmed: manual/TC-UV-4/exemption.md.
+Run: run-qa-feature-ankit-002

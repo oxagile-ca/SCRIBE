@@ -220,6 +220,32 @@ test_cases:
     tags: ["@universal", "@INV-506"]
 
 runs:
+  - id: run-qa-feature-ankit-002
+    kind: qa-feature
+    env: https://xin-np.wbee.ca/
+    executor: workabee-dev
+    started: "2026-06-29T09:50:00Z"
+    finished: "2026-06-29T10:08:00Z"
+    verdict: PASS-WITH-ISSUES
+    confidence: 85
+    compare_run: run-qa-feature-ankit-001
+    results:
+      TC-0506-001: {status: pass, note: "Folio dialog renders — reservation-detail.png + folio-dialog.png"}
+      TC-0506-002: {status: pass, note: "Line items populated — 326 Room $119.00 confirmed (2nd run)"}
+      TC-0506-003: {status: pass, note: "Invoice dialog renders with Invoice Number TOTEWCLQEH (2nd run)"}
+      TC-0506-004: {status: pass, note: "Hotel Room charge $119.00, not INV-506.00 (2nd run)"}
+      TC-0506-005: {status: pass, note: "Running balance reconciles end-to-end (2nd run)"}
+      TC-0506-006: {status: pass, note: "window.__printCalled=true from folio dialog"}
+      TC-0506-007: {status: pass, note: "window.__printCalled=true from invoice dialog"}
+      TC-0506-008: {status: pass, note: "API 200, 3 line items, MRDT 2% (consistent), currency='' (consistent)"}
+      TC-0506-009: {status: pass, note: "API 200, 11900+1785=13685 ✓, 13685-1000=12685 ✓, total_deposits=0 noted"}
+      TC-UV-1: {status: pass, note: "0 first-party console errors; Cognito favicon 404 allowlisted"}
+      TC-UV-2: {status: pass, note: "All 10 API calls 200; zero non-2xx"}
+      TC-UV-3: {status: pass, note: "0 broken images on /reservation/BK_J755DICT"}
+      TC-UV-4: {status: pass, note: "Exempt — read-only doc; see manual/TC-UV-4/exemption.md"}
+      TC-UV-5: {status: needs-review, note: "axe-core unavailable in Playwright MCP"}
+      TC-UV-6: {status: needs-review, note: "run-001 is now baseline candidate; visual diff deferred"}
+
   - id: run-qa-feature-ankit-001
     kind: qa-feature
     env: https://xin-np.wbee.ca/

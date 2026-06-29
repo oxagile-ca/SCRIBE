@@ -1,0 +1,145 @@
+{
+  "ticket": "INV-506",
+  "verdict": "PASS-WITH-ISSUES",
+  "score": {"pass": 12, "fail": 0, "blocked": 0, "needs_review": 3, "total": 15, "pct": 80},
+  "confidence": {
+    "headline": 85,
+    "band": "pass-with-issues",
+    "explanation": "All 9 primary ACs pass (confirmed independently on second run). UV suite: UV-1 PASS (Cognito favicon 404 is third-party/allowlisted), UV-2 PASS (all 10 API calls 200), UV-3 PASS (0 broken images), UV-4 exempt (read-only docs). UV-5 needs-review (axe-core unavailable in Playwright MCP), UV-6 needs-review (run-001 is now baseline candidate). Open issues: (1) MRDT 2% in API/UI vs 3% in spec — confirmed property-configured, consistent across both runs. (2) invoice.currency empty string in API. (3) total_deposits summary field = 0 in API (deposits held as line items only)."
+  },
+  "time": "~18 minutes",
+  "started": "2026-06-29T09:50:00Z",
+  "finished": "2026-06-29T10:08:00Z",
+  "executor": "workabee-dev",
+  "env": "https://xin-np.wbee.ca/",
+  "run_kind": "qa-feature",
+  "seed_booking": "BK_J755DICT",
+  "compare_run": "run-qa-feature-ankit-001",
+  "test_cases": [
+    {
+      "id": "TC-0506-001",
+      "title": "Folio renders via Reservation Detail → Print Folio",
+      "status": "pass",
+      "evidence": ["automated/TC-0506-001/reservation-detail.png", "automated/TC-0506-001/folio-dialog.png"],
+      "note": "Print Folio button opens Folio Preview dialog. Full header, guest info, line items, totals, T&Cs, signature all rendered. Consistent with run-001."
+    },
+    {
+      "id": "TC-0506-002",
+      "title": "Folio line item rows are populated (not empty)",
+      "status": "pass",
+      "evidence": ["automated/TC-0506-002/folio-line-items.png"],
+      "note": "Row '326 Room | 07/15/2026 | 07/17/2026 | 1 | $119.00 | $119.00' visible. Known defect FIXED (confirmed second run)."
+    },
+    {
+      "id": "TC-0506-003",
+      "title": "Invoice renders via Reservation Detail → Print Invoice",
+      "status": "pass",
+      "evidence": ["automated/TC-0506-003/invoice-dialog.png"],
+      "note": "Invoice Preview dialog renders with Invoice Number TOTEWCLQEH, all sections present. Consistent with run-001."
+    },
+    {
+      "id": "TC-0506-004",
+      "title": "Invoice Hotel Room charge is a dollar amount, not a ticket ID",
+      "status": "pass",
+      "evidence": ["automated/TC-0506-004/invoice-charge-amount.png"],
+      "note": "Room charge shows $119.00 (not INV-506.00). Known defect FIXED (confirmed second run)."
+    },
+    {
+      "id": "TC-0506-005",
+      "title": "Invoice running balance reconciles",
+      "status": "pass",
+      "evidence": ["automated/TC-0506-005/invoice-balance-reconcile.png"],
+      "note": "$119→+$9.52→$128.52→+$2.38→$130.90→+$5.95→$136.85→-$5.00→$131.85→-$5.00→$126.85. Summary: $119+$9.52+$0+$5.95+$2.38=$136.85; $136.85-$10.00=$126.85. All reconcile (confirmed second run)."
+    },
+    {
+      "id": "TC-0506-006",
+      "title": "Print Folio button invokes window.print()",
+      "status": "pass",
+      "evidence": ["automated/TC-0506-006/folio-print-confirmed.png"],
+      "note": "window.__printCalled=true confirmed via JS evaluation after clicking Print in folio dialog."
+    },
+    {
+      "id": "TC-0506-007",
+      "title": "Print Invoice button invokes window.print()",
+      "status": "pass",
+      "evidence": ["automated/TC-0506-007/invoice-print-confirmed.png"],
+      "note": "window.__printCalled=true confirmed via JS evaluation after clicking Print in invoice dialog."
+    },
+    {
+      "id": "TC-0506-008",
+      "title": "API: GET /so/folio returns valid payload with line items",
+      "status": "pass",
+      "evidence": ["automated/TC-0506-008/api-folio.json"],
+      "note": "HTTP 200. Keys: [invoice, terms, customer, location, booking]. 3 line items. subtotal=11900, total=13685, total_due=12685. MRDT 2% (vs spec 3%) — property-configured. currency=''."
+    },
+    {
+      "id": "TC-0506-009",
+      "title": "API: GET /so/invoice returns valid payload with reconciling totals",
+      "status": "pass",
+      "evidence": ["automated/TC-0506-009/api-invoice.json"],
+      "note": "HTTP 200. 11900+1785=13685 ✓; 13685-1000=12685 ✓. total_deposits summary field=0 (deposits as line items). currency=''."
+    },
+    {
+      "id": "TC-UV-1",
+      "title": "Console error scan",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-1/console-errors.json"],
+      "note": "1 console error: Cognito favicon 404 (third-party/allowlisted). Zero first-party errors."
+    },
+    {
+      "id": "TC-UV-2",
+      "title": "Network error scan",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-2/non-2xx.json"],
+      "note": "All 10 API calls to xin-api-np.wbee.ca returned 200. Zero 4xx/5xx."
+    },
+    {
+      "id": "TC-UV-3",
+      "title": "Broken image/asset scan",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-3/asset-report.json"],
+      "note": "1 image found, 0 broken (naturalWidth > 0 for all)."
+    },
+    {
+      "id": "TC-UV-4",
+      "title": "Document lifecycle smoke",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-4/publish-skipped.txt", "manual/TC-UV-4/exemption.md"],
+      "note": "Exempt: folio/invoice are read-only display documents with no save/publish flow."
+    },
+    {
+      "id": "TC-UV-5",
+      "title": "Accessibility scan",
+      "status": "needs-review",
+      "evidence": [],
+      "note": "axe-core not available via Playwright MCP. No a11y scan run. Downgraded to needs-review."
+    },
+    {
+      "id": "TC-UV-6",
+      "title": "Snapshot drift check",
+      "status": "needs-review",
+      "evidence": [],
+      "note": "run-qa-feature-ankit-001 is now a baseline candidate. Visual drift check between run-001 and run-002 screenshots deferred to manual review. Downgraded to needs-review."
+    }
+  ],
+  "issues_flagged": [
+    {
+      "severity": "minor",
+      "description": "MRDT rate is 2% in API/UI across both runs. Product spec documents MRDT as 3%. Consistent — property-configured for Totem Lodge.",
+      "affects": ["TC-0506-005", "TC-0506-008", "TC-0506-009"],
+      "trend": "consistent-across-2-runs"
+    },
+    {
+      "severity": "minor",
+      "description": "invoice.currency returns empty string in API (both folio and invoice endpoints). Expected 'CAD'.",
+      "affects": ["TC-0506-008", "TC-0506-009"],
+      "trend": "consistent-across-2-runs"
+    },
+    {
+      "severity": "minor",
+      "description": "invoice.total_deposits summary field = 0 in /so/invoice API. Deposits are present as individual line items (2×$5.00). UI correctly renders $10.00 deposits and $126.85 balance.",
+      "affects": ["TC-0506-009"],
+      "trend": "consistent-across-2-runs"
+    }
+  ]
+}

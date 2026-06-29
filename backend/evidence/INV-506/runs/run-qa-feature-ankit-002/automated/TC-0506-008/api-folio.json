@@ -1,0 +1,24 @@
+{
+  "request": {"method": "GET", "path": "/api/v1/so/folio", "query": "booking_id=8"},
+  "status": 200,
+  "ok": true,
+  "responseKeys": ["invoice", "terms", "customer", "location", "booking"],
+  "asserted": {
+    "http_200": true,
+    "has_invoice": true,
+    "has_line_items": true,
+    "line_item_count": 3,
+    "room_charge_unit_price_cents": 11900,
+    "deposit_items": 2,
+    "subtotal_cents": 11900,
+    "total_cents": 13685,
+    "total_due_cents": 12685,
+    "math_ok": "11900 + 1785_taxes = 13685 ✓",
+    "has_customer": true,
+    "has_location": true,
+    "has_terms": true
+  },
+  "notes": "MRDT shows 2% (consistent with run-001). total_deposits summary field = 0; deposits present as individual line items (2x 500 cents). currency field is empty string.",
+  "currency_field_empty": true,
+  "run": "run-qa-feature-ankit-002"
+}

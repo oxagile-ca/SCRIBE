@@ -222,10 +222,13 @@ its description and flag for review — do NOT substitute the linked ticket's sc
 Phase 2 drives a **real browser via the Playwright MCP** — codifying what the
 interactive agent does by hand so the headless `claude -p` run (no human to adapt)
 performs real QA instead of stopping. **There is NO `pnpm` / Playwright "evidence"
-project — do not look for one or try to install one.** Use the MCP tools:
-`mcp__plugin_playwright_playwright__browser_navigate / browser_snapshot /
-browser_type / browser_click / browser_take_screenshot / browser_evaluate /
-browser_console_messages / browser_network_requests / browser_wait_for`.
+project — do not look for one or try to install one.** Use the Playwright MCP
+browser tools (the run harness wires in the `playwright` MCP server via
+`--mcp-config`, so they appear as `mcp__playwright__browser_*`): `browser_navigate`,
+`browser_snapshot`, `browser_type`, `browser_click`, `browser_take_screenshot`,
+`browser_evaluate`, `browser_console_messages`, `browser_network_requests`,
+`browser_wait_for`. If these tools are absent, STOP (verdict `blocked`) — never
+fall back to a pnpm/spec runner.
 
 ### 2.0 Resolve targets (deterministic — strips guesswork)
 If the backend ships a `qa_targets.py` resolver, run it from the backend dir and

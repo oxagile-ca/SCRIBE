@@ -7,20 +7,50 @@ def test_build_qa_command_exact_template():
     assert cmd == "/qa-evidence-beeventory INV-660 run:qa-feature env:https://app.example.com --headless --auto-approve --isolated"
 
 
-def test_build_runner_argv_mirrors_council(monkeypatch):
+def test_build_runner_argv_mirrors_council(monkeypatch, tmp_path):
     monkeypatch.delenv("CLAUDE_BIN", raising=False)
+    cfg = tmp_path / "mcp.json"; cfg.write_text("{}")
+    monkeypatch.setenv("QA_MCP_CONFIG", str(cfg))
     argv = qa_runner.build_runner_argv("/qa-evidence-beeventory INV-1 ...", "claude-haiku-4-5")
-    assert argv[:6] == ["claude", "-p", "--output-format", "stream-json", "--verbose", "--permission-mode"]
+    assert argv[0] == "claude" and argv[1] == "-p"
+    assert "--output-format" in argv and "stream-json" in argv
+    assert "--verbose" in argv
     assert "bypassPermissions" in argv
     assert "--model" in argv and "claude-haiku-4-5" in argv
     assert argv[-1] == "/qa-evidence-beeventory INV-1 ..."
 
 
-def test_build_runner_argv_no_model_omits_flag(monkeypatch):
+def test_build_runner_argv_no_model_omits_flag(monkeypatch, tmp_path):
     monkeypatch.delenv("CLAUDE_BIN", raising=False)
+    cfg = tmp_path / "mcp.json"; cfg.write_text("{}")
+    monkeypatch.setenv("QA_MCP_CONFIG", str(cfg))
     argv = qa_runner.build_runner_argv("prompt", None)
     assert "--model" not in argv
     assert argv[-1] == "prompt"
+
+
+def test_build_runner_argv_injects_playwright_mcp(monkeypatch, tmp_path):
+    """Headless `claude -p` does not load the Playwright plugin MCP (D3); the
+    runner must wire it in via --mcp-config so Phase 2 can drive a browser."""
+    monkeypatch.delenv("CLAUDE_BIN", raising=False)
+    cfg = tmp_path / "mcp.json"; cfg.write_text("{}")
+    monkeypatch.setenv("QA_MCP_CONFIG", str(cfg))
+    argv = qa_runner.build_runner_argv("PROMPT", None)
+    assert "--mcp-config" in argv
+    i = argv.index("--mcp-config")
+    assert argv[i + 1] == str(cfg)
+    # --mcp-config is variadic: the token after its value MUST be a flag, never the
+    # bare command, or claude treats the prompt as a second config file and dies.
+    assert argv[i + 2].startswith("--")
+    assert argv[-1] == "PROMPT"
+
+
+def test_build_runner_argv_skips_absent_mcp_config(monkeypatch, tmp_path):
+    monkeypatch.delenv("CLAUDE_BIN", raising=False)
+    monkeypatch.setenv("QA_MCP_CONFIG", str(tmp_path / "does-not-exist.json"))
+    argv = qa_runner.build_runner_argv("PROMPT", None)
+    assert "--mcp-config" not in argv
+    assert argv[-1] == "PROMPT"
 
 
 class _FakeStdout:

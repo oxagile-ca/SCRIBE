@@ -16,16 +16,36 @@ def _claude_bin() -> str:
     return os.environ.get("CLAUDE_BIN", "claude")
 
 
+def _mcp_config_path() -> str:
+    """Path to the MCP config that wires the Playwright server into the run.
+
+    A headless `claude -p` does NOT inherit the Playwright *plugin* MCP, so Phase 2
+    (which drives a browser) needs the server injected explicitly via --mcp-config.
+    Override with QA_MCP_CONFIG; defaults to the committed backend/qa_mcp.config.json.
+    """
+    return os.environ.get(
+        "QA_MCP_CONFIG", os.path.join(os.path.dirname(__file__), "qa_mcp.config.json")
+    )
+
+
 def build_qa_command(ticket_key: str, env_url: str, skill_cmd: str) -> str:
     """The exact template agents.run_test uses today (agents.py:587-588)."""
     return f"{skill_cmd} {ticket_key} run:qa-feature env:{env_url} --headless --auto-approve --isolated"
 
 
 def build_runner_argv(command: str, model: str | None) -> list[str]:
-    """Argv for create_subprocess_exec — mirrors council._build_reviewer_cmd."""
-    argv = [
-        _claude_bin(),
-        "-p",
+    """Argv for create_subprocess_exec — mirrors council._build_reviewer_cmd.
+
+    Injects --mcp-config (Playwright) when the config file exists so the headless
+    Phase 2 can drive a browser. --mcp-config is variadic, so it must be followed
+    by another flag (here --output-format) — never placed right before the trailing
+    command, or claude would treat the command string as a second config file.
+    """
+    argv = [_claude_bin(), "-p"]
+    mcp_config = _mcp_config_path()
+    if mcp_config and os.path.exists(mcp_config):
+        argv += ["--mcp-config", mcp_config]
+    argv += [
         "--output-format", "stream-json",
         "--verbose",
         "--permission-mode", "bypassPermissions",

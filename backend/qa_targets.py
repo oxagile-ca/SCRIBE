@@ -78,13 +78,21 @@ def is_booking_dependent(ticket_type):
 
 
 def _invoice_total_due(invoice):
-    """Pull a total_due-ish number out of a /so/invoice response. None if absent."""
+    """Pull a total_due-ish number out of a /so/invoice response. None if absent.
+
+    The live response nests the invoice object under an "invoice" key; accept
+    either that shape or a flat invoice object."""
     if not isinstance(invoice, dict):
         return None
-    for k in ("total_due", "totalDue", "balance_due", "balanceDue", "total"):
-        v = invoice.get(k)
-        if isinstance(v, (int, float)):
-            return v
+    candidates = [invoice]
+    sub = invoice.get("invoice")
+    if isinstance(sub, dict):
+        candidates.append(sub)
+    for obj in candidates:
+        for k in ("total_due", "totalDue", "balance_due", "balanceDue", "total"):
+            v = obj.get(k)
+            if isinstance(v, (int, float)):
+                return v
     return None
 
 
@@ -172,30 +180,60 @@ def _ticket_text_from_manifest(evidence_root, key):
     return "\n".join(p for p in parts if p) or None
 
 
-def _fetch_bookings(api_base, id_token):
-    """GET /booking/property over a wide window. Returns normalized booking rows."""
-    import httpx
-    from datetime import date, timedelta
-    headers = {"Authorization": f"Bearer {id_token}"}
-    start = (date.today() - timedelta(days=120)).isoformat()
-    end = (date.today() + timedelta(days=365)).isoformat()
-    url = f"{api_base}/booking/property?check_in_from={start}&check_in_to={end}"
+def _user_buckets(client, api_base, headers):
+    """Bucket ids the test user can see, from GET /user/profile.bucket_to_location."""
     try:
-        with httpx.Client(timeout=20) as c:
-            r = c.get(url, headers=headers)
+        r = client.get(f"{api_base}/user/profile", headers=headers)
     except Exception:
         return []
     if r.status_code != 200:
         return []
-    data = r.json()
-    rows = data.get("data") if isinstance(data, dict) else data
+    prof = r.json() if isinstance(r.json(), dict) else {}
     out = []
-    for b in (rows or []):
-        out.append({
-            "booking_number": b.get("booking_number") or b.get("bookingNumber"),
-            "booking_id": b.get("id") or b.get("booking_id") or b.get("bookingId"),
-            "status": b.get("status"),
-        })
+    for entry in (prof.get("bucket_to_location") or []):
+        bucket = (entry or {}).get("bucket") or {}
+        bid = bucket.get("id")
+        if isinstance(bid, int):
+            out.append(bid)
+    return out
+
+
+def _normalize_booking(b):
+    return {
+        "booking_number": b.get("booking_number") or b.get("bookingNumber"),
+        "booking_id": b.get("id") or b.get("booking_id") or b.get("bookingId"),
+        "status": b.get("status"),
+    }
+
+
+def _fetch_bookings(api_base, id_token):
+    """POST /booking/search across the user's buckets. Returns normalized rows.
+
+    The search response holds rows under "bookings"; an empty search_payload
+    returns every booking in the bucket (which is what we want — pick a seed)."""
+    import httpx
+    headers = {"Authorization": f"Bearer {id_token}", "Content-Type": "application/json"}
+    out = []
+    try:
+        with httpx.Client(timeout=20) as c:
+            buckets = _user_buckets(c, api_base, headers) or []
+            for bucket_id in buckets:
+                body = {"bucket_id": bucket_id, "search_payload": {}}
+                try:
+                    r = c.post(
+                        f"{api_base}/booking/search"
+                        "?sort_order=id&sort_dir=desc&page=1&size=100",
+                        headers=headers, json=body,
+                    )
+                except Exception:
+                    continue
+                if r.status_code != 200:
+                    continue
+                data = r.json()
+                rows = data.get("bookings") if isinstance(data, dict) else data
+                out.extend(_normalize_booking(b) for b in (rows or []))
+    except Exception:
+        return out
     return out
 
 

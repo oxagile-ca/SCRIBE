@@ -125,6 +125,13 @@ def test_invoice_total_due_extraction():
     assert qa_targets._invoice_total_due({}) is None
 
 
+def test_invoice_total_due_nested_response():
+    # Live GET /so/invoice nests the invoice object under "invoice".
+    resp = {"invoice": {"so_id": 4, "total_due": 13685, "subtotal": 11900},
+            "terms": "...", "customer": {}, "location": {}, "booking": {}}
+    assert qa_targets._invoice_total_due(resp) == 13685
+
+
 def test_seed_booking_numbers_present():
     # The five QA-seed bookings from the plan must be the preferred defaults.
     for n in ("BK_X077IUKO", "BK_9IRRVC4P", "BK_CP8WAXM4", "BK_CRKCYYNI", "BK_J755DICT"):

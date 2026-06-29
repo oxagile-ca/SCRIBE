@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "ok": true,
+  "responseKeys": [
+    "invoice",
+    "terms",
+    "customer",
+    "location",
+    "booking"
+  ],
+  "hasInvoiceNumber": false,
+  "hasSoNumber": false,
+  "invoice_number_is_not_null": false,
+  "invoice_number_not_ticket_id": true
+}

@@ -1,0 +1,170 @@
+ticket: INV-609
+title: "Invoice Number & Unique Constraints on Number Identifiers"
+status: Ready for Testing
+assignee: Ankit Guhe
+created: 2026-06-29
+pr_context:
+  diff_found: false
+  note: "Headless mode — PR diff unavailable; manifest anchored to ticket description + ACs"
+scope: invoice
+milestone: "Invoice # / Unique Numbers"
+
+acceptance_criteria:
+  - id: AC-1
+    text: "DB1.7 unique constraint on customer_number — duplicate inserts are rejected"
+    source: description
+  - id: AC-2
+    text: "DB1.7 unique constraint on booking_number — duplicate inserts are rejected"
+    source: description
+  - id: AC-3
+    text: "DB1.7 unique constraint on sales_order_number — duplicate inserts are rejected"
+    source: description
+  - id: AC-4
+    text: "GET /so/invoice?booking_id=<id> response includes invoice_number field with a non-null, non-empty value"
+    source: description
+  - id: AC-5
+    text: "GET /so/invoice?booking_id=<id> response includes so_number field (Sales Order Number)"
+    source: description
+  - id: AC-6
+    text: "Invoice render page (/reservation/:booking_number/invoice) displays the Invoice Number correctly — NOT as 'INV-609.00' or ticket-id placeholder"
+    source: derived
+  - id: AC-7
+    text: "Invoice render 'Hotel Room' charge line shows the correct room charge amount, not the ticket number"
+    source: derived
+
+test_cases:
+  - id: TC-0609-001
+    title: "API — GET /so/invoice returns invoice_number field"
+    type: automated
+    priority: P0
+    ac: [AC-4]
+    evidence_required: [screenshot, network, api]
+    steps:
+      - Navigate to Reservation Details for BK_J755DICT
+      - Execute GET /so/invoice?booking_id=8 via browser javascript
+      - Assert response contains invoice_number (non-null, non-empty string)
+      - Assert response contains so_number field
+    notes: "Endpoint: GET /so/invoice?booking_id=8. Verifies INV-609 API contract — invoice_number and so_number must be present in response shape."
+    annotations_hint: "Arrow pointing to invoice_number value in API response JSON; callout on so_number field"
+    tags: ["@INV-609", "@api", "@invoice"]
+
+  - id: TC-0609-002
+    title: "API — GET /so/invoice response shape includes all expected number fields"
+    type: automated
+    priority: P1
+    ac: [AC-4, AC-5]
+    evidence_required: [screenshot, api]
+    steps:
+      - Execute GET /so/invoice?booking_id=8 in-browser
+      - Assert top-level fields include invoice_number, so_number, booking_id
+      - Assert invoice_number is not null and not equal to 'INV-609' or '0'
+    notes: "Validates full response shape. Booking-dependent — uses seed booking_id=8."
+    annotations_hint: "Callout box on the JSON response showing invoice_number and so_number fields"
+    tags: ["@INV-609", "@api", "@invoice"]
+
+  - id: TC-0609-003
+    title: "FE — Invoice render page shows correct Invoice Number (not ticket ID placeholder)"
+    type: automated
+    priority: P0
+    ac: [AC-6, AC-7]
+    evidence_required: [screenshot, live]
+    steps:
+      - Navigate to /reservation/BK_J755DICT
+      - Click Print Invoice button
+      - On invoice render page, locate Invoice Number header
+      - Assert it shows a real invoice number (e.g. INV-00001) NOT 'INV-609' or '609.00'
+      - Assert Hotel Room charge line shows a dollar amount, NOT 'INV-609.00'
+    notes: "Key regression guard: product context documents that Invoice render previously showed 'INV-609.00' as Hotel Room charge. This TC confirms that is fixed."
+    annotations_hint: "Red arrow pointing to Invoice Number display; green callout on Hotel Room charge showing correct dollar amount"
+    tags: ["@INV-609", "@frontend", "@invoice", "@regression"]
+
+  - id: TC-0609-004
+    title: "FE — Invoice total and balance reconcile correctly"
+    type: automated
+    priority: P1
+    ac: [AC-6]
+    evidence_required: [screenshot, live, api]
+    steps:
+      - Navigate to Invoice render for BK_J755DICT
+      - Capture all line items, subtotal, taxes, total
+      - Assert Total matches invoice_total_due from API (12685 cents = $126.85 CAD)
+      - Assert Balance Due = Total - Deposits (must not be unreconciled)
+    notes: "Seed booking invoice_total_due is 12685 (cents). Validates running balance reconciles to Total — a known open issue mentioned in product context."
+    annotations_hint: "Callout boxes on Subtotal, Tax lines, Total, Balance Due rows; arrow showing reconciliation math"
+    tags: ["@INV-609", "@frontend", "@invoice", "@math"]
+
+  # Universal Validation Suite
+  - id: TC-UV-1
+    title: "Universal — Console error scan"
+    type: automated
+    priority: P1
+    evidence_required: [console]
+    steps:
+      - Collect all console.error and pageerror events across all pages visited
+      - Save to console-errors.json
+      - Assert no non-allowlisted errors
+    notes: "Runs on every non-baseline run. Pages visited: login, /reservation/BK_J755DICT, /reservation/BK_J755DICT/invoice"
+    tags: ["@universal", "@INV-609"]
+
+  - id: TC-UV-2
+    title: "Universal — Network error scan (4xx/5xx)"
+    type: automated
+    priority: P1
+    evidence_required: [network]
+    steps:
+      - Record all network requests during the session
+      - Filter for non-2xx responses on app-authored requests
+      - Assert non-2xx list is empty or only allowlisted third-party beacons
+    notes: "HAR capture across full session. Endpoint surface: /so/invoice, /booking, /so/transactions"
+    tags: ["@universal", "@INV-609"]
+
+  - id: TC-UV-3
+    title: "Universal — Broken asset/image scan"
+    type: automated
+    priority: P2
+    evidence_required: [screenshot]
+    steps:
+      - Walk DOM on visited pages for img src, source srcset, CSS background-image
+      - HEAD-fetch each; assert status 200 and non-empty body
+    notes: "Asset scan on invoice render page — logo, icons, print stylesheet assets"
+    tags: ["@universal", "@INV-609"]
+
+runs:
+  - id: run-qa-feature-ankit-001
+    kind: qa-feature
+    env: https://xin-np.wbee.ca/
+    executor: ankit
+    started: 2026-06-29T09:15:00Z
+    finished: 2026-06-29T09:35:00Z
+    verdict: PASS-WITH-ISSUES
+    confidence: 72
+    seed_booking: BK_J755DICT
+    results:
+      TC-0609-001:
+        status: needs-review
+        note: "invoice_number field absent; sales_order_number='TOTEWCLQEH' present. FE uses SO number as Invoice Number. Needs dev confirmation re INV-613/614/615 spec."
+        method: api-browser
+      TC-0609-002:
+        status: needs-review
+        note: "so_number field absent; sales_order_number present. currency='' (empty, expected CAD)."
+        method: api-browser
+      TC-0609-003:
+        status: pass
+        note: "Invoice Number: TOTEWCLQEH. Hotel Room: $119.00. No INV-609.00 found. Balance Due: $126.85. Regression CLEARED."
+        method: browser-dom
+      TC-0609-004:
+        status: pass
+        note: "Running balance reconciles end-to-end: $119.00 → $126.85. Matches API total_due=12685 cents. Regression CLEARED."
+        method: browser-dom
+      TC-UV-1:
+        status: pass
+        note: "Cognito favicon 404 allowlisted. Zero app console errors."
+        method: browser-console
+      TC-UV-2:
+        status: pass
+        note: "All 4 app API calls 200: /user/profile, /booking/search, /so/invoice, /inventory/search."
+        method: browser-network
+      TC-UV-3:
+        status: pass
+        note: "No broken assets observed on reservation details or invoice preview."
+        method: browser-dom

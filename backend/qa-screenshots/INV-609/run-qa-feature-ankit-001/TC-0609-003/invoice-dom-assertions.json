@@ -1,0 +1,17 @@
+{
+  "invoice_number_displayed": "TOTEWCLQEH",
+  "has_ticket_id_as_amount": false,
+  "balance_due_displayed": "$126.85",
+  "balance_cells_count": 4,
+  "room_row_cells": [
+    "Jul 15, 2026 - Jul 17, 2026",
+    "326 Room",
+    "",
+    "1",
+    "$119.00",
+    "$119.00",
+    "",
+    "$119.00"
+  ],
+  "print_button_text": "Print Folio"
+}

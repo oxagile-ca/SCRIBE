@@ -1,0 +1,70 @@
+{
+  "summary_table": {
+    "subtotal": "$119.00",
+    "pst8": "$9.52",
+    "pst7": "$0.00",
+    "gst": "$5.95",
+    "mrdt": "$2.38",
+    "total": "$136.85",
+    "deposits": "$10.00",
+    "payments": "$0.00",
+    "credits": "$0.00",
+    "balanceDue": "$126.85"
+  },
+  "running_balance_rows": [
+    {
+      "desc": "326 Room",
+      "balance": "$119.00"
+    },
+    {
+      "desc": "8% PST (Room Charges)",
+      "balance": "$128.52"
+    },
+    {
+      "desc": "2% MRDT",
+      "balance": "$130.90"
+    },
+    {
+      "desc": "5% GST",
+      "balance": "$136.85"
+    },
+    {
+      "desc": "DEPOSIT",
+      "balance": "$131.85"
+    },
+    {
+      "desc": "DEPOSIT",
+      "balance": "$126.85"
+    },
+    {
+      "desc": "326 Room",
+      "balance": "$119.00"
+    },
+    {
+      "desc": "8% PST (Room Charges)",
+      "balance": "$128.52"
+    },
+    {
+      "desc": "2% MRDT",
+      "balance": "$130.90"
+    },
+    {
+      "desc": "5% GST",
+      "balance": "$136.85"
+    },
+    {
+      "desc": "DEPOSIT",
+      "balance": "$131.85"
+    },
+    {
+      "desc": "DEPOSIT",
+      "balance": "$126.85"
+    }
+  ],
+  "invoice_number_field": "TOTEWCLQEH",
+  "math_check": {
+    "subtotal_to_total": "$119.00 + $9.52 + $0.00 + $5.95 + $2.38 = $136.85",
+    "total_minus_deposits": "$136.85 - $10.00 = $126.85",
+    "balance_due_matches_api_total_due": true
+  }
+}

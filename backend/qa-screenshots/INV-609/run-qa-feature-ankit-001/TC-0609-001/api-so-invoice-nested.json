@@ -1,0 +1,67 @@
+{
+  "status": 200,
+  "ok": true,
+  "topLevelKeys": [
+    "invoice",
+    "terms",
+    "customer",
+    "location",
+    "booking"
+  ],
+  "invoiceKeys": [
+    "so_id",
+    "sales_order_number",
+    "total_due",
+    "status",
+    "currency",
+    "friendly_name",
+    "line_items",
+    "subtotal",
+    "taxes",
+    "total"
+  ],
+  "hasInvoiceNumber": false,
+  "hasSoNumber": false,
+  "invoice_total": 13685,
+  "invoice_subtotal": 11900,
+  "lineItemSample": [
+    {
+      "keys": [
+        "so_item_id",
+        "booking_item_id",
+        "status",
+        "unit_quantity",
+        "unit_price",
+        "unit_price_curr",
+        "updated_at",
+        "created_at",
+        "subtotal",
+        "total",
+        "name",
+        "desc",
+        "line_item_type",
+        "payment_type",
+        "taxes"
+      ]
+    },
+    {
+      "keys": [
+        "so_item_id",
+        "booking_item_id",
+        "status",
+        "unit_quantity",
+        "unit_price",
+        "unit_price_curr",
+        "updated_at",
+        "created_at",
+        "subtotal",
+        "total",
+        "name",
+        "desc",
+        "line_item_type",
+        "payment_type",
+        "taxes"
+      ]
+    }
+  ]
+}

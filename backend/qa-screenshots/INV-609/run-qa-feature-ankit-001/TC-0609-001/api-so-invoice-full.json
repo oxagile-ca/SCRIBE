@@ -1,0 +1,110 @@
+{
+  "status": 200,
+  "invoice_number_present": false,
+  "sales_order_number": "TOTEWCLQEH",
+  "friendly_name": "Hotel Booking",
+  "so_id": 8,
+  "currency": "",
+  "subtotal": 11900,
+  "total": 13685,
+  "total_due": 12685,
+  "inv_status": "DRAFT",
+  "taxes": [
+    {
+      "name": "PST",
+      "amount": 952,
+      "percentage": 8
+    },
+    {
+      "name": "PST",
+      "amount": 0,
+      "percentage": 7
+    },
+    {
+      "name": "GST",
+      "amount": 595,
+      "percentage": 5
+    },
+    {
+      "name": "MRDT",
+      "amount": 238,
+      "percentage": 2
+    }
+  ],
+  "lineItems": [
+    {
+      "so_item_id": 16,
+      "name": "326 Room",
+      "desc": "Hotel Room",
+      "line_item_type": {
+        "id": "1",
+        "name": "ROOM_CHARGE",
+        "status": "ENABLED",
+        "direction": "DEBIT"
+      },
+      "payment_type": null,
+      "unit_price": 11900,
+      "unit_quantity": 1,
+      "subtotal": 11900,
+      "total": 13685
+    },
+    {
+      "so_item_id": 24,
+      "name": "Payment - DEPOSIT CASH",
+      "desc": null,
+      "line_item_type": {
+        "id": "4",
+        "name": "DEPOSIT",
+        "status": "ENABLED",
+        "direction": "CREDIT"
+      },
+      "payment_type": {
+        "id": 3,
+        "name": "CASH",
+        "status": "ENABLED",
+        "direction": "ALL",
+        "desc": null
+      },
+      "unit_price": 500,
+      "unit_quantity": null,
+      "subtotal": 500,
+      "total": 500
+    },
+    {
+      "so_item_id": 25,
+      "name": "Payment - DEPOSIT CASH",
+      "desc": null,
+      "line_item_type": {
+        "id": "4",
+        "name": "DEPOSIT",
+        "status": "ENABLED",
+        "direction": "CREDIT"
+      },
+      "payment_type": {
+        "id": 3,
+        "name": "CASH",
+        "status": "ENABLED",
+        "direction": "ALL",
+        "desc": null
+      },
+      "unit_price": 500,
+      "unit_quantity": null,
+      "subtotal": 500,
+      "total": 500
+    }
+  ],
+  "booking_keys": [
+    "id",
+    "booking_number",
+    "status",
+    "payment_status",
+    "notes",
+    "created_at",
+    "updated_at",
+    "location",
+    "returning_customer_id",
+    "items",
+    "booking_properties"
+  ],
+  "booking_number": "BK_J755DICT"
+}

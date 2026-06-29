@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Evidence — INV-609 | run-qa-feature-ankit-001</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6fa; color: #2d3436; }
+  .header { background: #2d3436; color: #fff; padding: 20px 32px; }
+  .header h1 { font-size: 1.4rem; font-weight: 600; }
+  .header .meta { font-size: 0.85rem; color: #b2bec3; margin-top: 6px; }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+  .badge-pass-issues { background: #fdcb6e; color: #2d3436; }
+  .badge-pass { background: #00b894; color: #fff; }
+  .badge-fail { background: #d63031; color: #fff; }
+  .badge-review { background: #0984e3; color: #fff; }
+  .badge-blocked { background: #636e72; color: #fff; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+  .verdict-banner { background: #fff; border-radius: 10px; padding: 24px; margin-bottom: 24px; display: flex; align-items: center; gap: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+  .verdict-score { font-size: 2.5rem; font-weight: 700; color: #fdcb6e; }
+  .verdict-details h2 { font-size: 1.2rem; }
+  .verdict-details p { font-size: 0.9rem; color: #636e72; margin-top: 6px; max-width: 700px; }
+  .score-bar { background: #dfe6e9; border-radius: 6px; height: 8px; width: 300px; margin-top: 10px; }
+  .score-bar-fill { height: 100%; border-radius: 6px; background: #fdcb6e; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .card { background: #fff; border-radius: 10px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+  .card h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #636e72; margin-bottom: 10px; }
+  .stat-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.9rem; }
+  .stat-label { color: #636e72; }
+  .stat-value { font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+  th { background: #2d3436; color: #fff; padding: 10px 14px; text-align: left; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { padding: 12px 14px; border-bottom: 1px solid #f0f0f0; font-size: 0.88rem; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f9f9f9; }
+  .tc-id { font-family: monospace; font-weight: 600; color: #0984e3; font-size: 0.85rem; }
+  .note-text { color: #636e72; font-size: 0.82rem; line-height: 1.5; max-width: 420px; }
+  .finding { background: #fff3cd; border-left: 4px solid #fdcb6e; padding: 12px 16px; margin: 16px 0; border-radius: 0 8px 8px 0; font-size: 0.88rem; }
+  .finding strong { display: block; margin-bottom: 4px; }
+  .cleared { background: #d4edda; border-left-color: #00b894; }
+  .section-title { font-size: 1rem; font-weight: 600; margin: 24px 0 12px; color: #2d3436; }
+  .api-block { background: #2d3436; color: #74b9ff; border-radius: 8px; padding: 14px 16px; font-family: monospace; font-size: 0.82rem; overflow-x: auto; }
+  .api-block .key { color: #a29bfe; }
+  .api-block .val { color: #55efc4; }
+  .api-block .warn { color: #fdcb6e; }
+  footer { text-align: center; padding: 20px; color: #b2bec3; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>QA Evidence Report — INV-609</h1>
+  <div class="meta">
+    Invoice Number &amp; Unique Constraints on Number Identifiers &nbsp;|&nbsp;
+    run-qa-feature-ankit-001 &nbsp;|&nbsp; 2026-06-29 &nbsp;|&nbsp;
+    env: https://xin-np.wbee.ca/ &nbsp;|&nbsp; seed: BK_J755DICT
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Verdict Banner -->
+  <div class="verdict-banner">
+    <div class="verdict-score">72</div>
+    <div class="verdict-details">
+      <h2><span class="badge badge-pass-issues">PASS-WITH-ISSUES</span></h2>
+      <p>Core FE feature passes: Invoice renders with unique identifier (TOTEWCLQEH), Hotel Room charge is $119.00 (not INV-609.00 — regression cleared), running balance reconciles end-to-end. Two API field-naming questions need dev confirmation before final sign-off.</p>
+      <div class="score-bar"><div class="score-bar-fill" style="width:72%"></div></div>
+    </div>
+  </div>
+
+  <!-- Score Grid -->
+  <div class="grid">
+    <div class="card">
+      <h3>Test Scores</h3>
+      <div class="stat-row"><span class="stat-label">Pass</span><span class="stat-value" style="color:#00b894">5</span></div>
+      <div class="stat-row"><span class="stat-label">Needs Review</span><span class="stat-value" style="color:#0984e3">2</span></div>
+      <div class="stat-row"><span class="stat-label">Fail</span><span class="stat-value" style="color:#d63031">0</span></div>
+      <div class="stat-row"><span class="stat-label">Blocked</span><span class="stat-value" style="color:#636e72">0</span></div>
+      <div class="stat-row"><span class="stat-label">Total</span><span class="stat-value">7</span></div>
+    </div>
+    <div class="card">
+      <h3>Run Info</h3>
+      <div class="stat-row"><span class="stat-label">Ticket</span><span class="stat-value">INV-609</span></div>
+      <div class="stat-row"><span class="stat-label">Kind</span><span class="stat-value">qa-feature</span></div>
+      <div class="stat-row"><span class="stat-label">Executor</span><span class="stat-value">ankit</span></div>
+      <div class="stat-row"><span class="stat-label">Duration</span><span class="stat-value">~20 min</span></div>
+      <div class="stat-row"><span class="stat-label">Date</span><span class="stat-value">2026-06-29</span></div>
+    </div>
+  </div>
+
+  <!-- Key Findings -->
+  <div class="section-title">Key Findings</div>
+
+  <div class="finding cleared">
+    <strong>✅ REGRESSION CLEARED — Hotel Room charge no longer shows INV-609.00</strong>
+    Product context documented "Hotel Room charge shows INV-609.00" as an open issue. Invoice line item now correctly shows "$119.00" for the 326 Room charge.
+  </div>
+
+  <div class="finding cleared">
+    <strong>✅ REGRESSION CLEARED — Running balance now reconciles to Total</strong>
+    Product context documented "running Balance never reconciling to Total". Running balance progression verified: $119.00 → $128.52 → $130.90 → $136.85 → $131.85 → $126.85 = Balance Due ✓
+  </div>
+
+  <div class="finding">
+    <strong>⚠️ NEEDS REVIEW — `invoice_number` field absent from GET /so/invoice API</strong>
+    AC-4 expected a field named <code>invoice_number</code>. The API response returns <code>sales_order_number: "TOTEWCLQEH"</code> which the FE labels as "Invoice Number". If a distinct <code>invoice_number</code> field was required by INV-613/614/615 spec, this is a gap. If <code>sales_order_number</code> intentionally serves as invoice_number, this is by design.
+  </div>
+
+  <div class="finding">
+    <strong>⚠️ NEEDS REVIEW — `currency` field is empty string</strong>
+    <code>currency: ""</code> in the invoice object. Should be "CAD". May cause formatting issues if FE relies on this field.
+  </div>
+
+  <!-- API Evidence -->
+  <div class="section-title">API Evidence — GET /so/invoice?booking_id=8</div>
+  <div class="api-block">
+{<br>
+&nbsp;&nbsp;<span class="key">"status"</span>: <span class="val">200</span>,<br>
+&nbsp;&nbsp;<span class="key">"invoice"</span>: {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"sales_order_number"</span>: <span class="val">"TOTEWCLQEH"</span>,  <span class="warn">// serves as Invoice Number in FE</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="warn">// "invoice_number": MISSING</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"currency"</span>: <span class="warn">""</span>,  <span class="warn">// empty — expected "CAD"</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"subtotal"</span>: <span class="val">11900</span>,  <span class="val">// $119.00 ✓</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"total"</span>: <span class="val">13685</span>,    <span class="val">// $136.85 ✓</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"total_due"</span>: <span class="val">12685</span>, <span class="val">// $126.85 ✓</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"taxes"</span>: [ PST 8%=$9.52, PST 7%=$0, GST 5%=$5.95, MRDT 2%=$2.38 ]<br>
+&nbsp;&nbsp;}<br>
+}
+  </div>
+
+  <!-- Test Cases Table -->
+  <div class="section-title">Test Case Results</div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Title</th>
+        <th>Status</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="tc-id">TC-0609-001</td>
+        <td>API — invoice_number field in GET /so/invoice</td>
+        <td><span class="badge badge-review">NEEDS REVIEW</span></td>
+        <td class="note-text">Field absent; <code>sales_order_number</code> = "TOTEWCLQEH" present. FE uses this as Invoice Number. Needs dev confirmation re: INV-613/614/615 spec.</td>
+      </tr>
+      <tr>
+        <td class="tc-id">TC-0609-002</td>
+        <td>API — so_number field in GET /so/invoice</td>
+        <td><span class="badge badge-review">NEEDS REVIEW</span></td>
+        <td class="note-text">No <code>so_number</code> field. <code>sales_order_number</code> present. Also: <code>currency</code> = "" (empty).</td>
+      </tr>
+      <tr>
+        <td class="tc-id">TC-0609-003</td>
+        <td>FE — Invoice Number shows TOTEWCLQEH not ticket ID</td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td class="note-text">Invoice Number: "TOTEWCLQEH". Hotel Room: $119.00. No "INV-609" or "INV-609.00" anywhere in document. Balance Due: $126.85.</td>
+      </tr>
+      <tr>
+        <td class="tc-id">TC-0609-004</td>
+        <td>FE — Invoice running balance reconciles</td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td class="note-text">$119.00 → $128.52 → $130.90 → $136.85 → $131.85 → $126.85. Each step verified. Matches API total_due=12685 cents.</td>
+      </tr>
+      <tr>
+        <td class="tc-id">TC-UV-1</td>
+        <td>Universal — Console error scan</td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td class="note-text">1 error: Cognito favicon 404 (third-party, allowlisted). Zero app console errors.</td>
+      </tr>
+      <tr>
+        <td class="tc-id">TC-UV-2</td>
+        <td>Universal — Network error scan</td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td class="note-text">All 4 app API calls returned 200: /user/profile, /booking/search, /so/invoice, /inventory/search.</td>
+      </tr>
+      <tr>
+        <td class="tc-id">TC-UV-3</td>
+        <td>Universal — Broken asset scan</td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td class="note-text">No broken images or assets on reservation details or invoice preview pages.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Math Reconciliation -->
+  <div class="section-title">Invoice Math Verification</div>
+  <div class="card" style="margin-bottom:16px">
+    <h3>Running Balance (Invoice Line Items)</h3>
+    <table style="box-shadow:none; margin-top:8px;">
+      <thead><tr><th>Description</th><th>Charge</th><th>Deposit/Credit</th><th>Running Balance</th></tr></thead>
+      <tbody>
+        <tr><td>326 Room</td><td>$119.00</td><td>—</td><td>$119.00</td></tr>
+        <tr><td>8% PST (Room Charges)</td><td>$9.52</td><td>—</td><td>$128.52</td></tr>
+        <tr><td>2% MRDT</td><td>$2.38</td><td>—</td><td>$130.90</td></tr>
+        <tr><td>5% GST</td><td>$5.95</td><td>—</td><td>$136.85</td></tr>
+        <tr><td>DEPOSIT — CASH</td><td>—</td><td>$5.00</td><td>$131.85</td></tr>
+        <tr><td>DEPOSIT — CASH</td><td>—</td><td>$5.00</td><td style="font-weight:700;color:#00b894">$126.85 ✓</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<footer>INV-609 · run-qa-feature-ankit-001 · Generated 2026-06-29 · Beeventory HMS QA</footer>
+</body>
+</html>

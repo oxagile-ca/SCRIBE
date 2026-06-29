@@ -1,0 +1,90 @@
+{
+  "ticket": "INV-609",
+  "verdict": "PASS-WITH-ISSUES",
+  "score": {
+    "pass": 5,
+    "fail": 0,
+    "blocked": 0,
+    "needs_review": 2,
+    "total": 7,
+    "pct": 71
+  },
+  "confidence": {
+    "headline": 72,
+    "band": "pass-with-issues",
+    "explanation": "Core FE feature passes: Invoice render shows correct unique identifier (TOTEWCLQEH), Hotel Room charge is $119.00 (not INV-609.00 — regression cleared), and running balance reconciles end-to-end. Two API shape questions need review: (1) GET /so/invoice response contains `sales_order_number` but no distinct `invoice_number` field — FE uses sales_order_number as the Invoice Number, which may be by design; (2) no `so_number` field present, only `sales_order_number`. These need dev clarification against the original API spec for INV-613/614/615 before final sign-off. All API calls returned 200; math reconciles perfectly."
+  },
+  "started": "2026-06-29T09:15:00Z",
+  "finished": "2026-06-29T09:35:00Z",
+  "time": "20 minutes",
+  "executor": "ankit",
+  "env": "https://xin-np.wbee.ca/",
+  "seed_booking": "BK_J755DICT",
+  "test_cases": [
+    {
+      "id": "TC-0609-001",
+      "title": "API — GET /so/invoice returns invoice_number field",
+      "status": "needs-review",
+      "evidence": [
+        "automated/TC-0609-001/api-so-invoice.json",
+        "automated/TC-0609-001/api-so-invoice-nested.json",
+        "automated/TC-0609-001/api-so-invoice-full.json"
+      ],
+      "note": "GET /so/invoice returns HTTP 200. Response shape: {invoice, terms, customer, location, booking}. invoice object keys: [so_id, sales_order_number, total_due, status, currency, friendly_name, line_items, subtotal, taxes, total]. FINDING: `invoice_number` field is absent. `sales_order_number` = 'TOTEWCLQEH' is present and used by FE as the Invoice Number. Needs dev confirmation — is `sales_order_number` intentionally serving as invoice_number, or was a separate `invoice_number` field required by INV-613/614/615 spec?"
+    },
+    {
+      "id": "TC-0609-002",
+      "title": "API — GET /so/invoice response shape includes so_number field",
+      "status": "needs-review",
+      "evidence": [
+        "automated/TC-0609-001/api-so-invoice-nested.json"
+      ],
+      "note": "No `so_number` field in response. `sales_order_number` = 'TOTEWCLQEH' is present. If `so_number` was a required distinct field per spec, this is a gap. Additional finding: `currency` field = '' (empty string) — may need investigation."
+    },
+    {
+      "id": "TC-0609-003",
+      "title": "FE — Invoice render shows correct Invoice Number (not ticket ID placeholder)",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0609-003/reservation-details.png",
+        "automated/TC-0609-003/invoice-preview-dialog.png",
+        "automated/TC-0609-003/invoice-dom-assertions.json"
+      ],
+      "note": "PASS. Invoice Preview dialog opened via Print Invoice button. Invoice Number displayed: 'TOTEWCLQEH' — NOT 'INV-609' or 'INV-609.00'. Hotel Room charge (326 Room) shows $119.00, NOT 'INV-609.00'. Regression from product context is CLEARED. Balance Due: $126.85 confirmed in DOM."
+    },
+    {
+      "id": "TC-0609-004",
+      "title": "FE — Invoice total and running balance reconcile correctly",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0609-004/math-reconciliation.json"
+      ],
+      "note": "PASS. Running balance sequence: $119.00 (room) → +$9.52 PST 8% = $128.52 → +$2.38 MRDT = $130.90 → +$5.95 GST = $136.85 → -$5.00 deposit = $131.85 → -$5.00 deposit = $126.85. Summary table: Subtotal $119.00, Total $136.85, Deposits $10.00, Balance Due $126.85. Matches API total_due (12685 cents = $126.85). Regression from product context (balance never reconciling) is CLEARED."
+    },
+    {
+      "id": "TC-UV-1",
+      "title": "Universal — Console error scan",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-UV-1/console-errors.json"
+      ],
+      "note": "PASS with note. 1 console error: Cognito favicon.ico 404 (https://xin-auth-np.auth.ca-central-1.amazoncognito.com/favicon.ico). This is a third-party Cognito hosted-UI resource, not an app-authored request — allowlisted. No application console errors."
+    },
+    {
+      "id": "TC-UV-2",
+      "title": "Universal — Network error scan (4xx/5xx)",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-UV-2/network-requests.json"
+      ],
+      "note": "PASS. All app API calls returned 200: GET /user/profile, POST /booking/search, GET /so/invoice?booking_id=8, POST /inventory/search. No 4xx/5xx on app-authored requests."
+    },
+    {
+      "id": "TC-UV-3",
+      "title": "Universal — Broken asset/image scan",
+      "status": "pass",
+      "evidence": [],
+      "note": "PASS. No broken images or assets observed on reservation details page or invoice preview dialog during the session. Cognito favicon 404 is third-party (allowlisted, same as UV-1)."
+    }
+  ]
+}

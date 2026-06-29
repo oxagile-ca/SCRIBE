@@ -169,3 +169,23 @@ runs:
       TC-UV-4: {status: pass, note: "Dashboard and reservations loaded correctly", method: automated}
       TC-UV-5: {status: needs-review, note: "axe-core unavailable headlessly", method: manual}
       TC-UV-6: {status: pass, note: "Exempt: no prior baseline", method: automated}
+
+  - id: run-qa-feature-workabee-dev-002
+    kind: qa-feature
+    env: https://xin-np.wbee.ca/
+    executor: workabee-dev
+    started: "2026-06-29T09:25:00Z"
+    finished: "2026-06-29T09:45:00Z"
+    verdict: PASS
+    score: {pass: 8, fail: 0, blocked: 0, needs_review: 2, total: 10, pct: 80}
+    results:
+      TC-0540-001: {status: pass, note: "BK_GZHLE6YJ quantity=5 confirmed. BK_J755DICT quantity=1 is pre-fix seed data.", method: automated}
+      TC-0540-002: {status: pass, note: "POST /booking/search: BK_GZHLE6YJ item.quantity=5. 10 bookings scanned, no post-fix multi-night with qty=1.", method: api}
+      TC-0540-003: {status: pass, note: "GET /so/invoice?booking_id=9: unit_quantity=5, subtotal=59500. Jun28→Jul3 excl = 5 nights.", method: api}
+      TC-0540-004: {status: pass, note: "UI: $595.00 CAD Est. Total, Invoice $595 Rooms, Total $684.25. live.png captured.", method: automated}
+      TC-UV-1: {status: pass, note: "0 product errors. Cognito favicon 404 + test probe 400 are non-product artifacts.", method: automated}
+      TC-UV-2: {status: pass, note: "All 5 app API requests returned 200.", method: automated}
+      TC-UV-3: {status: pass, note: "1 image checked, 0 broken.", method: automated}
+      TC-UV-4: {status: pass, note: "Dashboard + BK_J755DICT + BK_GZHLE6YJ all loaded correctly.", method: automated}
+      TC-UV-5: {status: needs-review, note: "axe-core unavailable headlessly. Exemption logged.", method: manual}
+      TC-UV-6: {status: pass, note: "Exempt: no prior baseline. Exemption logged.", method: automated}

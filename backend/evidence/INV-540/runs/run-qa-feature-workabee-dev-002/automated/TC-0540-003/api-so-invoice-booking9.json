@@ -1,0 +1,1 @@
+"{\n  \"status\": 200,\n  \"ok\": true,\n  \"booking_number\": \"BK_GZHLE6YJ\",\n  \"so_id\": 9,\n  \"subtotal\": 59500,\n  \"total\": 68425,\n  \"room_line_item\": {\n    \"so_item_id\": 17,\n    \"booking_item_id\": 9,\n    \"unit_quantity\": 5,\n    \"unit_price\": 11900,\n    \"subtotal\": 59500,\n    \"name\": \"121 Room\"\n  }\n}"

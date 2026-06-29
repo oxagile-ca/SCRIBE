@@ -1,0 +1,30 @@
+{
+  "request": {"method": "GET", "path": "/location", "query": "bucket_id=2"},
+  "status": 200,
+  "ok": true,
+  "asserted": {
+    "email_present": true,
+    "email_value": "info@totemlodge.com",
+    "website_present": true,
+    "website_value": "www.totemlodge.com",
+    "name": "Totem Lodge",
+    "bucket_id_scope": "2 (Totem)"
+  },
+  "responseKeys": ["id","name","address_line1","address_line2","city","state_prov","country","postal_zip","phone_number","mobile_number","email","website","status","created_at","modified_at"],
+  "rawLocationItem": {
+    "id": 5,
+    "name": "Totem Lodge",
+    "address_line1": "1335 Park Avenue",
+    "city": "Prince Rupert",
+    "state_prov": "BC",
+    "country": "CA",
+    "postal_zip": "V8J 1K3",
+    "phone_number": "18005500178",
+    "mobile_number": "2506246761",
+    "email": "info@totemlodge.com",
+    "website": "www.totemlodge.com",
+    "status": "ENABLED"
+  },
+  "verdict": "pass",
+  "note": "GET /api/v1/location?bucket_id=2 → 200. email=info@totemlodge.com and website=www.totemlodge.com present. Array of 1 location (Totem Lodge id=5)."
+}

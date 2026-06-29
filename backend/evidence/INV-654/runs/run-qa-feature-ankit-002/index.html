@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Evidence — INV-654 run-qa-feature-ankit-002</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: #f5f5f5; color: #333; }
+  .header { background: #1a1a2e; color: white; padding: 20px 24px; border-radius: 8px; margin-bottom: 20px; }
+  .header h1 { margin: 0 0 4px; font-size: 20px; }
+  .header .meta { font-size: 13px; opacity: 0.75; }
+  .verdict-banner { display: inline-block; background: #22c55e; color: white; padding: 4px 14px; border-radius: 20px; font-weight: 700; font-size: 14px; margin-left: 12px; vertical-align: middle; }
+  .confidence { display: inline-block; background: #3b82f6; color: white; padding: 4px 14px; border-radius: 20px; font-size: 13px; margin-left: 8px; }
+  .score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .score-card { background: white; border-radius: 8px; padding: 16px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .score-card .num { font-size: 28px; font-weight: 700; }
+  .score-card .label { font-size: 12px; color: #888; margin-top: 4px; }
+  .pass-num { color: #22c55e; }
+  .fail-num { color: #ef4444; }
+  .blocked-num { color: #f59e0b; }
+  .total-num { color: #3b82f6; }
+  .section { background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .section h2 { margin: 0 0 16px; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f8f8f8; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #eee; }
+  td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+  tr:hover td { background: #fafafa; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge-pass { background: #dcfce7; color: #16a34a; }
+  .badge-fail { background: #fee2e2; color: #dc2626; }
+  .badge-blocked { background: #fef3c7; color: #d97706; }
+  .badge-p0 { background: #fee2e2; color: #dc2626; }
+  .badge-p1 { background: #fef3c7; color: #d97706; }
+  .badge-api { background: #dbeafe; color: #2563eb; }
+  .badge-ui { background: #f3e8ff; color: #7c3aed; }
+  .badge-auto { background: #ecfdf5; color: #059669; }
+  .note-cell { max-width: 320px; color: #555; }
+  .env-info { font-size: 12px; color: #888; }
+  .timing-table td:first-child { font-weight: 500; color: #555; }
+  .timing-table td:last-child { font-family: monospace; text-align: right; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>INV-654 — Add Location Email field &amp; Seed Data for Totem location
+    <span class="verdict-banner">PASS</span>
+    <span class="confidence">95/100 confidence</span>
+  </h1>
+  <div class="meta">
+    Run: run-qa-feature-ankit-002 &nbsp;|&nbsp; Kind: qa-feature &nbsp;|&nbsp;
+    Env: <a href="https://xin-np.wbee.ca/" style="color:#93c5fd">https://xin-np.wbee.ca/</a> &nbsp;|&nbsp;
+    Executor: ankit &nbsp;|&nbsp; 2026-06-29T10:04Z → 10:18Z
+  </div>
+</div>
+
+<div class="score-grid">
+  <div class="score-card"><div class="num pass-num">11</div><div class="label">Pass</div></div>
+  <div class="score-card"><div class="num fail-num">0</div><div class="label">Fail</div></div>
+  <div class="score-card"><div class="num blocked-num">0</div><div class="label">Blocked</div></div>
+  <div class="score-card"><div class="num total-num">11</div><div class="label">Total (100%)</div></div>
+</div>
+
+<div class="section">
+  <h2>Test Case Results</h2>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Note</th><th>Evidence</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>TC-0654-001</td>
+        <td>GET /location — email + website fields present</td>
+        <td><span class="badge badge-api">api</span></td>
+        <td><span class="badge badge-p0">P0</span></td>
+        <td><span class="badge badge-pass">pass</span></td>
+        <td class="note-cell">GET /api/v1/location?bucket_id=2 → 200. body.location[0].email=info@totemlodge.com, website=www.totemlodge.com. Both fields present.</td>
+        <td><a href="automated/TC-0654-001/api-location.json">api-location.json</a></td>
+      </tr>
+      <tr>
+        <td>TC-0654-002</td>
+        <td>GET /user/profile — location.email + location.website present</td>
+        <td><span class="badge badge-api">api</span></td>
+        <td><span class="badge badge-p1">P1</span></td>
+        <td><span class="badge badge-pass">pass</span></td>
+        <td class="note-cell">GET /api/v1/user/profile → 200. bucket_to_location[Totem].location[0].email+website present.</td>
+        <td><a href="automated/TC-0654-002/api-user-profile.json">api-user-profile.json</a></td>
+      </tr>
+      <tr>
+        <td>TC-0654-003</td>
+        <td>GET /so/folio — location.email + location.website present</td>
+        <td><span class="badge badge-api">api</span></td>
+        <td><span class="badge badge-p0">P0</span></td>
+        <td><span class="badge badge-pass">pass</span></td>
+        <td class="note-cell">GET /api/v1/so/folio?booking_id=1 → 200. location.email=info@totemlodge.com, location.website=www.totemlodge.com.</td>
+        <td><a href="automated/TC-0654-003/api-folio.json">api-folio.json</a></td>
+      </tr>
+      <tr>
+        <td>TC-0654-004</td>
+        <td>GET /so/invoice — location.email + location.website present</td>
+        <td><span class="badge badge-api">api</span></td>
+        <td><span class="badge badge-p0">P0</span></td>
+        <td><span class="badge badge-pass">pass</span></td>
+        <td class="note-cell">GET /api/v1/so/invoice?booking_id=1 → 200. location.email=info@totemlodge.com, location.website=www.totemlodge.com.</td>
+        <td><a href="automated/TC-0654-004/api-invoice.json">api-invoice.json</a></td>
+      </tr>
+      <tr>
+        <td>TC-0654-005</td>
+        <td>Totem Lodge seed data — all contact fields correct</td>
+        <td><span class="badge badge-api">api</span></td>
+        <td><span class="badge badge-p0">P0</span></td>
+        <td><span class="badge badge-pass">pass</span></td>
+        <td class="note-cell">All 9 seed fields verified: name, email, website, phone, mobile, address, city, state, postal.</td>
+        <td><a href="automated/TC-0654-005/api-seed-verification.json">api-seed-verification.json</a></td>
+      </tr>
+      <tr>
+        <td>TC-0654-006</td>
+        <td>Dashboard Location Info Card — email and website display</td>
+        <td><span class="badge badge-ui">ui</span></td>
+        <td><span class="badge badge-p0">P0</span></td>
+        <td><span class="badge badge-pass">pass</span></td>
+        <td class="note-cell">Dashboard Overview: email=info@totemlodge.com (mailto:) and website=www.totemlodge.com (https:) visible in Location Info card.</td>
+        <td><a href="automated/TC-0654-006/live.png">live.png</a></td>
+      </tr>
+      <tr>
+        <td>TC-0654-007</td>
+        <td>Dashboard Location Info Card — phone number formatting</td>
+        <td><span class="badge badge-ui">ui</span></td>
+        <td><span class="badge badge-p1">P1</span></td>
+        <td><span class="badge badge-pass">pass</span></td>
+        <td class="note-cell">Phone: "1 (800) 550-0178" (tel:18005500178). Mobile: "(250) 624-6761" (tel:2506246761). Formatted correctly.</td>
+        <td><a href="automated/TC-0654-007/live.png">live.png</a></td>
+      </tr>
+      <tr>
+        <td>TC-0654-008</td>
+        <td>Folio header — all location fields from API, phone formatted</td>
+        <td><span class="badge badge-ui">ui</span></td>
+        <td><span class="badge badge-p0">P0</span></td>
+        <td><span class="badge badge-pass">pass</span></td>
+        <td class="note-cell">Folio modal (BK_DCP3QIKN): Totem Lodge, www.totemlodge.com, info@totemlodge.com, 1 (800) 550-0178, (250) 624-6761, 1335 Park Avenue, Prince Rupert, BC, CA, V8J 1K3. All from API.</td>
+        <td><a href="automated/TC-0654-008/live.png">live.png</a></td>
+      </tr>
+      <tr>
+        <td>TC-UV-1</td>
+        <td>Console error scan</td>
+        <td><span class="badge badge-auto">auto</span></td>
+        <td><span class="badge badge-p0">P0</span></td>
+        <td><span class="badge badge-pass">pass</span></td>
+        <td class="note-cell">0 app-originated errors. 1 Cognito favicon 404 allowlisted (third-party).</td>
+        <td><a href="automated/TC-UV-1/console-errors.json">console-errors.json</a></td>
+      </tr>
+      <tr>
+        <td>TC-UV-2</td>
+        <td>Network error scan</td>
+        <td><span class="badge badge-auto">auto</span></td>
+        <td><span class="badge badge-p0">P0</span></td>
+        <td><span class="badge badge-pass">pass</span></td>
+        <td class="note-cell">All 5 app API requests returned 200. non-2xx.json is empty.</td>
+        <td><a href="automated/TC-UV-2/non-2xx.json">non-2xx.json</a></td>
+      </tr>
+      <tr>
+        <td>TC-UV-3</td>
+        <td>Broken asset scan</td>
+        <td><span class="badge badge-auto">auto</span></td>
+        <td><span class="badge badge-p1">P1</span></td>
+        <td><span class="badge badge-pass">pass</span></td>
+        <td class="note-cell">No broken assets on dashboard or reservation pages.</td>
+        <td><a href="automated/TC-UV-3/asset-report.json">asset-report.json</a></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h2>Timing Analysis</h2>
+  <table class="timing-table">
+    <tr><td>Setup + Manifest</td><td>~2 min</td></tr>
+    <tr><td>Authentication</td><td>~1 min</td></tr>
+    <tr><td>API Assertions (TC-001–005)</td><td>~4 min</td></tr>
+    <tr><td>UI Verification (TC-006–008)</td><td>~5 min</td></tr>
+    <tr><td>UV Suite + Evidence Write</td><td>~2 min</td></tr>
+    <tr><td>Report Generation</td><td>~2 min</td></tr>
+    <tr><td><strong>Total Pipeline</strong></td><td><strong>~14 min</strong></td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h2>Confidence Breakdown</h2>
+  <p><strong>Headline: 95/100 (High)</strong></p>
+  <p>All 8 ticket TCs pass with live evidence. -5 points: Print Invoice button disabled on BK_DCP3QIKN (no SO attached), so invoice UI render not exercised via browser. API-level assertion (TC-0654-004) confirms the data contract is correct. To close the gap: exercise a booking that has a Sales Order and verify the invoice modal renders location fields.</p>
+  <h3>API Contract Verification</h3>
+  <ul>
+    <li>✅ GET /location?bucket_id=2 → email + website present</li>
+    <li>✅ GET /user/profile → bucket_to_location[Totem].location[0].email + website present</li>
+    <li>✅ GET /so/folio?booking_id=1 → location.email + website present</li>
+    <li>✅ GET /so/invoice?booking_id=1 → location.email + website present</li>
+    <li>✅ Seed data: all 9 Totem Lodge fields correct</li>
+  </ul>
+  <h3>UI Verification</h3>
+  <ul>
+    <li>✅ Dashboard Location Info Card: email + website rendered from API</li>
+    <li>✅ Dashboard Location Info Card: phone/mobile formatted correctly</li>
+    <li>✅ Folio modal header: all 6 location fields present, from API (no hardcoding)</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h2>PR Context</h2>
+  <ul>
+    <li><strong>Backend PR #189</strong>: Adds email+website to location payload across 4 endpoints</li>
+    <li><strong>Frontend PR #239</strong>: Wires Dashboard card + Folio/Invoice header from API (no hardcoding)</li>
+    <li><strong>Database PR #41</strong>: Adds email column + Totem Lodge seed data</li>
+  </ul>
+</div>
+
+</body>
+</html>

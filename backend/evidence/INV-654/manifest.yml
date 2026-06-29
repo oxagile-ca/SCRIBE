@@ -171,3 +171,24 @@ runs:
       TC-UV-1: {status: pass, note: "0 app-originated console errors. 3 allowlisted.", method: automated}
       TC-UV-2: {status: pass, note: "0 non-2xx from app API. All calls 200.", method: automated}
       TC-UV-3: {status: pass, note: "No broken assets detected.", method: automated}
+
+  - id: run-qa-feature-ankit-002
+    kind: qa-feature
+    env: https://xin-np.wbee.ca/
+    executor: ankit
+    started: "2026-06-29T10:04:00Z"
+    finished: "2026-06-29T10:18:00Z"
+    verdict: PASS
+    confidence: 95
+    results:
+      TC-0654-001: {status: pass, note: "GET /location?bucket_id=2 → 200. body.location[0].email=info@totemlodge.com, website=www.totemlodge.com", method: api}
+      TC-0654-002: {status: pass, note: "GET /user/profile → 200. bucket_to_location[Totem].location[0].email+website present", method: api}
+      TC-0654-003: {status: pass, note: "GET /so/folio?booking_id=1 → 200. location.email+website present", method: api}
+      TC-0654-004: {status: pass, note: "GET /so/invoice?booking_id=1 → 200. location.email+website present", method: api}
+      TC-0654-005: {status: pass, note: "All 9 Totem seed fields verified correct", method: api}
+      TC-0654-006: {status: pass, note: "Dashboard card shows info@totemlodge.com + www.totemlodge.com — live.png captured", method: ui}
+      TC-0654-007: {status: pass, note: "Phone: 1 (800) 550-0178 / Mobile: (250) 624-6761 — correctly formatted — live.png captured", method: ui}
+      TC-0654-008: {status: pass, note: "Folio modal BK_DCP3QIKN: all location fields present from API, no hardcoding — live.png captured", method: ui}
+      TC-UV-1: {status: pass, note: "0 app-originated errors. Cognito favicon 404 allowlisted.", method: automated}
+      TC-UV-2: {status: pass, note: "0 non-2xx. All 5 app API requests returned 200.", method: automated}
+      TC-UV-3: {status: pass, note: "No broken assets on dashboard or reservation pages.", method: automated}

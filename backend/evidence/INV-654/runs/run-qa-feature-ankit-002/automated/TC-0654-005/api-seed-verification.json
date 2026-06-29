@@ -1,0 +1,19 @@
+{
+  "request": {"method": "GET", "path": "/location", "query": "bucket_id=2"},
+  "status": 200,
+  "ok": true,
+  "asserted": {
+    "name": {"expected": "Totem Lodge", "actual": "Totem Lodge", "match": true},
+    "email": {"expected": "info@totemlodge.com", "actual": "info@totemlodge.com", "match": true},
+    "website": {"expected": "www.totemlodge.com", "actual": "www.totemlodge.com", "match": true},
+    "phone_number": {"expected": "18005500178", "actual": "18005500178", "match": true},
+    "mobile_number": {"expected": "2506246761", "actual": "2506246761", "match": true},
+    "address_line1": {"expected": "1335 Park Avenue", "actual": "1335 Park Avenue", "match": true},
+    "city": {"expected": "Prince Rupert", "actual": "Prince Rupert", "match": true},
+    "state_prov": {"expected": "BC", "actual": "BC", "match": true},
+    "postal_zip": {"expected": "V8J 1K3", "actual": "V8J 1K3", "match": true}
+  },
+  "allMatch": true,
+  "verdict": "pass",
+  "note": "All 9 Totem Lodge seed fields verified correct via GET /location?bucket_id=2. DB PR #41 seed data confirmed live."
+}

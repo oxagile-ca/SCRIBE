@@ -1,0 +1,14 @@
+{
+  "request": {"method": "GET", "path": "/so/invoice", "query": "booking_id=1"},
+  "status": 200,
+  "ok": true,
+  "asserted": {
+    "location.email_present": true,
+    "location.email_value": "info@totemlodge.com",
+    "location.website_present": true,
+    "location.website_value": "www.totemlodge.com"
+  },
+  "responseKeys": ["location"],
+  "verdict": "pass",
+  "note": "GET /api/v1/so/invoice?booking_id=1 → 200. location.email=info@totemlodge.com and location.website=www.totemlodge.com present in invoice response."
+}

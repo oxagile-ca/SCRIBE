@@ -1,0 +1,93 @@
+{
+  "ticket": "INV-654",
+  "verdict": "PASS",
+  "score": {"pass": 11, "fail": 0, "blocked": 0, "total": 11, "pct": 100},
+  "confidence": {
+    "headline": 95,
+    "band": "high",
+    "explanation": "All 8 ticket TCs pass: 5 API assertions confirmed (email+website in /location, /user/profile, /so/folio, /so/invoice + all 9 seed fields verified) and 3 live UI checks (dashboard Location Info card email/website, phone formatting, folio modal header). UV-1: 0 app errors (1 Cognito favicon 404 allowlisted). UV-2: 0 non-2xx API responses. UV-3: no broken assets. -5 points: Print Invoice button was disabled on BK_DCP3QIKN (no SO attached) so invoice UI not exercised — API-level invoice assertion (TC-0654-004) confirms data contract is correct."
+  },
+  "started": "2026-06-29T10:04:00Z",
+  "finished": "2026-06-29T10:18:00Z",
+  "executor": "ankit",
+  "env": "https://xin-np.wbee.ca/",
+  "test_cases": [
+    {
+      "id": "TC-0654-001",
+      "title": "GET /location — email + website fields present",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-001/api-location.json"],
+      "note": "GET /api/v1/location?bucket_id=2 → 200. body.location[0].email=info@totemlodge.com, website=www.totemlodge.com. Both fields present."
+    },
+    {
+      "id": "TC-0654-002",
+      "title": "GET /user/profile — location.email + location.website present",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-002/api-user-profile.json"],
+      "note": "GET /api/v1/user/profile → 200. bucket_to_location[Totem].location[0].email=info@totemlodge.com, website=www.totemlodge.com."
+    },
+    {
+      "id": "TC-0654-003",
+      "title": "GET /so/folio — location.email + location.website present",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-003/api-folio.json"],
+      "note": "GET /api/v1/so/folio?booking_id=1 → 200. location.email=info@totemlodge.com, location.website=www.totemlodge.com."
+    },
+    {
+      "id": "TC-0654-004",
+      "title": "GET /so/invoice — location.email + location.website present",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-004/api-invoice.json"],
+      "note": "GET /api/v1/so/invoice?booking_id=1 → 200. location.email=info@totemlodge.com, location.website=www.totemlodge.com."
+    },
+    {
+      "id": "TC-0654-005",
+      "title": "Totem Lodge seed data — all contact fields correct",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-005/api-seed-verification.json"],
+      "note": "All 9 seed fields verified: name=Totem Lodge, email=info@totemlodge.com, website=www.totemlodge.com, phone=18005500178, mobile=2506246761, addr=1335 Park Avenue, city=Prince Rupert, state=BC, postal=V8J 1K3."
+    },
+    {
+      "id": "TC-0654-006",
+      "title": "Dashboard Location Info Card — email and website display",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-006/live.png"],
+      "note": "Dashboard Overview tab Location Info card shows email=info@totemlodge.com (mailto:) and website=www.totemlodge.com (https:). Both rendered from API payload."
+    },
+    {
+      "id": "TC-0654-007",
+      "title": "Dashboard Location Info Card — phone number formatting",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-007/live.png"],
+      "note": "Phone displays as '1 (800) 550-0178' (tel:18005500178). Mobile displays as '(250) 624-6761' (tel:2506246761). Both formatted correctly per spec."
+    },
+    {
+      "id": "TC-0654-008",
+      "title": "Folio header — all location fields from API, phone formatted",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-008/live.png"],
+      "note": "Folio modal header (BK_DCP3QIKN): name=Totem Lodge, website=www.totemlodge.com, email=info@totemlodge.com, phone=1 (800) 550-0178, mobile=(250) 624-6761, addr=1335 Park Avenue, Prince Rupert, BC, CA, V8J 1K3. All from API payload — no hardcoded values."
+    },
+    {
+      "id": "TC-UV-1",
+      "title": "Console error scan",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-1/console-errors.json"],
+      "note": "1 console error: Cognito favicon 404 (third-party, allowlisted). Zero app-originated console errors across all pages visited."
+    },
+    {
+      "id": "TC-UV-2",
+      "title": "Network error scan",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-2/non-2xx.json"],
+      "note": "All 5 app-originated API requests returned 200. No non-2xx responses. non-2xx.json is empty array."
+    },
+    {
+      "id": "TC-UV-3",
+      "title": "Broken asset scan",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-3/asset-report.json"],
+      "note": "No broken assets detected on dashboard or reservation detail pages."
+    }
+  ]
+}

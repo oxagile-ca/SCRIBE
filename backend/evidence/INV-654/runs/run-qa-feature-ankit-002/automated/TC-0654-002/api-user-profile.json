@@ -1,0 +1,15 @@
+{
+  "request": {"method": "GET", "path": "/user/profile", "query": ""},
+  "status": 200,
+  "ok": true,
+  "asserted": {
+    "bucket_to_location_present": true,
+    "totem_location.email_present": true,
+    "totem_location.email_value": "info@totemlodge.com",
+    "totem_location.website_present": true,
+    "totem_location.website_value": "www.totemlodge.com"
+  },
+  "responseTopKeys": ["user_payload", "bucket_to_location"],
+  "verdict": "pass",
+  "note": "GET /api/v1/user/profile → 200. bucket_to_location[Totem bucket].location[0].email=info@totemlodge.com, website=www.totemlodge.com. email+website fields present in profile location payload."
+}

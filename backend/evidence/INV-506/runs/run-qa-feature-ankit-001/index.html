@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Evidence — INV-506 | run-qa-feature-ankit-001</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; background: #f5f7fa; color: #1a1a2e; }
+  .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 24px 32px; }
+  .header h1 { margin: 0 0 4px; font-size: 22px; }
+  .header p { margin: 0; opacity: 0.7; font-size: 13px; }
+  .verdict-banner { padding: 16px 32px; background: #fef9c3; border-bottom: 2px solid #fbbf24; display: flex; align-items: center; gap: 12px; }
+  .verdict-badge { padding: 4px 12px; border-radius: 999px; font-weight: 700; font-size: 13px; background: #f59e0b; color: white; }
+  .score-num { font-size: 24px; font-weight: 800; color: #92400e; }
+  .content { max-width: 1100px; margin: 0 auto; padding: 24px 32px; }
+  .section { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .section h2 { margin: 0 0 16px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 10px; background: #f9fafb; color: #374151; font-weight: 600; border-bottom: 2px solid #e5e7eb; }
+  td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .pass { color: #059669; font-weight: 600; }
+  .fail { color: #dc2626; font-weight: 600; }
+  .needs-review { color: #d97706; font-weight: 600; }
+  .blocked { color: #7c3aed; font-weight: 600; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .pill-pass { background: #d1fae5; color: #065f46; }
+  .pill-fail { background: #fee2e2; color: #991b1b; }
+  .pill-nr { background: #fef3c7; color: #92400e; }
+  .pill-p0 { background: #fce7f3; color: #9d174d; }
+  .pill-p1 { background: #ede9fe; color: #4c1d95; }
+  .pill-p2 { background: #e0f2fe; color: #0c4a6e; }
+  .issue { padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid; }
+  .issue-minor { background: #fefce8; border-color: #fbbf24; }
+  .issue-info { background: #eff6ff; border-color: #3b82f6; }
+  .issue-title { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+  .issue-desc { font-size: 12px; color: #4b5563; }
+  .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .meta-item { background: #f9fafb; border-radius: 8px; padding: 12px 16px; }
+  .meta-label { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .meta-value { font-size: 14px; font-weight: 600; color: #111827; }
+  .note-text { font-size: 12px; color: #6b7280; max-width: 380px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>QA Evidence Report — INV-506</h1>
+  <p>Folio &amp; Invoice Support, Framework &nbsp;·&nbsp; run-qa-feature-ankit-001 &nbsp;·&nbsp; 2026-06-29</p>
+</div>
+
+<div class="verdict-banner">
+  <span class="verdict-badge">PASS-WITH-ISSUES</span>
+  <span class="score-num">82/100</span>
+  <span style="color:#92400e;font-size:14px">All 9 primary ACs pass. MRDT rate discrepancy (2% vs 3% spec) flagged. UV-3/5/6 partially covered.</span>
+</div>
+
+<div class="content">
+
+  <div class="section">
+    <h2>Run Summary</h2>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="meta-label">Ticket</div><div class="meta-value">INV-506</div></div>
+      <div class="meta-item"><div class="meta-label">Run Kind</div><div class="meta-value">qa-feature</div></div>
+      <div class="meta-item"><div class="meta-label">Environment</div><div class="meta-value">xin-np.wbee.ca</div></div>
+      <div class="meta-item"><div class="meta-label">Seed Booking</div><div class="meta-value">BK_J755DICT</div></div>
+      <div class="meta-item"><div class="meta-label">Executor</div><div class="meta-value">workabee-dev</div></div>
+      <div class="meta-item"><div class="meta-label">Confidence</div><div class="meta-value">82/100</div></div>
+      <div class="meta-item"><div class="meta-label">Pass</div><div class="meta-value" style="color:#059669">11</div></div>
+      <div class="meta-item"><div class="meta-label">Needs Review</div><div class="meta-value" style="color:#d97706">4</div></div>
+      <div class="meta-item"><div class="meta-label">Fail / Blocked</div><div class="meta-value" style="color:#6b7280">0 / 0</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Test Case Results</h2>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Title</th><th>Priority</th><th>Status</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>TC-0506-001</td>
+          <td>Folio renders via Print Folio button</td>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td class="pass">✅ pass</td>
+          <td class="note-text">Dialog opened with full folio content — hotel header, guest, rooms, totals, T&amp;Cs, signature.</td>
+        </tr>
+        <tr>
+          <td>TC-0506-002</td>
+          <td>Folio line items not empty</td>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td class="pass">✅ pass</td>
+          <td class="note-text">Known defect FIXED. Row: "326 Room | 07/15 | 07/17 | 1 | $119.00 | $119.00" visible.</td>
+        </tr>
+        <tr>
+          <td>TC-0506-003</td>
+          <td>Invoice renders via Print Invoice button</td>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td class="pass">✅ pass</td>
+          <td class="note-text">Invoice Preview dialog opened. Invoice Number: TOTEWCLQEH. All sections rendered.</td>
+        </tr>
+        <tr>
+          <td>TC-0506-004</td>
+          <td>Invoice Hotel Room charge is correct amount</td>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td class="pass">✅ pass</td>
+          <td class="note-text">Known defect FIXED. Shows "$119.00", not "INV-506.00". API desc = "Hotel Room".</td>
+        </tr>
+        <tr>
+          <td>TC-0506-005</td>
+          <td>Invoice running balance reconciles</td>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td class="pass">✅ pass</td>
+          <td class="note-text">Running balance: $119→$128.52→$130.90→$136.85→$131.85→$126.85. Summary: $119+$9.52+$5.95+$2.38=$136.85; −$10=$126.85=Balance Due. ✅</td>
+        </tr>
+        <tr>
+          <td>TC-0506-006</td>
+          <td>Print Folio → window.print()</td>
+          <td><span class="pill pill-p1">P1</span></td>
+          <td class="pass">✅ pass</td>
+          <td class="note-text">window.__printCalled = true after click. No custom dialog.</td>
+        </tr>
+        <tr>
+          <td>TC-0506-007</td>
+          <td>Print Invoice → window.print()</td>
+          <td><span class="pill pill-p1">P1</span></td>
+          <td class="pass">✅ pass</td>
+          <td class="note-text">window.__printCalled = true after click. No custom dialog.</td>
+        </tr>
+        <tr>
+          <td>TC-0506-008</td>
+          <td>API /so/folio → 200, line items present</td>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td class="pass">✅ pass</td>
+          <td class="note-text">HTTP 200. 3 line items. MRDT 2% (vs spec 3%) flagged. currency="" (minor gap).</td>
+        </tr>
+        <tr>
+          <td>TC-0506-009</td>
+          <td>API /so/invoice → 200, totals reconcile</td>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td class="pass">✅ pass</td>
+          <td class="note-text">subtotal=11900, total=13685, total_due=12685. Math: 11900+1785=13685; 13685−1000=12685. ✅</td>
+        </tr>
+        <tr>
+          <td>TC-UV-1</td>
+          <td>Console error scan</td>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td class="pass">✅ pass</td>
+          <td class="note-text">0 first-party errors. 1 Cognito favicon 404 (3rd-party, allowlisted).</td>
+        </tr>
+        <tr>
+          <td>TC-UV-2</td>
+          <td>Network error scan</td>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td class="pass">✅ pass</td>
+          <td class="note-text">All 9 XHR calls returned 200. Zero 4xx/5xx.</td>
+        </tr>
+        <tr>
+          <td>TC-UV-3</td>
+          <td>Broken image/asset scan</td>
+          <td><span class="pill pill-p1">P1</span></td>
+          <td class="needs-review">⚠️ needs-review</td>
+          <td class="note-text">HEAD-fetch sweep not available. No broken images observed. Needs explicit verification.</td>
+        </tr>
+        <tr>
+          <td>TC-UV-4</td>
+          <td>Document lifecycle smoke</td>
+          <td><span class="pill pill-p1">P1</span></td>
+          <td class="pass">✅ pass (exempt)</td>
+          <td class="note-text">Folio/Invoice are read-only. No save/publish flow. See manual/TC-UV-4/exemption.md.</td>
+        </tr>
+        <tr>
+          <td>TC-UV-5</td>
+          <td>Accessibility scan</td>
+          <td><span class="pill pill-p1">P1</span></td>
+          <td class="needs-review">⚠️ needs-review</td>
+          <td class="note-text">axe-core not available via Playwright MCP. No scan run.</td>
+        </tr>
+        <tr>
+          <td>TC-UV-6</td>
+          <td>Snapshot drift check</td>
+          <td><span class="pill pill-p2">P2</span></td>
+          <td class="needs-review">⚠️ needs-review</td>
+          <td class="note-text">No baseline run exists. Expected for first QA run on this ticket.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Issues Flagged</h2>
+    <div class="issue issue-minor">
+      <div class="issue-title">⚠️ MRDT rate: 2% shown, spec documents 3%</div>
+      <div class="issue-desc">Both API (/so/folio, /so/invoice) and UI (folio dialog, invoice dialog, Invoice Summary sidebar) show MRDT at 2%. Product spec and Known Risk Areas document MRDT as 3%. The math is internally consistent at 2% (119.00 × 0.02 = $2.38). Likely a property-level configuration for Totem Lodge — confirm with dev whether this is intentional.</div>
+    </div>
+    <div class="issue issue-minor">
+      <div class="issue-title">⚠️ API invoice.currency is empty string instead of "CAD"</div>
+      <div class="issue-desc">GET /so/folio and /so/invoice return <code>"currency": ""</code>. The spec implies CAD. UI correctly shows "$" / "CAD" from other fields (unit_price_curr), so no user-visible impact — but the API contract has a gap.</div>
+    </div>
+    <div class="issue issue-info">
+      <div class="issue-title">ℹ️ /reservation/:id/folio URL redirects to dashboard</div>
+      <div class="issue-desc">Direct navigation to <code>/reservation/BK_J755DICT/folio</code> redirects to <code>/dashboard</code>. Folio and Invoice are only accessible as modal dialogs from the reservation detail page. This is consistent with the implemented design (modal preview + print), but the URL listed in the product spec's Key Pages section may be outdated.</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Key Defects Verified as Fixed</h2>
+    <table>
+      <thead><tr><th>Known Defect</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>"Folio render — line item rows currently empty"</td><td class="pass">✅ FIXED — row visible with room, dates, qty, rate, total</td></tr>
+        <tr><td>"Invoice render — Hotel Room charge shows INV-506.00"</td><td class="pass">✅ FIXED — charge shows $119.00 (API desc = 'Hotel Room')</td></tr>
+        <tr><td>"running Balance never reconciling to Total"</td><td class="pass">✅ FIXED — all 6 running balance steps reconcile correctly</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>

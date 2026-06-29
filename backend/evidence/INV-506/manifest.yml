@@ -1,0 +1,246 @@
+ticket: INV-506
+title: "Folio & Invoice Support, Framework"
+state: Ready for Testing
+ticket_type: folio
+booking_dependent: true
+
+pr_context:
+  diff_found: false
+  anchor: scope-and-repro
+  note: "Headless run — VCS MCP unavailable. TCs anchored to ticket description and known product defects (folio line items empty, invoice charge shows placeholder amount, balance not reconciling)."
+
+acceptance_criteria:
+  - id: AC-1
+    text: "System supports displaying the Folio for a booking — folio page renders without error"
+    source: description
+  - id: AC-2
+    text: "Folio line item rows are populated (not empty)"
+    source: derived — known open defect in product context
+  - id: AC-3
+    text: "System supports displaying the Invoice for a booking — invoice page renders without error"
+    source: description
+  - id: AC-4
+    text: "Invoice Hotel Room charge displays a correct dollar amount (not a ticket ID like INV-506.00)"
+    source: derived — known open defect in product context
+  - id: AC-5
+    text: "Invoice running balance reconciles: Subtotal + taxes = Total; Total - Deposits = Balance Due"
+    source: derived — known open defect in product context
+  - id: AC-6
+    text: "Print Folio button invokes window.print() (not a custom dialog)"
+    source: product spec
+  - id: AC-7
+    text: "Print Invoice button invokes window.print() (not a custom dialog)"
+    source: product spec
+  - id: AC-8
+    text: "GET /so/folio?booking_id returns valid payload with line items present"
+    source: description — API support required
+  - id: AC-9
+    text: "GET /so/invoice?booking_id returns valid payload with reconciling totals"
+    source: description — API support required
+
+test_cases:
+  - id: TC-0506-001
+    title: "Folio page renders via Reservation Detail → Print Folio link"
+    type: functional
+    priority: P0
+    ac_refs: [AC-1]
+    evidence_required: [screenshot, network]
+    steps:
+      - Navigate to /reservation/BK_J755DICT
+      - Locate Print Folio button or link
+      - Navigate to /reservation/BK_J755DICT/folio
+      - Assert page renders (no error state, no blank page)
+    notes: "booking_dependent=true; seed BK_J755DICT (booking_id=8). Anchored to ticket description: 'display and print the folio for the booking'"
+    annotations_hint: "Arrow pointing at folio header and hotel name; callout on any error/empty state"
+    tags: ["@INV-506", "@folio", "@render"]
+
+  - id: TC-0506-002
+    title: "Folio line item rows are populated (not empty)"
+    type: functional
+    priority: P0
+    ac_refs: [AC-2]
+    evidence_required: [screenshot, network]
+    steps:
+      - Navigate to /reservation/BK_J755DICT/folio
+      - Assert at least one line item row is visible and contains text
+      - Check that room charges, taxes appear in the table
+    notes: "Known defect: 'Folio render — line item rows currently empty (open issue)'. This TC verifies the fix. Anchored to AC-2 derived from product context."
+    annotations_hint: "Highlight the line items table; box around each row; red callout if rows are empty"
+    tags: ["@INV-506", "@folio", "@line-items"]
+
+  - id: TC-0506-003
+    title: "Invoice page renders via Reservation Detail → Print Invoice link"
+    type: functional
+    priority: P0
+    ac_refs: [AC-3]
+    evidence_required: [screenshot, network]
+    steps:
+      - Navigate to /reservation/BK_J755DICT
+      - Locate Print Invoice button or link
+      - Navigate to /reservation/BK_J755DICT/invoice
+      - Assert page renders (no error state, no blank page)
+    notes: "booking_dependent=true; seed BK_J755DICT (booking_id=8). Anchored to ticket description: 'display and print the folio for the booking'"
+    annotations_hint: "Arrow pointing at invoice header, invoice number; callout on any error/empty state"
+    tags: ["@INV-506", "@invoice", "@render"]
+
+  - id: TC-0506-004
+    title: "Invoice Hotel Room charge is a dollar amount, not a ticket ID placeholder"
+    type: functional
+    priority: P0
+    ac_refs: [AC-4]
+    evidence_required: [screenshot]
+    steps:
+      - Navigate to /reservation/BK_J755DICT/invoice
+      - Locate the Hotel Room charge line item
+      - Assert the amount is a valid dollar value (e.g. $123.45) and NOT a ticket ID (e.g. INV-506.00)
+    notes: "Known defect: 'Invoice render — Hotel Room charge shows INV-506.00'. This TC verifies the fix."
+    annotations_hint: "Box around the Hotel Room charge amount; red callout if it shows INV-506.00 or similar"
+    tags: ["@INV-506", "@invoice", "@charge-amount"]
+
+  - id: TC-0506-005
+    title: "Invoice running balance reconciles: Subtotal + taxes = Total, Total - Deposits = Balance Due"
+    type: functional
+    priority: P0
+    ac_refs: [AC-5]
+    evidence_required: [screenshot]
+    steps:
+      - Navigate to /reservation/BK_J755DICT/invoice
+      - Read Subtotal, PST Room 8%, PST Non-Room 7%, GST 5%, MRDT 3%, Total, Deposits, Balance Due
+      - Assert Subtotal + all taxes = Total (within $0.01 rounding)
+      - Assert Total - Deposits = Balance Due (within $0.01)
+    notes: "Known defect: 'running Balance never reconciling to Total'. Verifies math fix."
+    annotations_hint: "Annotate totals section with expected math; red callout if numbers don't reconcile"
+    tags: ["@INV-506", "@invoice", "@totals", "@math"]
+
+  - id: TC-0506-006
+    title: "Print Folio button invokes window.print()"
+    type: functional
+    priority: P1
+    ac_refs: [AC-6]
+    evidence_required: [screenshot, manual-note]
+    steps:
+      - Navigate to /reservation/BK_J755DICT/folio
+      - Locate Print button
+      - Use browser_evaluate to monkey-patch window.print and detect invocation
+      - Click Print button
+      - Assert window.print was called (not a custom dialog)
+    notes: "Product spec: 'Print buttons must invoke window.print() not custom dialog'"
+    tags: ["@INV-506", "@folio", "@print"]
+
+  - id: TC-0506-007
+    title: "Print Invoice button invokes window.print()"
+    type: functional
+    priority: P1
+    ac_refs: [AC-7]
+    evidence_required: [screenshot, manual-note]
+    steps:
+      - Navigate to /reservation/BK_J755DICT/invoice
+      - Locate Print button
+      - Use browser_evaluate to monkey-patch window.print and detect invocation
+      - Click Print button
+      - Assert window.print was called (not a custom dialog)
+    notes: "Product spec: 'Print buttons must invoke window.print() not custom dialog'"
+    tags: ["@INV-506", "@invoice", "@print"]
+
+  - id: TC-0506-008
+    title: "API: GET /so/folio?booking_id=8 returns valid payload with line items"
+    type: api
+    priority: P0
+    ac_refs: [AC-8]
+    evidence_required: [network]
+    steps:
+      - Call GET /api/v1/so/folio?booking_id=8 in-browser using scribeApi helper
+      - Assert HTTP 200
+      - Assert response contains line_items array with at least one entry
+      - Assert each line item has description, amount, quantity fields
+    notes: "booking_id=8 from seed_booking. Anchored to ticket description: 'The get Folio API will be provided by the payment service'"
+    tags: ["@INV-506", "@api", "@folio"]
+
+  - id: TC-0506-009
+    title: "API: GET /so/invoice?booking_id=8 returns valid payload with reconciling totals"
+    type: api
+    priority: P0
+    ac_refs: [AC-9]
+    evidence_required: [network]
+    steps:
+      - Call GET /api/v1/so/invoice?booking_id=8 in-browser using scribeApi helper
+      - Assert HTTP 200
+      - Assert response contains subtotal, total, balance_due, line_items
+      - Assert math: subtotal + taxes ≈ total (within $0.01)
+    notes: "invoice_total_due from seed=12685. Verifies API contract matches invoice display."
+    tags: ["@INV-506", "@api", "@invoice"]
+
+  # Universal Validation Suite
+  - id: TC-UV-1
+    title: "Console error scan — no uncaught errors during folio/invoice session"
+    type: infrastructure
+    priority: P0
+    evidence_required: [console]
+    notes: "Universal suite — runs every non-baseline run"
+    tags: ["@universal", "@INV-506"]
+
+  - id: TC-UV-2
+    title: "Network error scan — no 4xx/5xx on first-party requests"
+    type: infrastructure
+    priority: P0
+    evidence_required: [network]
+    notes: "Universal suite — runs every non-baseline run"
+    tags: ["@universal", "@INV-506"]
+
+  - id: TC-UV-3
+    title: "Broken image/asset scan — all assets return 200"
+    type: infrastructure
+    priority: P1
+    evidence_required: [network]
+    notes: "Universal suite — runs every non-baseline run"
+    tags: ["@universal", "@INV-506"]
+
+  - id: TC-UV-4
+    title: "Document lifecycle smoke — folio/invoice round-trip"
+    type: infrastructure
+    priority: P1
+    evidence_required: [screenshot]
+    notes: "Universal suite — read-only for folio/invoice (display-only pages). Exempt from D1-D5 write gates."
+    tags: ["@universal", "@INV-506"]
+
+  - id: TC-UV-5
+    title: "Accessibility scan — folio and invoice pages"
+    type: accessibility
+    priority: P1
+    evidence_required: [screenshot]
+    notes: "Universal suite — axe-core scan on folio and invoice pages"
+    tags: ["@universal", "@INV-506"]
+
+  - id: TC-UV-6
+    title: "Snapshot drift check — no visual regression vs baseline"
+    type: visual
+    priority: P2
+    evidence_required: [screenshot]
+    notes: "Universal suite — skip with explicit exemption if no baseline exists"
+    tags: ["@universal", "@INV-506"]
+
+runs:
+  - id: run-qa-feature-ankit-001
+    kind: qa-feature
+    env: https://xin-np.wbee.ca/
+    executor: workabee-dev
+    started: "2026-06-29T08:55:00Z"
+    finished: "2026-06-29T09:15:00Z"
+    verdict: PASS-WITH-ISSUES
+    confidence: 82
+    results:
+      TC-0506-001: {status: pass, note: "Folio dialog renders fully via Print Folio button"}
+      TC-0506-002: {status: pass, note: "Line items populated — known defect FIXED"}
+      TC-0506-003: {status: pass, note: "Invoice dialog renders with Invoice Number TOTEWCLQEH"}
+      TC-0506-004: {status: pass, note: "Hotel Room charge shows $119.00 — known defect FIXED"}
+      TC-0506-005: {status: pass, note: "Running balance fully reconciles — known defect FIXED"}
+      TC-0506-006: {status: pass, note: "window.print() confirmed called from folio dialog"}
+      TC-0506-007: {status: pass, note: "window.print() confirmed called from invoice dialog"}
+      TC-0506-008: {status: pass, note: "API 200, 3 line items, all fields present. MRDT 2% flagged."}
+      TC-0506-009: {status: pass, note: "API 200, totals reconcile. 11900+1785=13685; 13685-1000=12685"}
+      TC-UV-1: {status: pass, note: "0 first-party console errors"}
+      TC-UV-2: {status: pass, note: "0 non-2xx network responses"}
+      TC-UV-3: {status: needs-review, note: "Asset scan not run — no axe/HEAD sweep available"}
+      TC-UV-4: {status: pass, note: "Exempt — read-only document, no save/publish flow"}
+      TC-UV-5: {status: needs-review, note: "axe-core unavailable in Playwright MCP"}
+      TC-UV-6: {status: needs-review, note: "No baseline run exists for this ticket"}

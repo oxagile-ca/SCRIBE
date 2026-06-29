@@ -1,0 +1,25 @@
+{
+  "request": {"method": "GET", "path": "/api/v1/so/invoice", "query": "booking_id=8"},
+  "status": 200,
+  "ok": true,
+  "responseKeys": ["invoice", "terms", "customer", "location", "booking"],
+  "asserted": {
+    "http_200": true,
+    "invoice_number": "TOTEWCLQEH",
+    "has_line_items": true,
+    "line_item_count": 3,
+    "room_charge_present": true,
+    "subtotal_cents": 11900,
+    "total_cents": 13685,
+    "total_due_cents": 12685,
+    "math_subtotal_plus_taxes_eq_total": true,
+    "math_detail": "11900 + 952 + 0 + 595 + 238 = 13685 (total). 13685 - 500 - 500 = 12685 (total_due/balance_due)",
+    "running_balance_reconciles": true,
+    "deposits_total_cents": 1000,
+    "balance_due_cents": 12685,
+    "balance_due_formula_check": "13685 - 1000 = 12685 PASS",
+    "ui_balance_due_matches_api": true,
+    "ui_shows": "$126.85",
+    "api_total_due": 12685
+  }
+}

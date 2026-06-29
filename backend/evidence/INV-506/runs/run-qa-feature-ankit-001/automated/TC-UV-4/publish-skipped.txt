@@ -1,0 +1,1 @@
+No publish step for folio/invoice (read-only display documents). TC-UV-4 document lifecycle D1-D5 gates exempt: folio and invoice are rendered from API data only — no editable fields, no save action, no draft/publish flow. Evidence: reservation detail page shows Invoice Summary panel as read-only. Print button calls window.print() only.

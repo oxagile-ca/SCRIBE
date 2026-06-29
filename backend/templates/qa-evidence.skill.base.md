@@ -150,7 +150,10 @@ browser session across tickets (see Phase 2.8 browser-session isolation).
 
 ## Phase 1 — Build the manifest (first run only)
 
-Skip if `<evidence_root>/<JIRA-KEY>/manifest.yml` exists.
+Skip if `<evidence_root>/<JIRA-KEY>/manifest.yml` exists **and is a real manifest**
+(ACs/TCs tied to this ticket's scope). A placeholder/blocked manifest left by a prior
+failed run (title like `[Placeholder]`, scope `other`, or TCs `[TBD]`) must be
+REBUILT, not reused.
 
 **SCOPING GUARD (read before generating any TC).** Build the manifest from
 **THIS ticket's own** title + description + ITS OWN PR diff — nothing else. A
@@ -160,22 +163,32 @@ invoice ticket must NOT be tested as invoice rendering). Test what THIS ticket's
 description says. If this ticket's own scope is genuinely unclear, draft TCs from
 its description and flag for review — do NOT substitute the linked ticket's scope.
 
-1. Fetch the ticket via MCP. Capture summary, description, assignee, ALL
-   comments, linked issues.
+1. Acquire the ticket's scope (summary + description + ACs).
+   - **Interactive:** fetch via the issue-tracker MCP — summary, description,
+     assignee, ALL comments, linked issues.
+   - **Headless (`--headless`):** an OAuth-http tracker MCP is NOT loaded in the
+     `claude -p` subprocess. If the backend ships a `qa_targets.py` resolver, run it
+     (`python qa_targets.py <JIRA-KEY> <env-url>`, §2.0) and use its `ticket_summary`
+     / `ticket_description` / `ticket_state` — fetched via the backend's tracker
+     token. That is the authoritative scope source headlessly. Do NOT block merely
+     because the tracker MCP is unreachable. Only if no ticket scope is obtainable AND
+     no `pr:` / `--text` was supplied: STOP with verdict `blocked`.
 
-2. **PR analysis is MANDATORY before generating test cases.** Acquire a diff
-   via, in order:
-   - `pr:` URL passed explicitly, OR
-   - The first OPEN PR from the Phase -1 Jira dev-info lookup whose
-     destination is `main`/`master`/`develop`/`release-*` (skip e2e or
-     stacked PRs), OR
-   - Bitbucket search by ticket key:
-     `GET /repositories/<workspace>/<repo>/pullrequests?q=source.branch.name~"<TICKET>"`.
+2. **PR analysis before generating test cases (best-effort).** Acquire a diff via,
+   in order: `pr:` URL passed explicitly, OR the first OPEN PR from the dev-info
+   lookup whose destination is `main`/`master`/`develop`/`release-*`, OR VCS search
+   by ticket key.
 
-   If no diff is reachable, STOP. Print:
-   `Cannot build manifest without PR context — supply pr: <url> or fix the
-   Jira dev info link for <TICKET>.`
-   Never invent test cases blind. A test plan with no diff anchor is noise.
+   If no diff is reachable:
+   - **Interactive:** STOP — `Cannot build manifest without PR context — supply
+     pr: <url> or fix the dev-info link for <TICKET>.`
+   - **Headless:** the VCS MCP is also absent in the subprocess, so a diff is often
+     unreachable. If the ticket SCOPE is available (step 1), do NOT stop — build a
+     **scope/repro-anchored** manifest: set `pr_context.diff_found: false`, anchor
+     each TC to the ticket's described behavior + ACs, and proceed to Phase 2. Only
+     STOP if BOTH the diff AND the ticket scope are unavailable.
+   Never invent test cases blind — anchor each TC to either a diff hunk OR the
+   ticket's explicit described behavior/ACs.
 
 3. **Map every non-trivial change to a TC.** Walk the diff. For each
    file with behavior changes (exclude: pure refactor with identical

@@ -73,6 +73,16 @@ def classify_ticket_type(text):
     return "other"
 
 
+def classify_ticket(summary, description=None):
+    """Classify preferring the title/summary; fall back to summary+description only if
+    the title is inconclusive. A verbose description often name-drops domain words
+    (e.g. 'DEPOSIT' as an example value) that would otherwise mis-bucket the ticket."""
+    by_title = classify_ticket_type(summary)
+    if by_title != "other":
+        return by_title
+    return classify_ticket_type("\n".join(p for p in (summary, description) if p))
+
+
 def is_booking_dependent(ticket_type):
     return ticket_type in BOOKING_DEPENDENT_TYPES
 
@@ -125,6 +135,32 @@ def _secret_name(value):
     return m.group(1) if m else None
 
 
+def split_ticket_key(key):
+    """'INV-602' -> ('INV', 602). ('TEAM' uppercased). (None, None) if unparseable."""
+    m = re.match(r"^([A-Za-z]+)-(\d+)$", str(key or "").strip())
+    if not m:
+        return None, None
+    return m.group(1).upper(), int(m.group(2))
+
+
+def parse_linear_issue(data):
+    """Extract {summary, description, state} from a Linear `issues` GraphQL response.
+
+    None if there are errors or no node — the caller then falls back (and the skill
+    treats a truly unfetchable ticket as blocked)."""
+    if not isinstance(data, dict) or data.get("errors"):
+        return None
+    nodes = (((data.get("data") or {}).get("issues") or {}).get("nodes")) or []
+    if not nodes:
+        return None
+    n = nodes[0]
+    return {
+        "summary": n.get("title"),
+        "description": n.get("description"),
+        "state": (n.get("state") or {}).get("name"),
+    }
+
+
 def default_evidence_root():
     """The evidence root the dashboard actually reads (config.EVIDENCE_DIR).
 
@@ -141,10 +177,18 @@ def _api_base(instance_cfg):
     return base + (api.get("prefix") or "")
 
 
-def gather(key, env_url, *, ticket_text, seed_booking, instance_cfg, evidence_root):
-    """Assemble the target JSON. Pure: no network, never reads/echoes the password."""
+def gather(key, env_url, *, ticket_text, seed_booking, instance_cfg, evidence_root,
+           ticket_summary=None, ticket_description=None, ticket_state=None):
+    """Assemble the target JSON. Pure: no network, never reads/echoes the password.
+
+    ticket_summary/description carry the ticket scope (backend-fetched headlessly)
+    so the skill's Phase 1 can build a real manifest without the Linear OAuth MCP."""
     testauth = (instance_cfg.get("environments") or {}).get("testAuth") or {}
-    ticket_type = classify_ticket_type(ticket_text)
+    # Title-first when we have a structured summary (Linear); else classify the blob.
+    if ticket_summary:
+        ticket_type = classify_ticket(ticket_summary, ticket_description)
+    else:
+        ticket_type = classify_ticket_type(ticket_text)
     return {
         "key": key,
         "login_url": testauth.get("loginUrl") or env_url,
@@ -152,6 +196,9 @@ def gather(key, env_url, *, ticket_text, seed_booking, instance_cfg, evidence_ro
         "password_secret": _secret_name(testauth.get("password")),
         "ticket_type": ticket_type,
         "booking_dependent": is_booking_dependent(ticket_type),
+        "ticket_summary": ticket_summary,
+        "ticket_description": ticket_description,
+        "ticket_state": ticket_state,
         "evidence_root": evidence_root,
         "runs_dir": os.path.join(evidence_root, key, "runs"),
         "api_base": _api_base(instance_cfg),
@@ -160,6 +207,41 @@ def gather(key, env_url, *, ticket_text, seed_booking, instance_cfg, evidence_ro
 
 
 # --- live shell (only runs in main(); unit tests never reach here) ----------
+
+def _fetch_linear_ticket(key):
+    """Fetch a ticket's scope from Linear via LINEAR_TOKEN (direct GraphQL, no OAuth/MCP).
+
+    The Linear *MCP* is OAuth-http and absent in the headless `claude -p` subprocess,
+    so Phase 1 cannot 'fetch the ticket via MCP' there. The backend already holds a
+    Linear API token — use it. Returns {summary, description, state} or None."""
+    import httpx
+    ic.load_secrets_env()
+    tok = os.environ.get("LINEAR_TOKEN")
+    if not tok:
+        return None
+    team, number = split_ticket_key(key)
+    if not team:
+        return None
+    query = (
+        '{ issues(first:1, filter:{ number:{ eq:%d }, team:{ key:{ eq:"%s" } } })'
+        '{ nodes{ identifier title state{name} description } } }' % (number, team)
+    )
+    try:
+        with httpx.Client(timeout=20) as c:
+            r = c.post(
+                "https://api.linear.app/graphql",
+                headers={"Authorization": tok, "Content-Type": "application/json"},
+                json={"query": query},
+            )
+    except Exception:
+        return None
+    if r.status_code != 200:
+        return None
+    try:
+        return parse_linear_issue(r.json())
+    except Exception:
+        return None
+
 
 def _ticket_text_from_manifest(evidence_root, key):
     """Read this ticket's own summary+description from the Phase-1 manifest."""
@@ -287,7 +369,22 @@ def main(argv=None):
 
     cfg = ic.load_instance_config() or {}
     evidence_root = default_evidence_root()
-    ticket_text = args.text or _ticket_text_from_manifest(evidence_root, args.key)
+
+    # Resolve ticket scope: explicit --text wins; else fetch FRESH from Linear via the
+    # backend token (authoritative — the OAuth Linear MCP is absent headless); fall
+    # back to an existing manifest only when Linear is unreachable. (Linear is
+    # preferred over the manifest so a stale/placeholder manifest from a prior blocked
+    # run can't poison classification.)
+    ticket = None
+    ticket_text = args.text
+    if not ticket_text and not args.no_network:
+        ticket = _fetch_linear_ticket(args.key)
+        if ticket:
+            ticket_text = "\n".join(
+                p for p in (ticket.get("summary"), ticket.get("description")) if p
+            )
+    if not ticket_text:
+        ticket_text = _ticket_text_from_manifest(evidence_root, args.key)
     ttype = classify_ticket_type(ticket_text)
 
     seed_booking, seed_error = None, None
@@ -295,10 +392,15 @@ def main(argv=None):
         seed_booking, seed_error = _resolve_seed_booking(_api_base(cfg))
 
     out = gather(args.key, args.env_url, ticket_text=ticket_text,
+                 ticket_summary=(ticket or {}).get("summary"),
+                 ticket_description=(ticket or {}).get("description"),
+                 ticket_state=(ticket or {}).get("state"),
                  seed_booking=seed_booking, instance_cfg=cfg,
                  evidence_root=evidence_root)
     if seed_error:
         out["seed_error"] = seed_error
+    if ticket_text is None:
+        out["scope_error"] = "ticket scope unavailable (no --text, manifest, or Linear fetch)"
     print(json.dumps(out, indent=2))
     return 0
 

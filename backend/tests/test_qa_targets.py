@@ -138,6 +138,57 @@ def test_seed_booking_numbers_present():
         assert n in qa_targets.SEED_BOOKING_NUMBERS
 
 
+# --- Linear ticket fetch (backend token, no OAuth MCP) ---------------------
+
+def test_split_ticket_key():
+    assert qa_targets.split_ticket_key("INV-602") == ("INV", 602)
+    assert qa_targets.split_ticket_key("abc-12") == ("ABC", 12)
+    assert qa_targets.split_ticket_key("nonsense") == (None, None)
+    assert qa_targets.split_ticket_key("") == (None, None)
+    assert qa_targets.split_ticket_key(None) == (None, None)
+
+
+def test_parse_linear_issue():
+    data = {"data": {"issues": {"nodes": [
+        {"identifier": "INV-602", "title": "[SD4.12.0] Apply Payment to Booking",
+         "description": "New API to apply a payment...", "state": {"name": "Ready for Testing"}}
+    ]}}}
+    got = qa_targets.parse_linear_issue(data)
+    assert got["summary"] == "[SD4.12.0] Apply Payment to Booking"
+    assert got["description"].startswith("New API to apply a payment")
+    assert got["state"] == "Ready for Testing"
+
+
+def test_parse_linear_issue_empty_or_error():
+    assert qa_targets.parse_linear_issue({"data": {"issues": {"nodes": []}}}) is None
+    assert qa_targets.parse_linear_issue({"errors": [{"message": "deprecated"}]}) is None
+    assert qa_targets.parse_linear_issue({}) is None
+
+
+def test_classify_ticket_prefers_title_over_description():
+    # Title says payment; the long description merely name-drops DEPOSIT as an example
+    # value — title-first classification must not mis-bucket this as deposit.
+    summary = "[SD4.12.0] Apply Payment to Booking"
+    description = ("New API to apply a payment ... txn_type maps to values such as "
+                   "DEPOSIT and MANUAL_CREDIT ... POST /api/v1/booking/payment")
+    assert qa_targets.classify_ticket(summary, description) == "payment"
+
+
+def test_classify_ticket_falls_back_to_description_when_title_vague():
+    assert qa_targets.classify_ticket("SD4.12.0 update", "This reworks the invoice renderer") == "invoice"
+    assert qa_targets.classify_ticket("Misc cleanup", None) == "other"
+
+
+def test_classify_payment_from_real_inv602_description():
+    # The real INV-602 scope must classify as payment (booking-dependent), NOT "other".
+    text = ("[SD4.12.0] Apply Payment to Booking\n"
+            "New API to apply a payment to a booking, executing the payment against "
+            "the sales order system. API Call: POST /api/v1/booking/payment")
+    t = qa_targets.classify_ticket_type(text)
+    assert t == "payment"
+    assert qa_targets.is_booking_dependent(t) is True
+
+
 # --- output assembly + secret hygiene --------------------------------------
 
 _INSTANCE_CFG = {
@@ -184,6 +235,22 @@ def test_gather_never_leaks_password(monkeypatch):
     # the non-booking ticket carries no seed booking
     assert out["seed_booking"] is None
     assert out["booking_dependent"] is False
+
+
+def test_gather_includes_ticket_scope():
+    out = qa_targets.gather(
+        "INV-602", "https://xin-np.wbee.ca/",
+        ticket_text="Apply Payment to Booking POST /api/v1/booking/payment",
+        ticket_summary="[SD4.12.0] Apply Payment to Booking",
+        ticket_description="New API to apply a payment to a booking",
+        ticket_state="Ready for Testing",
+        seed_booking=None, instance_cfg=_INSTANCE_CFG, evidence_root="/home/u/evidence",
+    )
+    assert out["ticket_type"] == "payment"
+    assert out["booking_dependent"] is True
+    assert out["ticket_summary"] == "[SD4.12.0] Apply Payment to Booking"
+    assert out["ticket_description"] == "New API to apply a payment to a booking"
+    assert out["ticket_state"] == "Ready for Testing"
 
 
 def test_default_evidence_root_is_dashboard_canonical():

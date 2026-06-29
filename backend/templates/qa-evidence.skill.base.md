@@ -152,7 +152,15 @@ browser session across tickets (see Phase 2.8 browser-session isolation).
 
 Skip if `<evidence_root>/<JIRA-KEY>/manifest.yml` exists.
 
-1. Fetch Jira ticket via MCP. Capture summary, description, assignee, ALL
+**SCOPING GUARD (read before generating any TC).** Build the manifest from
+**THIS ticket's own** title + description + ITS OWN PR diff — nothing else. A
+`Related: <KEY>` / "blocked by" / "part of" link is **context only**; never adopt
+the related ticket's feature scope (e.g. a display-only ticket that *links* an
+invoice ticket must NOT be tested as invoice rendering). Test what THIS ticket's
+description says. If this ticket's own scope is genuinely unclear, draft TCs from
+its description and flag for review — do NOT substitute the linked ticket's scope.
+
+1. Fetch the ticket via MCP. Capture summary, description, assignee, ALL
    comments, linked issues.
 
 2. **PR analysis is MANDATORY before generating test cases.** Acquire a diff
@@ -211,29 +219,100 @@ Skip if `<evidence_root>/<JIRA-KEY>/manifest.yml` exists.
 
 ## Phase 2 — Execute
 
-1. Generate run ID: `run-<kind>-<user-slug>-<seq>` (increment `seq` if prior
-   runs of same kind+user exist).
+Phase 2 drives a **real browser via the Playwright MCP** — codifying what the
+interactive agent does by hand so the headless `claude -p` run (no human to adapt)
+performs real QA instead of stopping. **There is NO `pnpm` / Playwright "evidence"
+project — do not look for one or try to install one.** Use the MCP tools:
+`mcp__plugin_playwright_playwright__browser_navigate / browser_snapshot /
+browser_type / browser_click / browser_take_screenshot / browser_evaluate /
+browser_console_messages / browser_network_requests / browser_wait_for`.
+
+### 2.0 Resolve targets (deterministic — strips guesswork)
+If the backend ships a `qa_targets.py` resolver, run it from the backend dir and
+parse its JSON:
+
+    python qa_targets.py <JIRA-KEY> <env-url>
+
+It returns `login_url`, `username`, `password_secret` (the env-var NAME of the
+password — read its VALUE from `.secrets.env`, never echo it), `ticket_type`,
+`booking_dependent` (whether the surface needs an existing record), `evidence_root`,
+`runs_dir`, `api_base`, and a `seed_record` (e.g. `seed_booking`) or `null`. If no
+resolver exists, derive the same values from the instance config (`environments.testAuth`,
+`api.baseUrl`) and the product context above.
+
+**Use the absolute `evidence_root` for ALL run output** — the path the dashboard
+reads (the backend's `config.EVIDENCE_DIR`, i.e. `~/evidence`), NOT a relative
+`evidence/` under the cwd or a worktree. Writing elsewhere produces evidence the
+dashboard never registers.
+
+### 2.1 Run scaffolding
+1. Generate run ID: `run-<kind>-<user-slug>-<seq>` (increment `seq` if prior runs
+   of the same kind+user exist).
 2. Create `<evidence_root>/<JIRA-KEY>/runs/<run-id>/` with subfolders
    `automated/`, `manual/`, `markup/`, `diffs/`.
-3. Append a `runs[]` entry to the manifest with the run metadata (kind, env,
-   executor, started, etc.).
-4. Export env vars the reporter needs:
-   - `QA_EVIDENCE_RUN_ID=<run-id>`
-   - `QA_EVIDENCE_TICKET=<JIRA-KEY>`
-   - `QA_EVIDENCE_ROOT=<evidence_root>`
-5. Per run kind:
-   - `dev-local`, `qa-feature`, `qa-main`, `ad-hoc`: run
-     `pnpm playwright test --project=evidence --grep @<JIRA-KEY>`.
-   - `baseline-stable`: skip automated test execution. For each TC with
-     `markup` in `evidence_required`, navigate to the relevant URL on the
-     stable env (read-only) and capture `baseline.png` into
-     `automated/<TC-ID>/`. No interactions, no assertions.
-6. The reporter files artifacts automatically as tests complete.
-7. On failure, retry up to 3x per TC: read trace + error + relevant source,
-   apply test-only fixes (never product code), re-run the single spec. After
-   3 attempts still failing, mark `status: fail` and continue.
-   - If `--headless` is set: do NOT pause for human input on failures.
-     Mark `status: fail`, capture error screenshot, and continue to next TC.
+3. Append a `runs[]` entry to the manifest with run metadata (kind, env,
+   executor, started).
+4. Export: `QA_EVIDENCE_RUN_ID=<run-id>`, `QA_EVIDENCE_TICKET=<JIRA-KEY>`,
+   `QA_EVIDENCE_ROOT=<evidence_root>`.
+
+### 2.2 Authenticate (drive the real login form)
+Token / session-storage injection does NOT log most SPAs in — type the real creds:
+`browser_navigate(login_url)`; `browser_snapshot` to find the fields; `browser_type`
+the username; `browser_type` the password (VALUE from `.secrets.env`
+`<password_secret>` — NEVER write it to logs, console, screenshots, or evidence);
+submit; `browser_wait_for` an authenticated element. If login fails, screenshot it,
+mark the run `blocked`, write summary.json + index.html (§2.5), and stop.
+
+### 2.3 Per test case — navigate, capture, assert
+`baseline-stable`: skip assertions; capture `baseline.png` read-only for each
+`markup` TC. Otherwise, for each non-UV TC:
+1. **Navigate to the surface (data-dependent nav rule — see below):** a TC whose
+   surface needs an EXISTING record (an invoice / document / detail page) MUST open
+   an existing seed record (`qa_targets.seed_record`) THROUGH THE UI; it must NEVER
+   create one through an interactive flow headless Playwright cannot drive. Other
+   TCs `browser_navigate` directly to the page/route.
+2. `browser_take_screenshot` → `automated/<TC-ID>/<tc-id>.png`.
+3. Assert the AC with `browser_snapshot` / `browser_evaluate` (DOM reads are valid
+   evidence); for numeric/API-backed surfaces cross-check against `api_base`
+   (Phase 2.7). Record `pass` / `fail` with an observed-vs-expected note.
+
+### 2.4 Universal Validation Suite (deterministic, every non-baseline run)
+- UV-1 console: `browser_console_messages` → `automated/TC-UV-1/console-errors.json`.
+- UV-2 network: `browser_network_requests` → `automated/TC-UV-2/non-2xx.json`.
+- UV-3 / UV-5 / UV-6 (asset / a11y / snapshot-drift) as feasible headlessly; log skips.
+
+### 2.5 Write the dashboard evidence (REQUIRED — the run only counts WITH these)
+Into `<evidence_root>/<JIRA-KEY>/runs/<run-id>/`, write **BOTH** `summary.json` and
+a non-empty `index.html` (write it, or call the backend helper
+`generate_html_report("<JIRA-KEY>", "<run-id>")`). Also write per-TC outcomes into
+the manifest `runs[<this-run>].results` map. `summary.json` schema:
+```json
+{
+  "ticket": "<JIRA-KEY>",
+  "verdict": "PASS | PASS-WITH-ISSUES | NEEDS-REVIEW | BLOCKED",
+  "score": {"pass": N, "fail": N, "blocked": N, "total": N, "pct": 0-100},
+  "confidence": {"headline": 0-100, "band": "...", "explanation": "..."},
+  "time": "<minutes or ISO>", "started": "<iso>", "finished": "<iso>",
+  "executor": "<user>", "env": "<env-url>",
+  "test_cases": [{"id": "TC-XXXX-001", "title": "...",
+                  "status": "pass|fail|blocked", "evidence": ["automated/.../tc.png"],
+                  "note": "observed vs expected"}]
+}
+```
+`score` may be a single number; `confidence.headline` is the fallback. Always
+include `test_cases` and a top-level `verdict`.
+
+### 2.6 Headless failure rule (keep)
+On a TC failure do NOT pause: mark `status: fail`, `browser_take_screenshot` into
+`automated/<TC-ID>/error.png`, continue. Retry a flaky TC up to 3× (re-navigate /
+re-assert only — never edit product code) before marking `fail`.
+
+### Data-dependent navigation rule (HARD)
+A TC whose surface depends on an existing record MUST reach it through an EXISTING
+seed record via the UI — never by creating one through an interactive flow headless
+Playwright cannot drive (the class of blocker that stalls headless runs). If no seed
+record is available, mark the affected TCs `blocked`, set the run verdict `BLOCKED`,
+write summary.json + index.html anyway (so the dashboard registers it), and stop.
 
 ## Phase 2.5 — Document Lifecycle Gates (HARD REQUIREMENT)
 
@@ -774,8 +853,10 @@ timing without touching any dropdown manually.
 When both flags are set, the entire pipeline runs without human interaction:
 
 - Phase 1: manifest auto-approved (no pause)
-- Phase 2: Playwright runs headless (default). On failure after 3 retries,
-  mark `status: fail` and continue — never pause for input.
+- Phase 2: the Playwright **MCP** browser drives the app headlessly (§2.0–2.6).
+  On a TC failure after 3 retries, mark `status: fail` and continue — never pause
+  for input. A data-dependent TC with no seed record → `BLOCKED` (still writes
+  summary.json + index.html so the dashboard registers the run).
 - Phase 4: skip manual evidence wait. Log missing items as `incomplete`.
 - Phase 8: if gap gate fails, log remediation list but do NOT exit.
   Mark run as `needs-review` instead of blocking.

@@ -1,4 +1,4 @@
-import type { Lane } from './types'
+import type { Lane, EvidenceStatus } from './types'
 
 /**
  * Should the passive 60s evidence poll fire for this lane?
@@ -50,6 +50,22 @@ export function streamLostUpdate(evidenceFound: boolean): StreamLostUpdate {
     return { state: 'done', message: 'QA complete (stream reconnect lost)', waitingForEvidence: false, completed: true }
   }
   return { state: 'active', message: 'Stream lost — watching for evidence…', waitingForEvidence: true, completed: false }
+}
+
+/**
+ * Has this ticket's QA run actually FINISHED (vs merely started)?
+ *
+ * The backend marks evidence `status: 'tested'` the moment a run *directory* is
+ * created — which happens at the very START of a run (Phase 2 scaffolding), before
+ * any verdict is written. So `status === 'tested'` alone is NOT "complete" and was
+ * making in-progress runs show a "✓ QAed" badge. A genuinely finished run has a
+ * real result: a score (from summary.json) or a generated report (index.html). An
+ * in-progress run has neither yet.
+ */
+export function evidenceIsComplete(ev?: EvidenceStatus | null): boolean {
+  if (!ev) return false
+  if (ev.status !== 'tested' && ev.status !== 'published') return false
+  return ev.score != null || !!ev.reportUrl || !!ev.reportPath
 }
 
 export type BlockerKind = 'login' | 'data' | 'runner' | 'connection' | 'generic'

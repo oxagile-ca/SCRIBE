@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Ticket } from '../types'
 import type { EnvLockMap, PipelineStateEntry } from './Queue'
+import { evidenceIsComplete } from '../laneStatus'
 
 const PRIORITY_COLORS: Record<string, string> = {
   Highest: 'var(--pri-highest)',
@@ -285,8 +286,11 @@ export function isTicketDone(t: Ticket): boolean {
 /** SCRIBE has captured QA evidence (tested/published) but the ticket has not been
  *  moved to Done yet — i.e. it's awaiting closure. Drives the "QAed" badge + filter. */
 export function isTicketQAed(t: Ticket): boolean {
-  const s = t.evidence?.status
-  return (s === 'tested' || s === 'published') && !isTicketDone(t)
+  // Use evidenceIsComplete (not just status==='tested'): the backend flips a ticket
+  // to 'tested' the instant a run dir is created — at the START of a run — so a
+  // run that is still in progress would otherwise show a "✓ QAed" badge. Require a
+  // real finished result (score or report).
+  return evidenceIsComplete(t.evidence) && !isTicketDone(t)
 }
 
 function extractACs(description: string): string[] {

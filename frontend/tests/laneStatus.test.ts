@@ -5,8 +5,9 @@ import {
   waitingLaneKey,
   classifyBlocker,
   streamLostUpdate,
+  evidenceIsComplete,
 } from '../src/laneStatus'
-import type { Lane, AgentName, AgentStatus, CouncilStatus } from '../src/types'
+import type { Lane, AgentName, AgentStatus, CouncilStatus, EvidenceStatus } from '../src/types'
 
 let passed = 0
 let failed = 0
@@ -136,6 +137,26 @@ for (const msg of ['log in', 'no branch', 'chrome', 'connection lost', 'boom']) 
 }
 ok((streamLostUpdate(true).state as string) !== 'failed' && (streamLostUpdate(false).state as string) !== 'failed',
   'a dropped live stream is NEVER reported as failed')
+
+// --- evidenceIsComplete (in-progress run must not read as "complete") --------
+{
+  const ev = (over: Partial<EvidenceStatus>): EvidenceStatus =>
+    ({ status: 'tested', score: null, time: '', reportPath: '', ...over })
+  ok(evidenceIsComplete(undefined) === false, 'no evidence -> not complete')
+  ok(evidenceIsComplete(ev({ status: 'none' })) === false, 'status none -> not complete')
+  ok(evidenceIsComplete(ev({ status: 'manifest' })) === false, 'manifest only -> not complete')
+  // the bug: a run dir exists (status tested) but no result yet -> NOT complete
+  ok(evidenceIsComplete(ev({ status: 'tested', score: null, reportPath: '', reportUrl: '' })) === false,
+    'tested but no score/report (run still in progress) -> NOT complete')
+  ok(evidenceIsComplete(ev({ status: 'tested', score: 100 })) === true,
+    'tested + score -> complete')
+  ok(evidenceIsComplete(ev({ status: 'tested', reportUrl: '/e/INV-1/runs/r/index.html' })) === true,
+    'tested + report url -> complete')
+  ok(evidenceIsComplete(ev({ status: 'tested', reportPath: '/e/.../index.html' })) === true,
+    'tested + report path -> complete')
+  ok(evidenceIsComplete(ev({ status: 'published', score: 90 })) === true,
+    'published + score -> complete')
+}
 
 // --- report -----------------------------------------------------------------
 console.log(`\nlaneStatus: ${passed} passed, ${failed} failed`)

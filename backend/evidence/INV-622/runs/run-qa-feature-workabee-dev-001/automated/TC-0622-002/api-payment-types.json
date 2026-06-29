@@ -1,0 +1,25 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/so/transactions",
+    "query": "booking_id=8"
+  },
+  "status": 200,
+  "ok": true,
+  "asserted": {
+    "BALANCE_in_frontend_bundle": true,
+    "BALANCE_usage_context": "Hardcoded as payment_type='BALANCE' for Manual transaction type (y=true branch in bundle code). Expression: x='BALANCE' when manual=true.",
+    "BALANCE_in_SO_transactions": false,
+    "note": "BALANCE IS referenced in the frontend JS bundle. It is used as the payment_type value sent to the API when a 'Manual' transaction (credit or debit) is created. This confirms the frontend expects BALANCE to be a valid payment type in the DB. However, no existing SO transaction records were found using BALANCE. Direct DB verification that INV-622 migration added BALANCE is not possible via read-only API.",
+    "verdict": "needs-review"
+  },
+  "frontend_bundle_payment_types": ["CREDIT_CARD", "CASH", "DEBIT_CARD", "CHEQUE", "INTERAC", "BALANCE"],
+  "hb_array": [
+    {"value": "credit_card", "label": "Credit Card", "payment_type": "CREDIT_CARD"},
+    {"value": "cash", "label": "Cash", "payment_type": "CASH"},
+    {"value": "debit_card", "label": "Debit Card", "payment_type": "DEBIT_CARD"},
+    {"value": "cheque", "label": "Cheque", "payment_type": "CHEQUE"},
+    {"value": "interac", "label": "Interac", "payment_type": "INTERAC"}
+  ],
+  "manual_payment_type": "BALANCE"
+}

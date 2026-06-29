@@ -1,0 +1,26 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/so/transactions",
+    "query": "booking_id=8"
+  },
+  "status": 200,
+  "ok": true,
+  "responseKeys": ["invoice", "so_id", "sales_order_number", "total_due", "status", "line_items", "payment_type"],
+  "asserted": {
+    "payment_type_ACCOUNT_in_existing_transactions": false,
+    "payment_type_BALANCE_in_existing_transactions": false,
+    "ACCOUNT_in_frontend_bundle": false,
+    "BALANCE_in_frontend_bundle": true,
+    "BALANCE_usage_in_bundle": "Used as payment_type for Manual transaction type entries",
+    "note": "No read-only endpoint exists to directly list all payment_types_tbl entries. ACCOUNT is completely absent from the frontend JS bundle (index-B0E7Y5i9.js). BALANCE is present in the bundle hardcoded for manual entries. Existing SO transactions use CREDIT_CARD (id=1) and CASH (id=3). ACCOUNT and BALANCE do not appear in any existing SO transaction records across bookings 7-11.",
+    "verdict": "needs-review"
+  },
+  "cross_booking_payment_types_found": [
+    {"booking_id": 8, "payment_types_used": ["CASH"]},
+    {"booking_id": 9, "payment_types_used": ["CREDIT_CARD"]},
+    {"booking_id": 7, "payment_types_used": []},
+    {"booking_id": 10, "payment_types_used": []},
+    {"booking_id": 11, "payment_types_used": []}
+  ]
+}

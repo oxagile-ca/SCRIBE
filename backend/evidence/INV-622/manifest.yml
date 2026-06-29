@@ -1,0 +1,188 @@
+ticket: INV-622
+title: "[Seed Data / ENUM] - DB1.7 Payment Type Add BALANCE & ACCOUNT - BASE.8.2.2"
+status: Ready for Testing
+assignee: Ankit Guhe
+milestone: Booking Payments
+created: "2026-06-18T21:15:59.944Z"
+labels:
+  - Back-End
+
+pr_context:
+  url: https://github.com/Workabee-Technologies/xinventory-database/pull/37
+  repo: xinventory-database
+  diff_found: false
+  note: "GitHub VCS MCP not available headlessly; manifest anchored to ticket description + ACs"
+
+scope_summary: |
+  DB migration adding ACCOUNT and BALANCE to payment_types_tbl (BASE.8.2.2 v1.1).
+  ORM (Drizzle Schema) Payment Type Enum updated to include the two new values.
+  Primary verification: API confirms ACCOUNT + BALANCE exist as valid payment types;
+  UI payment-type dropdowns surface them on Reservation Details / Payment Tab.
+
+acceptance_criteria:
+  - id: AC-1
+    text: "Update Table Seed Data — ACCOUNT and BALANCE values populated through migration/update script"
+    source: description
+  - id: AC-2
+    text: "Update ORM as required — Payment Type Enum includes ACCOUNT and BALANCE"
+    source: description
+
+test_cases:
+  - id: TC-0622-001
+    title: "Verify ACCOUNT payment type present via live API"
+    type: api
+    priority: P1
+    evidence_required:
+      - screenshot
+      - network
+    steps:
+      - "Login to https://xin-np.wbee.ca/ as workabee-dev"
+      - "Navigate to Reservation Details for BK_J755DICT"
+      - "Execute in-browser fetch: GET /api/v1/fees/types (or payment-types endpoint)"
+      - "Assert ACCOUNT is present in the returned type list"
+      - "Screenshot the API response captured via browser_evaluate"
+    tags:
+      - "@INV-622"
+      - "@payment"
+      - "@seed-data"
+      - "@api"
+    notes: "AC-1 coverage. Diff anchor: payment_types_tbl seed migration in xinventory-database/pull/37"
+    ac_ref: AC-1
+    annotations_hint: "Callout arrow pointing at ACCOUNT in the JSON response or dropdown"
+
+  - id: TC-0622-002
+    title: "Verify BALANCE payment type present via live API"
+    type: api
+    priority: P1
+    evidence_required:
+      - screenshot
+      - network
+    steps:
+      - "Re-use authenticated session from TC-0622-001"
+      - "Execute in-browser fetch for payment types"
+      - "Assert BALANCE is present in the returned type list"
+      - "Screenshot the API response"
+    tags:
+      - "@INV-622"
+      - "@payment"
+      - "@seed-data"
+      - "@api"
+    notes: "AC-1 coverage. Diff anchor: payment_types_tbl seed migration in xinventory-database/pull/37"
+    ac_ref: AC-1
+    annotations_hint: "Callout arrow pointing at BALANCE in the JSON response or dropdown"
+
+  - id: TC-0622-003
+    title: "Verify payment type UI on Reservation Details surfaces ACCOUNT and BALANCE"
+    type: functional
+    priority: P2
+    evidence_required:
+      - screenshot
+      - markup
+    steps:
+      - "Navigate to /reservation/BK_J755DICT"
+      - "Click Payments tab"
+      - "Open the payment type selector / dropdown"
+      - "Screenshot showing ACCOUNT and BALANCE as options"
+    tags:
+      - "@INV-622"
+      - "@payment"
+      - "@ui"
+    notes: "AC-2 coverage (ORM enum visible in UI). If Payment tab not yet integrated (INV-605 still open), downgrade to needs-review. Diff anchor: Drizzle enum in xinventory-database/pull/37"
+    ac_ref: AC-2
+    annotations_hint: "Highlight ACCOUNT and BALANCE in the payment type dropdown list"
+
+  - id: TC-UV-1
+    title: "Console error scan"
+    type: automated
+    priority: P0
+    evidence_required:
+      - console
+    steps:
+      - "Collect all browser console messages throughout the session"
+      - "Filter for errors and warnings"
+      - "Write to automated/TC-UV-1/console-errors.json"
+    tags:
+      - "@universal"
+    notes: "Universal Validation Suite — non-skippable"
+
+  - id: TC-UV-2
+    title: "Network error scan"
+    type: automated
+    priority: P0
+    evidence_required:
+      - network
+    steps:
+      - "Collect all network requests"
+      - "Filter for 4xx/5xx responses"
+      - "Write non-2xx.json"
+    tags:
+      - "@universal"
+    notes: "Universal Validation Suite — non-skippable"
+
+  - id: TC-UV-3
+    title: "Broken image / asset scan"
+    type: automated
+    priority: P0
+    evidence_required:
+      - network
+    steps:
+      - "Check all image/asset URLs for 200 responses"
+    tags:
+      - "@universal"
+    notes: "Universal Validation Suite — non-skippable"
+
+  - id: TC-UV-4
+    title: "Document lifecycle smoke"
+    type: automated
+    priority: P0
+    evidence_required:
+      - screenshot
+    steps:
+      - "Exempt: seed-data/enum ticket does not involve document editing"
+    tags:
+      - "@universal"
+    notes: "Exempt — this ticket has no document create/edit surface. See manual/TC-UV-4/exemption.md"
+
+  - id: TC-UV-5
+    title: "Accessibility scan"
+    type: automated
+    priority: P0
+    evidence_required:
+      - screenshot
+    steps:
+      - "Run axe-core on pages visited during the session"
+    tags:
+      - "@universal"
+    notes: "Universal Validation Suite — check for serious/critical violations"
+
+  - id: TC-UV-6
+    title: "Snapshot drift check (visual regression)"
+    type: automated
+    priority: P0
+    evidence_required:
+      - screenshot
+    steps:
+      - "No baseline-stable run exists for INV-622 — first run exempted"
+    tags:
+      - "@universal"
+    notes: "Exempt — no baseline for this ticket yet. See diffs/UV-6-skipped.txt"
+
+runs:
+  - id: run-qa-feature-workabee-dev-001
+    kind: qa-feature
+    env: https://xin-np.wbee.ca/
+    executor: workabee-dev
+    started: "2026-06-29T07:28:00.000Z"
+    finished: "2026-06-29T07:46:00.000Z"
+    verdict: NEEDS-REVIEW
+    confidence: 52
+    results:
+      TC-0622-001: {status: needs-review, note: "ACCOUNT absent from frontend bundle; no read-only API to verify DB state", method: api+bundle}
+      TC-0622-002: {status: needs-review, note: "BALANCE in frontend bundle for manual entries; DB state not directly verifiable", method: api+bundle}
+      TC-0622-003: {status: needs-review, note: "UI shows hardcoded options only; ACCOUNT absent; BALANCE programmatic only; expected for DB-layer ticket", method: live-browser}
+      TC-UV-1: {status: pass, note: "Only Cognito favicon 404 (third-party noise, allowlisted)", method: automated}
+      TC-UV-2: {status: pass, note: "All 5 app API requests returned 200", method: automated}
+      TC-UV-3: {status: pass, note: "No broken assets", method: automated}
+      TC-UV-4: {status: exempt, note: "No document create/edit surface for seed-data ticket", method: n/a}
+      TC-UV-5: {status: blocked, note: "axe-core not available headlessly", method: skipped}
+      TC-UV-6: {status: exempt, note: "No baseline-stable run exists", method: n/a}

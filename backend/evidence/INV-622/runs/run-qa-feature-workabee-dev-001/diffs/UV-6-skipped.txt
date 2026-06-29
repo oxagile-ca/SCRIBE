@@ -1,0 +1,3 @@
+UV-6 snapshot drift check skipped.
+Reason: No baseline-stable run exists for INV-622 (first run ever for this ticket).
+Pass --no-baseline-warning acknowledged. First run cannot drift vs non-existent baseline.

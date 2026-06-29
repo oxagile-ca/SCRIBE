@@ -1,0 +1,124 @@
+{
+  "ticket": "INV-622",
+  "verdict": "NEEDS-REVIEW",
+  "score": {
+    "pass": 2,
+    "fail": 0,
+    "blocked": 0,
+    "needs_review": 3,
+    "total": 5,
+    "pct": 40
+  },
+  "confidence": {
+    "headline": 52,
+    "band": "needs-review",
+    "explanation": "Primary gap: no read-only API endpoint to directly verify payment_types_tbl contents. ACCOUNT is completely absent from the frontend JS bundle, which is a concern but may be by design (DB-only ticket; UI integration is INV-605's scope). BALANCE is referenced in frontend for manual entries. All app API calls returned 200. DB migration state cannot be confirmed via UI/API alone."
+  },
+  "time": "18 minutes",
+  "started": "2026-06-29T07:28:00.000Z",
+  "finished": "2026-06-29T07:46:00.000Z",
+  "executor": "workabee-dev",
+  "env": "https://xin-np.wbee.ca/",
+  "run_id": "run-qa-feature-workabee-dev-001",
+  "test_cases": [
+    {
+      "id": "TC-0622-001",
+      "title": "Verify ACCOUNT payment type present via live API",
+      "status": "needs-review",
+      "evidence": [
+        "automated/TC-0622-001/live.png",
+        "automated/TC-0622-001/api-payment-types.json"
+      ],
+      "note": "ACCOUNT is completely absent from the frontend JS bundle (index-B0E7Y5i9.js). No existing SO transactions use ACCOUNT across bookings 7-11. No read-only endpoint to directly list payment_types_tbl entries. Cannot confirm ACCOUNT migration ran without destructive write test or direct DB access. Recommend verifying via DB query or POST /so/lineitem with ACCOUNT payment type on a test booking."
+    },
+    {
+      "id": "TC-0622-002",
+      "title": "Verify BALANCE payment type present via live API",
+      "status": "needs-review",
+      "evidence": [
+        "automated/TC-0622-002/live.png",
+        "automated/TC-0622-002/api-payment-types.json"
+      ],
+      "note": "BALANCE IS referenced in the frontend JS bundle — used as payment_type='BALANCE' for Manual transaction entries. The frontend expects BALANCE to be valid in the DB. However, no SO transactions exist yet that use BALANCE, and no read-only listing endpoint confirms DB presence. Confidence is higher than ACCOUNT since the frontend actively uses BALANCE. Recommend verifying via POST /so/lineitem with Manual type or DB query."
+    },
+    {
+      "id": "TC-0622-003",
+      "title": "Verify Payment Type UI on Reservation Details surfaces ACCOUNT and BALANCE",
+      "status": "needs-review",
+      "evidence": [
+        "automated/TC-0622-003/live.png",
+        "automated/TC-0622-003/payments-tab.png",
+        "automated/TC-0622-003/reservation-details.png",
+        "automated/TC-0622-003/ui-findings.json"
+      ],
+      "note": "The Payments tab shows 5 hardcoded options: Credit Card, Cash, Debit Card, Cheque, Interac. ACCOUNT and BALANCE are NOT visible as user-selectable payment methods. BALANCE is programmatically used for Manual entries (not a user-visible option). ACCOUNT is entirely absent from the frontend. This is likely expected behavior — INV-622 is a DB-layer ticket and INV-605 (Reservation Details - Payment Tab - API Integration) covers UI integration."
+    },
+    {
+      "id": "TC-UV-1",
+      "title": "Console error scan",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-UV-1/console.log",
+        "automated/TC-UV-1/console-errors.json"
+      ],
+      "note": "Only 1 error: Cognito auth server favicon.ico 404 — allowlisted as third-party noise. No app console errors."
+    },
+    {
+      "id": "TC-UV-2",
+      "title": "Network error scan",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-UV-2/network.har",
+        "automated/TC-UV-2/non-2xx.json"
+      ],
+      "note": "All 5 app-authored API requests returned 200. No 4xx/5xx responses."
+    },
+    {
+      "id": "TC-UV-3",
+      "title": "Broken image / asset scan",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-UV-3/asset-report.json"
+      ],
+      "note": "No broken assets detected in the app. Asset report is empty (no non-200 responses)."
+    },
+    {
+      "id": "TC-UV-4",
+      "title": "Document lifecycle smoke",
+      "status": "exempt",
+      "evidence": [],
+      "note": "Exempt: seed-data/enum ticket has no document create/edit surface. See manual/TC-UV-4/exemption.md"
+    },
+    {
+      "id": "TC-UV-5",
+      "title": "Accessibility scan",
+      "status": "blocked",
+      "evidence": [
+        "automated/TC-UV-5/axe-skipped.txt"
+      ],
+      "note": "axe-core/playwright not available in current headless MCP environment. No serious/critical violations observed manually."
+    },
+    {
+      "id": "TC-UV-6",
+      "title": "Snapshot drift check",
+      "status": "exempt",
+      "evidence": [],
+      "note": "Exempt: no baseline-stable run exists for INV-622. First run for this ticket."
+    }
+  ],
+  "key_findings": [
+    "CRITICAL: ACCOUNT payment type is completely absent from the frontend JS bundle (index-B0E7Y5i9.js). This means the frontend has no awareness of ACCOUNT whatsoever.",
+    "BALANCE is present in the frontend bundle — hardcoded as the payment_type for Manual transaction entries.",
+    "The Payments tab UI shows 5 hardcoded methods (Credit Card, Cash, Debit Card, Cheque, Interac) — no dynamic loading from payment_types_tbl.",
+    "No read-only API endpoint exists to list all payment_types_tbl entries. Direct DB verification blocked.",
+    "Existing SO transactions use CREDIT_CARD (id=1) and CASH (id=3). No ACCOUNT or BALANCE transactions found.",
+    "All app API calls returned 200. No console errors from app code. No network errors.",
+    "INV-605 (Reservation Details - Payment Tab - API Integration) is the upstream ticket that would wire up ACCOUNT/BALANCE in the UI."
+  ],
+  "recommendations": [
+    "Verify ACCOUNT and BALANCE exist in payment_types_tbl via direct DB query: SELECT * FROM payment_types_tbl WHERE name IN ('ACCOUNT', 'BALANCE')",
+    "Or create a test SO line item with ACCOUNT payment type on a disposable seed booking to verify API accepts it",
+    "If ACCOUNT is confirmed in DB but absent from ORM, raise as a defect against INV-599 or INV-622",
+    "Block INV-605 (Payment Tab UI Integration) until DB seed data is confirmed to ensure ACCOUNT and BALANCE will work end-to-end"
+  ]
+}

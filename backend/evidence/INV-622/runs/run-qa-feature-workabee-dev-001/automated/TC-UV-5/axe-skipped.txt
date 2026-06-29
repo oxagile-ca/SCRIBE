@@ -1,0 +1,5 @@
+UV-5 accessibility scan skipped.
+Reason: axe-core/playwright is not available in the current headless Playwright MCP environment.
+Pages visited: /sign-in (Cognito), /dashboard, /reservation/BK_J755DICT
+No serious/critical violations observed manually during navigation.
+Status: incomplete — log for post-run review.

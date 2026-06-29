@@ -1,0 +1,22 @@
+{
+  "page": "/reservation/BK_J755DICT",
+  "tab": "Payments",
+  "payment_method_options_visible": [
+    "Credit Card", "Cash", "Debit Card", "Cheque", "Interac"
+  ],
+  "ACCOUNT_visible_in_UI": false,
+  "BALANCE_visible_in_UI": false,
+  "BALANCE_used_programmatically": true,
+  "BALANCE_usage": "Sent as payment_type='BALANCE' to API when Manual transaction type is selected. Not visible as a user-selectable radio button.",
+  "ACCOUNT_in_frontend_bundle": false,
+  "note": "The Payments tab UI shows 5 hardcoded payment method options (Credit Card, Cash, Debit Card, Cheque, Interac). Neither ACCOUNT nor BALANCE appears as a user-visible option. BALANCE is wired into the frontend code for manual entries only. ACCOUNT is completely absent from the frontend bundle. This is likely by design — INV-622 is a DB-layer ticket; INV-605 (Reservation Details - Payment Tab - API Integration) handles the UI integration of new payment types.",
+  "network_calls_on_payments_tab_load": [
+    "GET /api/v1/user/profile => 200",
+    "POST /api/v1/booking/search => 200",
+    "POST /api/v1/inventory/search => 200",
+    "GET /api/v1/so/invoice?booking_id=8 => 200",
+    "GET /api/v1/so/folio?booking_id=8 => 200"
+  ],
+  "no_payment_types_api_call": true,
+  "verdict": "needs-review"
+}

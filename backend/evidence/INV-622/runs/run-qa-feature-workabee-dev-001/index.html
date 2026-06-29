@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Evidence — INV-622 | run-qa-feature-workabee-dev-001</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; background: #f5f5f5; color: #333; }
+  .header { background: #1a1a2e; color: white; padding: 20px 32px; }
+  .header h1 { margin: 0; font-size: 1.4em; }
+  .header .meta { margin-top: 8px; font-size: 0.85em; opacity: 0.8; }
+  .banner { padding: 16px 32px; display: flex; align-items: center; gap: 24px; }
+  .verdict { padding: 10px 20px; border-radius: 6px; font-weight: 700; font-size: 1.1em; }
+  .verdict.needs-review { background: #fff3cd; color: #856404; border: 2px solid #ffc107; }
+  .verdict.pass { background: #d4edda; color: #155724; border: 2px solid #28a745; }
+  .confidence { font-size: 1.2em; font-weight: 600; }
+  .main { max-width: 1100px; margin: 0 auto; padding: 0 32px 40px; }
+  .card { background: white; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .card h2 { margin: 0 0 16px; font-size: 1em; text-transform: uppercase; letter-spacing: 0.05em; color: #666; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #f8f9fa; text-align: left; padding: 8px 12px; font-size: 0.85em; border-bottom: 2px solid #dee2e6; }
+  td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 0.9em; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.78em; font-weight: 600; }
+  .badge.pass { background: #d4edda; color: #155724; }
+  .badge.fail { background: #f8d7da; color: #721c24; }
+  .badge.needs-review { background: #fff3cd; color: #856404; }
+  .badge.blocked { background: #e2e3e5; color: #383d41; }
+  .badge.exempt { background: #e8e8e8; color: #555; }
+  .finding { padding: 10px 14px; background: #fff8e1; border-left: 4px solid #ffc107; border-radius: 4px; margin-bottom: 8px; font-size: 0.9em; }
+  .finding.critical { background: #ffeaea; border-left-color: #dc3545; }
+  .rec { padding: 10px 14px; background: #e8f4fd; border-left: 4px solid #0d6efd; border-radius: 4px; margin-bottom: 8px; font-size: 0.9em; }
+  .score-grid { display: flex; gap: 16px; flex-wrap: wrap; }
+  .score-box { flex: 1; min-width: 100px; padding: 14px; background: #f8f9fa; border-radius: 6px; text-align: center; }
+  .score-box .num { font-size: 2em; font-weight: 700; }
+  .score-box .label { font-size: 0.8em; color: #666; }
+  .score-box.pass .num { color: #28a745; }
+  .score-box.nr .num { color: #856404; }
+  .score-box.blocked .num { color: #6c757d; }
+  .timing { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .timing-row { padding: 8px 12px; background: #f8f9fa; border-radius: 4px; font-size: 0.88em; }
+  code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>QA Evidence Report — INV-622</h1>
+  <div class="meta">
+    [Seed Data / ENUM] - DB1.7 Payment Type Add BALANCE &amp; ACCOUNT - BASE.8.2.2 |
+    Run: run-qa-feature-workabee-dev-001 |
+    Kind: qa-feature |
+    Env: https://xin-np.wbee.ca/ |
+    Executor: workabee-dev |
+    Date: 2026-06-29
+  </div>
+</div>
+
+<div class="banner">
+  <div class="verdict needs-review">NEEDS-REVIEW</div>
+  <div class="confidence">Confidence: 52/100</div>
+  <div style="font-size:0.9em;color:#666;">Primary gap: no read-only API to verify payment_types_tbl • ACCOUNT absent from frontend bundle</div>
+</div>
+
+<div class="main">
+
+  <div class="card">
+    <h2>Score Summary</h2>
+    <div class="score-grid">
+      <div class="score-box pass"><div class="num">2</div><div class="label">Pass</div></div>
+      <div class="score-box nr"><div class="num">3</div><div class="label">Needs Review</div></div>
+      <div class="score-box blocked"><div class="num">1</div><div class="label">Blocked/Exempt</div></div>
+      <div class="score-box"><div class="num">9</div><div class="label">Total TCs</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Key Findings</h2>
+    <div class="finding critical">
+      <strong>CRITICAL:</strong> <code>ACCOUNT</code> payment type is completely absent from the frontend JS bundle
+      (<code>index-B0E7Y5i9.js</code>). The HB payment-method array and all payment_type references do not include ACCOUNT.
+      This means the frontend has no awareness of ACCOUNT.
+    </div>
+    <div class="finding">
+      <strong>BALANCE:</strong> Present in the frontend bundle — hardcoded as <code>payment_type='BALANCE'</code>
+      for Manual transaction entries (the "Manual" radio button option). Not user-selectable as a named option.
+    </div>
+    <div class="finding">
+      <strong>UI:</strong> The Payments tab shows 5 hardcoded options: Credit Card, Cash, Debit Card, Cheque, Interac.
+      No dynamic API call to load payment types from the DB. Payment type selection is completely hardcoded in the frontend.
+    </div>
+    <div class="finding">
+      <strong>API:</strong> No read-only endpoint exists to list all <code>payment_types_tbl</code> entries.
+      SO transactions across bookings 7–11 show only <code>CREDIT_CARD</code> (id=1) and <code>CASH</code> (id=3) in use.
+    </div>
+    <div class="finding">
+      <strong>All app API calls 200.</strong> No console errors from app code. No broken assets.
+      INV-605 (Payment Tab API Integration) is the upstream blocker for UI integration.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Test Case Results</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>TC ID</th>
+          <th>Title</th>
+          <th>Status</th>
+          <th>Notes</th>
+          <th>Evidence</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>TC-0622-001</strong></td>
+          <td>Verify ACCOUNT payment type present via live API</td>
+          <td><span class="badge needs-review">needs-review</span></td>
+          <td>ACCOUNT is entirely absent from the frontend JS bundle. No SO transactions use ACCOUNT. No read-only API to verify DB state. Cannot confirm migration ran without destructive test or direct DB access.</td>
+          <td><a href="automated/TC-0622-001/api-payment-types.json">api-payment-types.json</a></td>
+        </tr>
+        <tr>
+          <td><strong>TC-0622-002</strong></td>
+          <td>Verify BALANCE payment type present via live API</td>
+          <td><span class="badge needs-review">needs-review</span></td>
+          <td>BALANCE IS in the frontend bundle — used for Manual entries. Frontend expects BALANCE to be valid in the DB. No SO transactions use BALANCE yet. DB confirmation still needed.</td>
+          <td><a href="automated/TC-0622-002/api-payment-types.json">api-payment-types.json</a></td>
+        </tr>
+        <tr>
+          <td><strong>TC-0622-003</strong></td>
+          <td>Verify Payment Type UI surfaces ACCOUNT and BALANCE</td>
+          <td><span class="badge needs-review">needs-review</span></td>
+          <td>UI shows hardcoded options only (Credit Card, Cash, Debit Card, Cheque, Interac). ACCOUNT absent. BALANCE used programmatically for Manual entries only. This is expected for a DB-layer ticket — UI integration is INV-605's scope.</td>
+          <td>
+            <a href="automated/TC-0622-003/live.png">live.png</a> |
+            <a href="automated/TC-0622-003/ui-findings.json">ui-findings.json</a>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>TC-UV-1</strong></td>
+          <td>Console error scan</td>
+          <td><span class="badge pass">pass</span></td>
+          <td>Only 1 error: Cognito auth favicon.ico 404 (third-party noise, allowlisted). No app console errors.</td>
+          <td><a href="automated/TC-UV-1/console-errors.json">console-errors.json</a></td>
+        </tr>
+        <tr>
+          <td><strong>TC-UV-2</strong></td>
+          <td>Network error scan</td>
+          <td><span class="badge pass">pass</span></td>
+          <td>All 5 app-authored API requests returned 200. No 4xx/5xx.</td>
+          <td><a href="automated/TC-UV-2/non-2xx.json">non-2xx.json</a></td>
+        </tr>
+        <tr>
+          <td><strong>TC-UV-3</strong></td>
+          <td>Broken image / asset scan</td>
+          <td><span class="badge pass">pass</span></td>
+          <td>No broken assets.</td>
+          <td><a href="automated/TC-UV-3/asset-report.json">asset-report.json</a></td>
+        </tr>
+        <tr>
+          <td><strong>TC-UV-4</strong></td>
+          <td>Document lifecycle smoke</td>
+          <td><span class="badge exempt">exempt</span></td>
+          <td>Seed-data/enum ticket — no document create/edit surface.</td>
+          <td><a href="../../manual/TC-UV-4/exemption.md">exemption.md</a></td>
+        </tr>
+        <tr>
+          <td><strong>TC-UV-5</strong></td>
+          <td>Accessibility scan</td>
+          <td><span class="badge blocked">incomplete</span></td>
+          <td>axe-core not available in headless MCP environment. No serious/critical violations observed manually.</td>
+          <td><a href="automated/TC-UV-5/axe-skipped.txt">axe-skipped.txt</a></td>
+        </tr>
+        <tr>
+          <td><strong>TC-UV-6</strong></td>
+          <td>Snapshot drift check</td>
+          <td><span class="badge exempt">exempt</span></td>
+          <td>No baseline-stable run exists. First run for this ticket.</td>
+          <td><a href="diffs/UV-6-skipped.txt">UV-6-skipped.txt</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Frontend Bundle Analysis</h2>
+    <table>
+      <thead>
+        <tr><th>Payment Type</th><th>In HB Array</th><th>As Literal String</th><th>User Visible</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>CREDIT_CARD</td><td>✅</td><td>✅</td><td>✅ Credit Card</td><td>Standard</td></tr>
+        <tr><td>CASH</td><td>✅</td><td>✅</td><td>✅ Cash</td><td>Standard</td></tr>
+        <tr><td>DEBIT_CARD</td><td>✅</td><td>✅</td><td>✅ Debit Card</td><td>Standard</td></tr>
+        <tr><td>CHEQUE</td><td>✅</td><td>✅</td><td>✅ Cheque</td><td>Standard</td></tr>
+        <tr><td>INTERAC</td><td>✅</td><td>✅</td><td>✅ Interac</td><td>Standard</td></tr>
+        <tr><td><strong>BALANCE</strong></td><td>❌</td><td>✅</td><td>❌</td><td>Hardcoded for Manual entries (<code>x="BALANCE"</code>)</td></tr>
+        <tr style="background:#fff0f0"><td><strong>ACCOUNT</strong></td><td>❌</td><td>❌</td><td>❌</td><td><strong>NOT FOUND</strong> in bundle</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:0.85em;color:#666;margin-top:10px">Bundle: <code>https://xin-np.wbee.ca/assets/index-B0E7Y5i9.js</code> (2741 KB)</p>
+  </div>
+
+  <div class="card">
+    <h2>Recommendations</h2>
+    <div class="rec">Verify ACCOUNT and BALANCE exist in <code>payment_types_tbl</code> via direct DB query:<br>
+      <code>SELECT * FROM payment_types_tbl WHERE name IN ('ACCOUNT', 'BALANCE');</code>
+    </div>
+    <div class="rec">Or create a test SO line item with ACCOUNT payment type on a disposable seed booking to verify the API accepts it.</div>
+    <div class="rec">If ACCOUNT is confirmed in DB but absent from the ORM export: raise a defect against INV-622 or INV-599.</div>
+    <div class="rec">Block INV-605 (Payment Tab UI Integration) until DB seed data for ACCOUNT is confirmed, to prevent silent failures when the UI tries to use the new type.</div>
+  </div>
+
+  <div class="card">
+    <h2>Timing Analysis</h2>
+    <div class="timing">
+      <div class="timing-row"><strong>Setup + Manifest</strong>: ~5 min</div>
+      <div class="timing-row"><strong>Authentication</strong>: ~2 min</div>
+      <div class="timing-row"><strong>Actual Testing</strong>: ~8 min</div>
+      <div class="timing-row"><strong>Evidence Writing</strong>: ~3 min</div>
+      <div class="timing-row"><strong>Total Pipeline</strong>: <strong>~18 min</strong></div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

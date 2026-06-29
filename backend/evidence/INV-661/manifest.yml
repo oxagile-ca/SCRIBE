@@ -192,3 +192,25 @@ runs:
       TC-UV-4: {status: pass, note: "Exempt — API-only ticket, see manual/TC-UV-4/exemption.md"}
       TC-UV-5: {status: blocked, note: "Skipped — axe-core unavailable headlessly"}
       TC-UV-6: {status: blocked, note: "Skipped — no baseline-stable run exists"}
+
+  - id: run-qa-feature-ankit-001
+    kind: qa-feature
+    env: https://xin-np.wbee.ca/
+    executor: ankit
+    started: "2026-06-29T18:02:00.000Z"
+    finished: "2026-06-29T18:20:00.000Z"
+    verdict: PASS
+    confidence: 82
+    seed_booking: {booking_number: BK_J755DICT, booking_id: 8}
+    results:
+      TC-0661-001: {status: pass, note: "location.email='info@totemlodge.com' in GET /so/invoice?booking_id=8. HTTP 200."}
+      TC-0661-002: {status: pass, note: "location.website='www.totemlodge.com' in GET /so/invoice?booking_id=8. HTTP 200."}
+      TC-0661-003: {status: pass, note: "All 11 location fields present (name,address_line1,address_line2,city,state_prov,country,postal_zip,phone_number,mobile_number,email,website). No regression."}
+      TC-0661-004: {status: pass, note: "info@totemlodge.com visible with mail icon in Invoice Preview dialog header. Confirmed via DOM snapshot."}
+      TC-0661-005: {status: pass, note: "www.totemlodge.com visible with globe icon in Invoice Preview dialog header. Confirmed via DOM snapshot."}
+      TC-UV-1: {status: pass, note: "1 allowlisted error (Cognito favicon 404). No app-originated console errors."}
+      TC-UV-2: {status: pass, note: "All 4 xin-api-np.wbee.ca calls → 200. non-2xx.json empty."}
+      TC-UV-3: {status: blocked, note: "Skipped — no asset HEAD-check tooling headlessly"}
+      TC-UV-4: {status: pass, note: "Exempt — API-only ticket, see manual/TC-UV-4/exemption.md"}
+      TC-UV-5: {status: blocked, note: "Skipped — axe-core unavailable headlessly"}
+      TC-UV-6: {status: blocked, note: "Skipped — no baseline-stable run exists"}

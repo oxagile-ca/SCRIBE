@@ -1,0 +1,35 @@
+{
+  "status": 200,
+  "ok": true,
+  "locationKeys": [
+    "name",
+    "address_line1",
+    "address_line2",
+    "city",
+    "state_prov",
+    "country",
+    "postal_zip",
+    "phone_number",
+    "mobile_number",
+    "email",
+    "website"
+  ],
+  "email": "info@totemlodge.com",
+  "website": "www.totemlodge.com",
+  "name": "Totem Lodge",
+  "phone": "MISSING",
+  "address": "MISSING",
+  "fullLocation": {
+    "name": "Totem Lodge",
+    "address_line1": "1335 Park Avenue",
+    "address_line2": null,
+    "city": "Prince Rupert",
+    "state_prov": "BC",
+    "country": "CA",
+    "postal_zip": "V8J 1K3",
+    "phone_number": "18005500178",
+    "mobile_number": "2506246761",
+    "email": "info@totemlodge.com",
+    "website": "www.totemlodge.com"
+  }
+}

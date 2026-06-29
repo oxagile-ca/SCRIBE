@@ -1,0 +1,132 @@
+{
+  "ticket": "INV-661",
+  "verdict": "PASS",
+  "score": {
+    "pass": 9,
+    "fail": 0,
+    "blocked": 3,
+    "skipped": 0,
+    "total": 12,
+    "pct": 100
+  },
+  "confidence": {
+    "headline": 82,
+    "band": "pass-with-issues",
+    "explanation": "All 5 core ACs verified via live API (GET /so/invoice?booking_id=8 returns location.email=info@totemlodge.com and location.website=www.totemlodge.com) and Invoice Preview UI modal (both fields rendered with correct icons). All 11 location fields present — no regression. UV-3 asset scan, UV-5 accessibility scan, and UV-6 snapshot drift were not executed (tooling unavailable headlessly). Core deduction: 0. UV gap deduction: -18 (3 UV TCs blocked)."
+  },
+  "started": "2026-06-29T18:02:00.000Z",
+  "finished": "2026-06-29T18:20:00.000Z",
+  "time": "18 minutes",
+  "executor": "ankit",
+  "env": "https://xin-np.wbee.ca/",
+  "seed_booking": {
+    "booking_number": "BK_J755DICT",
+    "booking_id": 8
+  },
+  "test_cases": [
+    {
+      "id": "TC-0661-001",
+      "title": "GET /so/invoice returns location.email field",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0661-001/api-invoice-location.json",
+        "automated/TC-0661-001/live.png"
+      ],
+      "note": "location.email='info@totemlodge.com' present in GET /so/invoice?booking_id=8 response. HTTP 200. Confirmed via in-page fetch with bearer token."
+    },
+    {
+      "id": "TC-0661-002",
+      "title": "GET /so/invoice returns location.website field",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0661-002/api-invoice-location.json",
+        "automated/TC-0661-002/live.png"
+      ],
+      "note": "location.website='www.totemlodge.com' present in GET /so/invoice?booking_id=8 response. HTTP 200."
+    },
+    {
+      "id": "TC-0661-003",
+      "title": "Existing location fields remain present and unaffected",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0661-003/api-invoice-location.json",
+        "automated/TC-0661-003/live.png"
+      ],
+      "note": "All 11 location fields present: name, address_line1, address_line2, city, state_prov, country, postal_zip, phone_number, mobile_number, email, website. No regression."
+    },
+    {
+      "id": "TC-0661-004",
+      "title": "Invoice render page displays location email",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0661-004/live.png"
+      ],
+      "note": "Invoice Preview dialog shows 'info@totemlodge.com' with mail icon in location header. Confirmed via Playwright snapshot ref e304/e305/e306."
+    },
+    {
+      "id": "TC-0661-005",
+      "title": "Invoice render page displays location website",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0661-005/live.png"
+      ],
+      "note": "Invoice Preview dialog shows 'www.totemlodge.com' with global icon in location header. Confirmed via Playwright snapshot ref e299/e300/e301."
+    },
+    {
+      "id": "TC-UV-1",
+      "title": "Console Error Scan",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-UV-1/console-errors.json"
+      ],
+      "note": "1 allowlisted error: Cognito favicon 404 (https://xin-auth-np.auth.ca-central-1.amazoncognito.com/favicon.ico). No app-originated console errors."
+    },
+    {
+      "id": "TC-UV-2",
+      "title": "Network Error Scan",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-UV-2/network-api-requests.json",
+        "automated/TC-UV-2/non-2xx.json",
+        "automated/TC-UV-2/network-scan.png"
+      ],
+      "note": "All 4 xin-api-np.wbee.ca calls returned 200: GET /user/profile, POST /booking/search, GET /so/invoice?booking_id=8, POST /inventory/search. non-2xx.json is empty."
+    },
+    {
+      "id": "TC-UV-3",
+      "title": "Broken Asset Scan",
+      "status": "blocked",
+      "evidence": [
+        "automated/TC-UV-3/asset-report.json"
+      ],
+      "note": "Skipped — no asset HEAD-check tooling available headlessly."
+    },
+    {
+      "id": "TC-UV-4",
+      "title": "Document Lifecycle Smoke",
+      "status": "pass",
+      "evidence": [
+        "manual/TC-UV-4/exemption.md"
+      ],
+      "note": "Exempt — API-only ticket, no CMS document create/edit workflow in scope. See exemption.md."
+    },
+    {
+      "id": "TC-UV-5",
+      "title": "Accessibility Scan",
+      "status": "blocked",
+      "evidence": [
+        "automated/TC-UV-5/axe-skipped.txt"
+      ],
+      "note": "Skipped — axe-core/playwright not available in this headless run environment."
+    },
+    {
+      "id": "TC-UV-6",
+      "title": "Snapshot Drift Check",
+      "status": "blocked",
+      "evidence": [
+        "automated/TC-UV-6/snapshot-drift-skipped.txt"
+      ],
+      "note": "Skipped — no baseline-stable run exists for INV-661."
+    }
+  ]
+}

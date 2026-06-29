@@ -1,0 +1,1 @@
+UV-6 Snapshot drift check skipped: no baseline-stable run exists for INV-661. Status: blocked.

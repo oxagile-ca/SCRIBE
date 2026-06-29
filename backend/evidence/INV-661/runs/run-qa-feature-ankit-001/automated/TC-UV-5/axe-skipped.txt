@@ -1,0 +1,1 @@
+UV-5 Accessibility scan skipped: axe-core/playwright not available in this headless run environment. Status: blocked.

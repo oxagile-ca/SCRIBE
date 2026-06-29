@@ -240,8 +240,23 @@ browser tools (the run harness wires in the `playwright` MCP server via
 `--mcp-config`, so they appear as `mcp__playwright__browser_*`): `browser_navigate`,
 `browser_snapshot`, `browser_type`, `browser_click`, `browser_take_screenshot`,
 `browser_evaluate`, `browser_console_messages`, `browser_network_requests`,
-`browser_wait_for`. If these tools are absent, STOP (verdict `blocked`) — never
-fall back to a pnpm/spec runner.
+`browser_wait_for`.
+
+**Load the browser tools FIRST, and wait for the MCP to connect.** In the headless
+`claude -p` subprocess these tools are **deferred** and the `npx @playwright/mcp`
+server takes a few seconds to come up. Before Phase 2.2, run **ToolSearch** with
+`select:mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_type,mcp__playwright__browser_click,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_evaluate,mcp__playwright__browser_console_messages,mcp__playwright__browser_network_requests,mcp__playwright__browser_wait_for`
+to load their schemas. If the first attempt returns nothing, the server is still
+connecting — **wait ~5s and retry, up to ~6 times (~60s total)** before concluding
+it is unavailable.
+
+**NEVER fabricate a substitute execution path.** Do NOT write a Python/`requests`
+script, a `playwright` Python harness, a `pnpm`/spec runner, or any API-only "test"
+in place of driving the browser — those produce no real UI evidence and are
+forbidden. The ONLY acceptable Phase-2 engines are these Playwright MCP browser
+tools. If after the retries the tools genuinely will not load, STOP with verdict
+`blocked` (reason: "Playwright MCP unavailable"), write summary.json + index.html,
+and exit — do not improvise.
 
 ### 2.0 Resolve targets (deterministic — strips guesswork)
 If the backend ships a `qa_targets.py` resolver, run it from the backend dir and

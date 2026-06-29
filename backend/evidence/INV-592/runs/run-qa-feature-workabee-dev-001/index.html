@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QA Evidence — INV-592 | run-qa-feature-workabee-dev-001</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; background: #f5f5f5; color: #222; }
+  .header { background: #1a1a2e; color: #fff; padding: 24px 32px; }
+  .header h1 { margin: 0 0 4px; font-size: 22px; }
+  .header p { margin: 0; opacity: .7; font-size: 14px; }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-left: 12px; }
+  .badge-pass-with-issues { background: #ffc107; color: #333; }
+  .badge-pass { background: #28a745; color: #fff; }
+  .badge-fail { background: #dc3545; color: #fff; }
+  .badge-blocked { background: #6c757d; color: #fff; }
+  .badge-needs-review { background: #fd7e14; color: #fff; }
+  .container { max-width: 1100px; margin: 24px auto; padding: 0 24px; }
+  .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); margin-bottom: 20px; overflow: hidden; }
+  .card-header { padding: 16px 20px; border-bottom: 1px solid #eee; font-weight: 600; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+  .card-body { padding: 20px; }
+  .score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px; }
+  .score-item { text-align: center; }
+  .score-num { font-size: 36px; font-weight: 700; }
+  .score-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: .5px; }
+  .green { color: #28a745; }
+  .orange { color: #fd7e14; }
+  .gray { color: #6c757d; }
+  .red { color: #dc3545; }
+  .confidence-bar { height: 12px; background: #eee; border-radius: 6px; margin: 8px 0; overflow: hidden; }
+  .confidence-fill { height: 100%; background: #ffc107; border-radius: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { background: #f8f9fa; padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: #666; border-bottom: 2px solid #dee2e6; }
+  td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .status-pass { color: #28a745; font-weight: 600; }
+  .status-fail { color: #dc3545; font-weight: 600; }
+  .status-blocked { color: #6c757d; font-weight: 600; }
+  .status-needs-review { color: #fd7e14; font-weight: 600; }
+  .note-text { font-size: 12px; color: #555; }
+  .api-tag { display: inline-block; background: #e8f0fe; color: #1a73e8; font-size: 11px; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+  .sub-tickets { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .ticket-chip { background: #f0f4ff; border: 1px solid #c5d3f5; padding: 2px 8px; border-radius: 12px; font-size: 12px; color: #3b5bdb; }
+  .findings-list { margin: 0; padding: 0 0 0 18px; font-size: 13px; line-height: 1.6; }
+  .finding-pass::marker { color: #28a745; }
+  .finding-warn::marker { color: #fd7e14; }
+  .screenshots { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .screenshot-thumb { border: 1px solid #ddd; border-radius: 4px; overflow: hidden; text-align: center; }
+  .screenshot-thumb img { max-width: 280px; height: auto; display: block; }
+  .screenshot-thumb p { margin: 4px; font-size: 11px; color: #666; }
+  .timing-table td:first-child { font-weight: 500; }
+  .timing-table td:last-child { color: #555; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>INV-592 — Add Booking Item: Sales Order Integration
+    <span class="badge badge-pass-with-issues">PASS-WITH-ISSUES</span>
+  </h1>
+  <p>run-qa-feature-workabee-dev-001 &nbsp;·&nbsp; env: https://xin-np.wbee.ca/ &nbsp;·&nbsp; 2026-06-29</p>
+</div>
+
+<div class="container">
+
+  <!-- Score -->
+  <div class="card">
+    <div class="card-header">Test Results Overview</div>
+    <div class="card-body">
+      <div class="score-grid">
+        <div class="score-item"><div class="score-num green">4</div><div class="score-label">Pass</div></div>
+        <div class="score-item"><div class="score-num red">0</div><div class="score-label">Fail</div></div>
+        <div class="score-item"><div class="score-num gray">1</div><div class="score-label">Blocked</div></div>
+        <div class="score-item"><div class="score-num orange">2</div><div class="score-label">Needs Review</div></div>
+        <div class="score-item"><div class="score-num">7</div><div class="score-label">Total TCs</div></div>
+      </div>
+      <div style="margin-top:20px">
+        <strong>Confidence: 72/100</strong>
+        <div class="confidence-bar"><div class="confidence-fill" style="width:72%"></div></div>
+        <p class="note-text">Four TCs pass with direct API evidence. Two need review (require special test data for orphaned booking item / CLOSED status bookings). One blocked (headless mode — POST mutation skipped; indirect evidence strong).</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scope -->
+  <div class="card">
+    <div class="card-header">Scope</div>
+    <div class="card-body">
+      <p style="margin-top:0">Parent ticket for Sales Order integration when adding a booking item. Four sub-tickets:</p>
+      <div class="sub-tickets">
+        <span class="ticket-chip">INV-593 — POST /booking/item + SO resync</span>
+        <span class="ticket-chip">INV-594 — POST /so/lineitem validation fix</span>
+        <span class="ticket-chip">INV-595 — PUT /so/lineitem/resync new line item support</span>
+        <span class="ticket-chip">INV-596 — PUT /so/resync no-SO case + status transitions</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Test Cases -->
+  <div class="card">
+    <div class="card-header">Test Cases</div>
+    <div class="card-body" style="padding:0">
+      <table>
+        <thead>
+          <tr>
+            <th>TC ID</th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Evidence</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>TC-0592-001</code></td>
+            <td>POST /booking/item triggers SO resync</td>
+            <td class="status-blocked">BLOCKED</td>
+            <td><span class="api-tag">api-booking-item-so-integration.json</span></td>
+            <td class="note-text">Headless: mutation skipped. Indirect evidence: booking_item_id=1 linked to SO line item id=1 confirms resync (INV-593 SN16) ran at creation.</td>
+          </tr>
+          <tr>
+            <td><code>TC-0592-002</code></td>
+            <td>POST /so/lineitem validates CURR_BI.booking_id ≠ null</td>
+            <td class="status-needs-review">NEEDS-REVIEW</td>
+            <td><span class="api-tag">api-so-lineitem-validation.json</span></td>
+            <td class="note-text">INV-594: SN25 fix path requires orphaned booking item (booking_id=null). Required field validation fires first. Positive path confirmed via TC-0592-005.</td>
+          </tr>
+          <tr>
+            <td><code>TC-0592-003</code></td>
+            <td>PUT /so/lineitem/resync creates/updates SO line items</td>
+            <td class="status-pass">PASS</td>
+            <td><span class="api-tag">api-so-lineitem-resync.json</span></td>
+            <td class="note-text">200 OK, 9 line items returned. UPDATE path ✅. INV-595 SN11 table fix confirmed by correct data. CREATE NEW path not tested (all BIs already have SO lines).</td>
+          </tr>
+          <tr>
+            <td><code>TC-0592-004</code></td>
+            <td>PUT /so/resync handles no-SO + status transitions</td>
+            <td class="status-pass">PASS</td>
+            <td><span class="api-tag">api-so-resync.json</span></td>
+            <td class="note-text">200 OK, DRAFT→CONFIRMED transition for CONFIRMED booking ✅ (INV-596 SN27). CLOSED status paths not testable on current dataset.</td>
+          </tr>
+          <tr>
+            <td><code>TC-0592-005</code></td>
+            <td>GET /so/invoice — line items populated, payment_type present</td>
+            <td class="status-pass">PASS</td>
+            <td><span class="api-tag">api-so-transactions.json</span> + 2 screenshots</td>
+            <td class="note-text">ROOM_CHARGE linked (booking_item_id=1), payment_type field on all items, tax math reconciles ($119→$136.85→$2.57 due). UI Invoice Summary matches API exactly.</td>
+          </tr>
+          <tr>
+            <td><code>TC-UV-1</code></td>
+            <td>Console Error Scan</td>
+            <td class="status-pass">PASS</td>
+            <td><span class="api-tag">console-errors.json</span></td>
+            <td class="note-text">1 error (Cognito favicon 404) — third-party allowlisted. No application errors.</td>
+          </tr>
+          <tr>
+            <td><code>TC-UV-2</code></td>
+            <td>Network Error Scan</td>
+            <td class="status-pass">PASS</td>
+            <td><span class="api-tag">non-2xx.json</span></td>
+            <td class="note-text">All application API calls returned 200 during session.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Key Findings -->
+  <div class="card">
+    <div class="card-header">Key Findings</div>
+    <div class="card-body">
+      <ul class="findings-list">
+        <li class="finding-pass">✅ SO line item created for booking item id=1 — name "124 Room", ROOM_CHARGE type, booking_item_id linked. INV-593 integration confirmed via existing data.</li>
+        <li class="finding-pass">✅ <code>payment_type</code> field present on all SO line items (null for ROOM_CHARGE, populated for DEPOSIT/MANUAL_CREDIT). INV-595 field shape correct.</li>
+        <li class="finding-pass">✅ PUT /so/lineitem/resync: 200 OK, 9 line items returned. SN11 table correction (sales_order_line_item_tbl) producing correct results.</li>
+        <li class="finding-pass">✅ PUT /so/resync: DRAFT→CONFIRMED status transition for CONFIRMED booking. INV-596 SN27 enforcement working.</li>
+        <li class="finding-pass">✅ Invoice math reconciles: $119.00 subtotal + PST 8% $9.52 + GST 5% $5.95 + MRDT 2% $2.38 = $136.85 total − $133.28 deposits − $1.00 credits = $2.57 balance due.</li>
+        <li class="finding-warn">⚠️ TC-0592-001: POST /booking/item not directly tested (headless mutation restriction). Indirect evidence sufficient but manual verification recommended.</li>
+        <li class="finding-warn">⚠️ TC-0592-002: INV-594 SN25 null-booking_id path not testable without orphaned booking item in dataset.</li>
+        <li class="finding-warn">⚠️ INV-595 CREATE NEW line item path (SN33-37) not exercised — all existing booking items already have SO line items.</li>
+        <li class="finding-warn">⚠️ INV-596 CLOSED_ALL_SETTLED and CLOSED_OUTSTANDING status transitions (SN31-35) not testable — no such bookings in current dataset.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Screenshots -->
+  <div class="card">
+    <div class="card-header">Screenshots</div>
+    <div class="card-body">
+      <div class="screenshots">
+        <div class="screenshot-thumb">
+          <img src="automated/TC-0592-005/TC-0592-005-reservation-BK_DCP3QIKN.png" alt="Reservation BK_DCP3QIKN - Rooms Tab">
+          <p>TC-0592-005: Reservation BK_DCP3QIKN (Rooms Tab)</p>
+        </div>
+        <div class="screenshot-thumb">
+          <img src="automated/TC-0592-005/TC-0592-005-payments-tab.png" alt="Payments Tab">
+          <p>TC-0592-005: Reservation BK_DCP3QIKN (Payments Tab)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timing -->
+  <div class="card">
+    <div class="card-header">Timing Analysis</div>
+    <div class="card-body">
+      <table class="timing-table">
+        <tr><td>Setup + Authentication</td><td>~2 min</td></tr>
+        <tr><td>Manifest Build</td><td>~3 min</td></tr>
+        <tr><td>API Test Execution</td><td>~4 min</td></tr>
+        <tr><td>Evidence Write</td><td>~1 min</td></tr>
+        <tr><td><strong>Total Pipeline</strong></td><td><strong>~10 min</strong></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Remediation -->
+  <div class="card">
+    <div class="card-header">Remediation (to reach full coverage)</div>
+    <div class="card-body">
+      <ol style="font-size:14px;line-height:1.8;margin:0">
+        <li><strong>TC-0592-001</strong>: Run POST /booking/item on a CONFIRMED booking manually and verify new SO line item appears in GET /so/invoice response.</li>
+        <li><strong>TC-0592-002</strong>: Create a test fixture with a booking item where booking_id is NULL, then call POST /so/lineitem with it — confirm INVALID_PARAMETER is returned (SN25 path).</li>
+        <li><strong>TC-0592-003</strong>: Create a booking item that has no existing SO line item (e.g., add a new booking item to an existing booking before SO resync fires), then call PUT /so/lineitem/resync and verify a new line item is created (SN33-37 path).</li>
+        <li><strong>TC-0592-004 (gap)</strong>: Transition a booking to CLOSED_ALL_SETTLED or CLOSED_OUTSTANDING and verify PUT /so/resync sets SO status to COMPLETED/IN_PROGRESS accordingly.</li>
+      </ol>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

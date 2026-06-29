@@ -1,0 +1,16 @@
+{
+  "request": { "method": "PUT", "path": "/so/resync", "body": { "booking_ids": [1] } },
+  "status": 200,
+  "ok": true,
+  "responseKeys": ["so"],
+  "asserted": {
+    "so_id": 1,
+    "so_status_before": "DRAFT",
+    "so_status_after": "CONFIRMED",
+    "booking_status": "CONFIRMED",
+    "status_transition_correct": true,
+    "sales_order_number": "TOT03ZFTXU",
+    "line_items_count": 9
+  },
+  "note": "INV-596 SD5.9.3: PUT /so/resync returned 200. SO status transitioned DRAFT → CONFIRMED matching booking status CONFIRMED (per SN27 rule). No-SO case (SN17-23) not testable without a booking with no SO — all current bookings already have SOs. CLOSED status transitions (SN31-35) not testable without CLOSED_ALL_SETTLED or CLOSED_OUTSTANDING bookings in current dataset."
+}

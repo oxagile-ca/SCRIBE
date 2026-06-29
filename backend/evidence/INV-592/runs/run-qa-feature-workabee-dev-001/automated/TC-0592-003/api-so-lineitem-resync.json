@@ -1,0 +1,17 @@
+{
+  "request": { "method": "PUT", "path": "/so/lineitem/resync", "body": { "booking_item_id": 1 } },
+  "status": 200,
+  "ok": true,
+  "responseKeys": ["so"],
+  "asserted": {
+    "so_id": 1,
+    "so_status": "DRAFT",
+    "line_items_count": 9,
+    "line_item_id_1_exists": true,
+    "line_item_name": "124 Room",
+    "line_item_status": "NEW",
+    "update_path_confirmed": true,
+    "create_path_tested": false
+  },
+  "note": "INV-595 SD5.7.2: PUT /so/lineitem/resync returned 200. UPDATE path confirmed (booking_item_id=1 already had SO line item id=1 → updated). CREATE NEW path (SN33-37, for booking items with no existing line item) requires orphaned booking item — cannot test without mutation in headless mode. SN11 table correction (sales_order_line_item_tbl) confirmed via 200 OK and correct line item data in response."
+}

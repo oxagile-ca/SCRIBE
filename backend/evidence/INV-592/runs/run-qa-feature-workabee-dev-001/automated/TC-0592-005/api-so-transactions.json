@@ -1,0 +1,41 @@
+{
+  "request": { "method": "GET", "path": "/so/invoice", "query": "booking_id=1" },
+  "status": 200,
+  "ok": true,
+  "responseKeys": ["invoice"],
+  "asserted": {
+    "so_id": 1,
+    "so_status": "DRAFT",
+    "total_line_items": 3,
+    "line_items_with_booking_item_id": 1,
+    "all_line_items_have_payment_type_field": true,
+    "room_charge_line_item": {
+      "so_item_id": 1,
+      "booking_item_id": 1,
+      "name": "124 Room",
+      "desc": "Hotel Room",
+      "unit_price": 11900,
+      "subtotal": 11900,
+      "total": 13685,
+      "line_item_type_name": "ROOM_CHARGE",
+      "payment_type": null,
+      "taxes_count": 3,
+      "taxes": ["PST 8% = 952", "MRDT 2% = 238", "GST 5% = 595"]
+    },
+    "invoice_total_due_cents": 257,
+    "math_check": {
+      "subtotal_cents": 11900,
+      "pst_room_8pct": 952,
+      "gst_5pct": 595,
+      "mrdt_2pct": 238,
+      "total_cents": 13685,
+      "deposits_cents": 13328,
+      "credits_cents": 100,
+      "balance_due_cents": 257,
+      "math_reconciles": true,
+      "formula": "13685 - 13328 - 100 = 257"
+    }
+  },
+  "ui_verified": true,
+  "ui_note": "Invoice Summary on /reservation/BK_DCP3QIKN matches API data: Rooms $119.00, Total $136.85, Deposits $133.28, Credits $1.00, Balance Due $2.57"
+}

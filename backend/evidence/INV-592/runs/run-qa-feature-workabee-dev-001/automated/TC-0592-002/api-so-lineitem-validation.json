@@ -1,0 +1,11 @@
+{
+  "request": { "method": "POST", "path": "/so/lineitem", "body": { "booking_item_id": 99999, "sales_order_id": 1 } },
+  "status": 400,
+  "ok": false,
+  "asserted": {
+    "error_code": "INVALID_PARAMETER",
+    "required_field_validation_fires": true
+  },
+  "note": "INV-594 fix (CURR_BI.booking_id null check at SN25) cannot be directly tested without an orphaned booking item (one that exists but has no booking_id). Required field validation fires before reaching SN25. The positive path (valid booking item with booking_id) is confirmed via TC-0592-005 which shows booking_item_id=1 flows through SO line item creation correctly. Marked needs-review: direct negative-path test requires test data with booking_id=null on a real booking item.",
+  "status_verdict": "needs-review"
+}

@@ -1,0 +1,9 @@
+[
+  {
+    "level": "error",
+    "message": "Failed to load resource: the server responded with a status of 404 ()",
+    "url": "https://xin-auth-np.auth.ca-central-1.amazoncognito.com/favicon.ico",
+    "allowlisted": true,
+    "reason": "Third-party Cognito favicon resource, not an application error"
+  }
+]

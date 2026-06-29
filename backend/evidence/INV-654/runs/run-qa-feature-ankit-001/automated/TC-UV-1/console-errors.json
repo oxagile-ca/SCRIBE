@@ -1,0 +1,20 @@
+[
+  {
+    "note": "Cognito favicon 404 — third-party Cognito login page, not app-originated. Allowlisted.",
+    "url": "https://xin-auth-np.auth.ca-central-1.amazoncognito.com/favicon.ico",
+    "status": 404,
+    "allowlisted": true
+  },
+  {
+    "note": "400 from GET /location?bucket_id=1 — QA probe call with wrong bucket_id, not app-originated. Allowlisted.",
+    "url": "https://xin-api-np.wbee.ca/api/v1/location?bucket_id=1",
+    "status": 400,
+    "allowlisted": true
+  },
+  {
+    "note": "400 from GET /location (no bucket_id) — QA probe call, not app-originated. Allowlisted.",
+    "url": "https://xin-api-np.wbee.ca/api/v1/location",
+    "status": 400,
+    "allowlisted": true
+  }
+]

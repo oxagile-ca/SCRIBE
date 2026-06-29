@@ -1,0 +1,27 @@
+{
+  "request": {"method": "GET", "path": "/api/v1/user/profile", "query": ""},
+  "status": 200,
+  "ok": true,
+  "responseKeys": ["user_payload", "bucket_to_location"],
+  "asserted": {
+    "location_email_present": true,
+    "location_email_value": "info@totemlodge.com",
+    "location_website_present": true,
+    "location_website_value": "www.totemlodge.com",
+    "existing_fields_intact": true
+  },
+  "result": "PASS",
+  "totem_location_payload": {
+    "id": 5,
+    "name": "Totem Lodge",
+    "address_line1": "1335 Park Avenue",
+    "city": "Prince Rupert",
+    "state_prov": "BC",
+    "postal_zip": "V8J 1K3",
+    "phone_number": "18005500178",
+    "mobile_number": "2506246761",
+    "email": "info@totemlodge.com",
+    "website": "www.totemlodge.com",
+    "status": "ENABLED"
+  }
+}

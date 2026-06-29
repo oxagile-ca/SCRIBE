@@ -1,0 +1,17 @@
+{
+  "request": {"method": "GET", "path": "/api/v1/user/profile", "query": ""},
+  "status": 200,
+  "ok": true,
+  "result": "PASS",
+  "seed_verification": [
+    {"field": "name", "expected": "Totem Lodge", "actual": "Totem Lodge", "match": true},
+    {"field": "email", "expected": "info@totemlodge.com", "actual": "info@totemlodge.com", "match": true},
+    {"field": "website", "expected": "www.totemlodge.com", "actual": "www.totemlodge.com", "match": true},
+    {"field": "phone_number", "expected": "18005500178", "actual": "18005500178", "match": true},
+    {"field": "mobile_number", "expected": "2506246761", "actual": "2506246761", "match": true},
+    {"field": "address_line1", "expected": "1335 Park Avenue", "actual": "1335 Park Avenue", "match": true},
+    {"field": "city", "expected": "Prince Rupert", "actual": "Prince Rupert", "match": true},
+    {"field": "state_prov", "expected": "BC", "actual": "BC", "match": true},
+    {"field": "postal_zip", "expected": "V8J 1K3", "actual": "V8J 1K3", "match": true}
+  ]
+}

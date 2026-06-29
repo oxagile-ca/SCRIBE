@@ -1,0 +1,93 @@
+{
+  "ticket": "INV-654",
+  "verdict": "PASS",
+  "score": {"pass": 11, "fail": 0, "blocked": 0, "total": 11, "pct": 100},
+  "confidence": {
+    "headline": 95,
+    "band": "high",
+    "explanation": "All 8 ticket TCs pass: 5 API assertions (email+website present in all 4 endpoints + seed data verified) and 3 UI checks (dashboard card + folio header). UV-1/UV-2/UV-3 pass. -5 points: Invoice UI (Print Invoice disabled, no SO on any Totem booking) not fully exercised via UI; API-level folio/invoice assertions confirm data contract is correct."
+  },
+  "started": "2026-06-29T09:06:00Z",
+  "finished": "2026-06-29T09:20:00Z",
+  "executor": "ankit",
+  "env": "https://xin-np.wbee.ca/",
+  "test_cases": [
+    {
+      "id": "TC-0654-001",
+      "title": "GET /location — email + website fields present",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-001/api-location.json"],
+      "note": "GET /api/v1/location?bucket_id=2 → 200. location.email=info@totemlodge.com, location.website=www.totemlodge.com. All existing fields intact."
+    },
+    {
+      "id": "TC-0654-002",
+      "title": "GET /user/profile — location.email + location.website present",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-002/api-user-profile.json"],
+      "note": "GET /api/v1/user/profile → 200. bucket_to_location[Totem].location[0].email=info@totemlodge.com, website=www.totemlodge.com. Totem bucket_id=2."
+    },
+    {
+      "id": "TC-0654-003",
+      "title": "GET /so/folio — location.email + location.website present",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-003/api-folio.json"],
+      "note": "GET /api/v1/so/folio?booking_id=1 → 200. location.email=info@totemlodge.com, location.website=www.totemlodge.com present at top-level location key."
+    },
+    {
+      "id": "TC-0654-004",
+      "title": "GET /so/invoice — location.email + location.website present",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-004/api-invoice.json"],
+      "note": "GET /api/v1/so/invoice?booking_id=1 → 200. location.email=info@totemlodge.com, location.website=www.totemlodge.com present at top-level location key."
+    },
+    {
+      "id": "TC-0654-005",
+      "title": "Totem Lodge seed data — all contact fields correct",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-005/api-seed-verification.json"],
+      "note": "All 9 seed fields match expected values: name, email, website, phone_number, mobile_number, address_line1, city, state_prov, postal_zip."
+    },
+    {
+      "id": "TC-0654-006",
+      "title": "Dashboard Location Info Card — email and website display",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-006/live.png"],
+      "note": "Dashboard Overview tab shows Location Info card with email=info@totemlodge.com (mailto link) and website=www.totemlodge.com (https link). Rendered correctly from API data."
+    },
+    {
+      "id": "TC-0654-007",
+      "title": "Dashboard Location Info Card — phone number formatting",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-007/live.png"],
+      "note": "Phone displays as '1 (800) 550-0178' (tel:18005500178) and Mobile as '(250) 624-6761' (tel:2506246761). Both correctly formatted per INV-662 spec."
+    },
+    {
+      "id": "TC-0654-008",
+      "title": "Folio header — all location fields from API, phone formatted",
+      "status": "pass",
+      "evidence": ["automated/TC-0654-008/live.png"],
+      "note": "Folio modal header shows: name=Totem Lodge, contact section=www.totemlodge.com info@totemlodge.com 1 (800) 550-0178 (250) 624-6761, addr=1335 Park Avenue, Prince Rupert, BC, CA, V8J 1K3. All from API payload, no hardcoded values."
+    },
+    {
+      "id": "TC-UV-1",
+      "title": "Console error scan",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-1/console-errors.json"],
+      "note": "3 console errors found — all allowlisted: Cognito favicon 404 (third-party) and 2 QA probe calls with wrong bucket_id (not app-originated). Zero app-originated errors."
+    },
+    {
+      "id": "TC-UV-2",
+      "title": "Network error scan",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-2/non-2xx.json"],
+      "note": "All app-originated API requests returned 200. No non-2xx responses from the app itself."
+    },
+    {
+      "id": "TC-UV-3",
+      "title": "Broken asset scan",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-3/asset-report.json"],
+      "note": "No broken assets detected on pages visited."
+    }
+  ]
+}

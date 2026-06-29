@@ -1,0 +1,173 @@
+ticket: INV-654
+title: "Add Location Email field & Seed Data for Totem location"
+status: Ready for Testing
+assignee: Ankit Guhe
+pr_context:
+  backend_pr: "https://github.com/Workabee-Technologies/xinventory-services/pull/189"
+  frontend_pr: "https://github.com/Workabee-Technologies/xinventory-ux/pull/239"
+  database_pr: "https://github.com/Workabee-Technologies/xinventory-database/pull/41"
+  diff_found: true
+  notes: |
+    Backend PR #189 adds email+website to location payload across 4 endpoints.
+    FE PR #239 wires Dashboard card + Folio/Invoice header from API (no hardcoding).
+    DB PR #41 adds email column + Totem Lodge seed data.
+
+acceptance_criteria:
+  - id: AC-1
+    text: "Totem Lodge seed data is populated — email: info@totemlodge.com, website: www.totemlodge.com, address, phone, mobile"
+    source: description (INV-653 child)
+  - id: AC-2
+    text: "GET /location?bucket_id returns email and website fields in location payload"
+    source: description (INV-658 child)
+  - id: AC-3
+    text: "GET /user/profile returns location.email and location.website fields"
+    source: description (INV-659 child)
+  - id: AC-4
+    text: "GET /so/folio?booking_id returns location.email and location.website fields"
+    source: description (INV-660 child)
+  - id: AC-5
+    text: "GET /so/invoice?booking_id returns location.email and location.website fields"
+    source: description (INV-661 child)
+  - id: AC-6
+    text: "Dashboard Location Info Card displays email address for the currently selected location"
+    source: description (INV-662 child)
+  - id: AC-7
+    text: "Dashboard Location Info Card phone number displays correctly: 1 (800) 550-0178 and (250) 624-6761"
+    source: description (INV-662 child)
+  - id: AC-8
+    text: "Folio/Invoice header displays all location fields (name, website, email, phone, mobile, address) from API payload — no hardcoded values"
+    source: description (INV-663 child)
+
+test_cases:
+  - id: TC-0654-001
+    title: "GET /location — email + website fields present in response"
+    type: api
+    priority: P0
+    ac: [AC-1, AC-2]
+    evidence_required: [screenshot, api]
+    notes: "PR #189: GET /api/v1/location?bucket_id — assert email and website keys present and non-empty for Totem bucket"
+    annotations_hint: "Annotate the email and website JSON fields in the API response"
+
+  - id: TC-0654-002
+    title: "GET /user/profile — location.email + location.website present"
+    type: api
+    priority: P1
+    ac: [AC-3]
+    evidence_required: [screenshot, api]
+    notes: "PR #189: GET /api/v1/user/profile — assert location object contains email and website"
+    annotations_hint: "Highlight location sub-object with email/website in response"
+
+  - id: TC-0654-003
+    title: "GET /so/folio — location.email + location.website present"
+    type: api
+    priority: P0
+    ac: [AC-4]
+    evidence_required: [screenshot, api]
+    notes: "PR #189: GET /api/v1/so/folio?booking_id — assert location.email and location.website in response body"
+    annotations_hint: "Arrow pointing to location.email and location.website in folio JSON"
+
+  - id: TC-0654-004
+    title: "GET /so/invoice — location.email + location.website present"
+    type: api
+    priority: P0
+    ac: [AC-5]
+    evidence_required: [screenshot, api]
+    notes: "PR #189: GET /api/v1/so/invoice?booking_id — assert location.email and location.website in invoice response"
+    annotations_hint: "Arrow pointing to location.email and location.website in invoice JSON"
+
+  - id: TC-0654-005
+    title: "Totem Lodge seed data — all contact fields correct via /location API"
+    type: api
+    priority: P0
+    ac: [AC-1]
+    evidence_required: [screenshot, api]
+    notes: |
+      PR db/41: Verify seed values: name=Totem Lodge, email=info@totemlodge.com,
+      website=www.totemlodge.com, phone_number=18005500178 or 1-800-550-0178,
+      mobile_number=2506246761 or 250-624-6761,
+      address1=1335 Park Avenue, city=Prince Rupert, state_prov=BC, postal_zip=V8J 1K3
+    annotations_hint: "Annotate each seed field value confirming correct values"
+
+  - id: TC-0654-006
+    title: "Dashboard Location Info Card — email and website display"
+    type: ui
+    priority: P0
+    ac: [AC-6]
+    evidence_required: [screenshot]
+    steps:
+      - Navigate to https://xin-np.wbee.ca/dashboard
+      - Locate the Location Info card
+      - Verify email field shows info@totemlodge.com
+      - Verify website field shows www.totemlodge.com
+    annotations_hint: "Callout box around the email and website fields in the Location Info card"
+
+  - id: TC-0654-007
+    title: "Dashboard Location Info Card — phone number formatting"
+    type: ui
+    priority: P1
+    ac: [AC-7]
+    evidence_required: [screenshot]
+    steps:
+      - Navigate to https://xin-np.wbee.ca/dashboard
+      - Locate the Location Info card
+      - Verify phone number displays as 1 (800) 550-0178
+      - Verify mobile number displays as (250) 624-6761
+    annotations_hint: "Arrows pointing to Phone and Mobile fields showing formatted numbers"
+
+  - id: TC-0654-008
+    title: "Folio header — all location fields from API (no hardcoding), phone formatted"
+    type: ui
+    priority: P0
+    ac: [AC-8]
+    evidence_required: [screenshot]
+    steps:
+      - Navigate to a booking's Folio page
+      - Verify header shows: Totem Lodge, www.totemlodge.com, info@totemlodge.com
+      - Verify phone number formatted as 1 (800) 550-0178
+      - Verify mobile formatted as (250) 624-6761
+      - Verify address shows 1335 Park Avenue, Prince Rupert, BC, V8J 1K3
+    annotations_hint: "Callout boxes around each header field; note API source vs hardcoded"
+
+  # Universal Validation Suite
+  - id: TC-UV-1
+    title: "Console error scan — no uncaught errors on tested pages"
+    type: automated
+    priority: P0
+    evidence_required: [console]
+    notes: "Capture browser_console_messages on all pages visited during this run"
+
+  - id: TC-UV-2
+    title: "Network error scan — no 4xx/5xx responses from app-authored requests"
+    type: automated
+    priority: P0
+    evidence_required: [network]
+    notes: "Capture browser_network_requests; filter for non-2xx status codes"
+
+  - id: TC-UV-3
+    title: "Broken asset scan — all images and CSS backgrounds return 200"
+    type: automated
+    priority: P1
+    evidence_required: [screenshot]
+    notes: "Walk DOM for img src, source srcset, background-image URLs; HEAD-fetch each"
+
+runs:
+  - id: run-qa-feature-ankit-001
+    kind: qa-feature
+    env: https://xin-np.wbee.ca/
+    executor: ankit
+    started: "2026-06-29T09:06:00Z"
+    finished: "2026-06-29T09:20:00Z"
+    verdict: PASS
+    confidence: 95
+    results:
+      TC-0654-001: {status: pass, note: "GET /location → email+website present, HTTP 200", method: api}
+      TC-0654-002: {status: pass, note: "GET /user/profile → location.email+website present, HTTP 200", method: api}
+      TC-0654-003: {status: pass, note: "GET /so/folio → location.email+website present, HTTP 200", method: api}
+      TC-0654-004: {status: pass, note: "GET /so/invoice → location.email+website present, HTTP 200", method: api}
+      TC-0654-005: {status: pass, note: "All 9 seed fields correct via API", method: api}
+      TC-0654-006: {status: pass, note: "Dashboard card shows info@totemlodge.com + www.totemlodge.com", method: ui}
+      TC-0654-007: {status: pass, note: "Phone: 1 (800) 550-0178 / Mobile: (250) 624-6761 — correctly formatted", method: ui}
+      TC-0654-008: {status: pass, note: "Folio modal header: all location fields from API payload, no hardcoding", method: ui}
+      TC-UV-1: {status: pass, note: "0 app-originated console errors. 3 allowlisted.", method: automated}
+      TC-UV-2: {status: pass, note: "0 non-2xx from app API. All calls 200.", method: automated}
+      TC-UV-3: {status: pass, note: "No broken assets detected.", method: automated}

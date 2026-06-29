@@ -1,0 +1,27 @@
+{
+  "request": {"method": "GET", "path": "/api/v1/so/invoice", "query": "booking_id=1"},
+  "status": 200,
+  "ok": true,
+  "responseKeys": ["invoice", "terms", "customer", "location", "booking"],
+  "asserted": {
+    "location_email_present": true,
+    "location_email_value": "info@totemlodge.com",
+    "location_website_present": true,
+    "location_website_value": "www.totemlodge.com",
+    "existing_fields_intact": true
+  },
+  "result": "PASS",
+  "location_payload": {
+    "name": "Totem Lodge",
+    "address_line1": "1335 Park Avenue",
+    "address_line2": null,
+    "city": "Prince Rupert",
+    "state_prov": "BC",
+    "country": "CA",
+    "postal_zip": "V8J 1K3",
+    "phone_number": "18005500178",
+    "mobile_number": "2506246761",
+    "email": "info@totemlodge.com",
+    "website": "www.totemlodge.com"
+  }
+}

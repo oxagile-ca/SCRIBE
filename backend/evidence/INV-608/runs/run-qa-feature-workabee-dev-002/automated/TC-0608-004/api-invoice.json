@@ -1,0 +1,21 @@
+{
+  "request": {"method": "GET", "path": "/so/invoice", "query": "booking_id=8"},
+  "status": 200,
+  "ok": true,
+  "asserted": {
+    "invoice_total_due_cents": 12685,
+    "invoice_total_due_dollars": 126.85,
+    "line_items_count": 3,
+    "payment_type_field_present": true,
+    "deposit_items": [
+      {"name": "Payment - DEPOSIT CASH", "payment_type": {"id": 3, "name": "CASH", "status": "ENABLED", "direction": "ALL"}, "status": "NEW"},
+      {"name": "Payment - DEPOSIT CASH", "payment_type": {"id": 3, "name": "CASH", "status": "ENABLED", "direction": "ALL"}, "status": "NEW"}
+    ],
+    "charge_item": {"name": "326 Room", "desc": "Hotel Room", "payment_type": null, "status": "NEW"},
+    "all_item_statuses": ["NEW"],
+    "no_cancelled_solis": true,
+    "invoice_keys_present": ["so_id", "sales_order_number", "total_due", "status", "currency", "friendly_name", "line_items", "subtotal", "taxes", "total"]
+  },
+  "verdict": "PASS",
+  "notes": "payment_type field confirmed on DEPOSIT line items (DB1.7 requirement). total_due=12685 matches UI Balance Due $126.85. Invoice Number TOTEWCLQEH shown in UI (friendly_name field). No CANCELLED SOLIs in seed data."
+}

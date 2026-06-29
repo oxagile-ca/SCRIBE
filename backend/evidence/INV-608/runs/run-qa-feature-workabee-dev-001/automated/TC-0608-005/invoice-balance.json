@@ -1,0 +1,14 @@
+{
+  "source": "live DOM + API /so/invoice?booking_id=8",
+  "invoice_number": "TOTEWCLQEH",
+  "prior_known_bug": "INV-608.00 placeholder value — FIXED in this build",
+  "running_balance": [
+    {"row": "326 Room", "charge": 119.00, "deposit": null, "balance": 119.00, "check": "PASS"},
+    {"row": "8% PST (Room Charges)", "charge": 9.52, "deposit": null, "balance": 128.52, "check": "119.00+9.52=128.52 PASS"},
+    {"row": "2% MRDT", "charge": 2.38, "deposit": null, "balance": 130.90, "check": "128.52+2.38=130.90 PASS"},
+    {"row": "5% GST", "charge": 5.95, "deposit": null, "balance": 136.85, "check": "130.90+5.95=136.85 PASS"},
+    {"row": "DEPOSIT CASH", "charge": null, "deposit": 5.00, "balance": 131.85, "check": "136.85-5.00=131.85 PASS"},
+    {"row": "DEPOSIT CASH", "charge": null, "deposit": 5.00, "balance": 126.85, "check": "131.85-5.00=126.85 PASS"}
+  ],
+  "final_balance_matches_total_due": "126.85 == 126.85 PASS"
+}

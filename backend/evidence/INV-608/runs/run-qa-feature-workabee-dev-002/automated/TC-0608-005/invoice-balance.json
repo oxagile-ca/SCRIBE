@@ -1,0 +1,24 @@
+{
+  "source": "invoice-dialog DOM read + API, run-qa-feature-workabee-dev-002",
+  "booking": "BK_J755DICT",
+  "invoice_number_ui": "TOTEWCLQEH",
+  "running_balance_rows": [
+    {"row": 1, "description": "326 Room",             "charge": 119.00, "deposit": null,  "balance": 119.00,  "check": "0 + 119.00 = 119.00 ✓"},
+    {"row": 2, "description": "8% PST (Room Charges)","charge": 9.52,   "deposit": null,  "balance": 128.52,  "check": "119.00 + 9.52 = 128.52 ✓"},
+    {"row": 3, "description": "2% MRDT",              "charge": 2.38,   "deposit": null,  "balance": 130.90,  "check": "128.52 + 2.38 = 130.90 ✓"},
+    {"row": 4, "description": "5% GST",               "charge": 5.95,   "deposit": null,  "balance": 136.85,  "check": "130.90 + 5.95 = 136.85 ✓"},
+    {"row": 5, "description": "DEPOSIT",               "charge": null,   "deposit": 5.00,  "balance": 131.85,  "check": "136.85 - 5.00 = 131.85 ✓"},
+    {"row": 6, "description": "DEPOSIT",               "charge": null,   "deposit": 5.00,  "balance": 126.85,  "check": "131.85 - 5.00 = 126.85 ✓"}
+  ],
+  "summary": {
+    "subtotal": 119.00,
+    "total": 136.85,
+    "deposits": 10.00,
+    "payments": 0.00,
+    "credits": 0.00,
+    "balance_due": 126.85
+  },
+  "api_total_due_cents": 12685,
+  "api_matches_ui": true,
+  "verdict": "PASS"
+}

@@ -1,0 +1,3 @@
+TC-UV-5 Accessibility scan — SKIPPED (headless run, no axe-core available)
+Pages visited: /reservation/BK_J755DICT, folio dialog, invoice dialog
+No axe-core MCP available in this run. Recommend manual a11y review of print dialogs.

@@ -1,0 +1,25 @@
+{
+  "request": {"method": "GET", "path": "/so/invoice", "query": "booking_id=8"},
+  "status": 200,
+  "ok": true,
+  "responseKeys": ["invoice", "terms", "customer", "location", "booking"],
+  "asserted": {
+    "sales_order_number": "TOTEWCLQEH",
+    "total_due_cents": 12685,
+    "total_cents": 13685,
+    "line_item_count": 3,
+    "room_charge_name": "326 Room",
+    "room_charge_desc": "Hotel Room",
+    "room_charge_payment_type": null,
+    "deposit_1_payment_type_name": "CASH",
+    "deposit_1_payment_type_id": 3,
+    "deposit_2_payment_type_name": "CASH",
+    "deposit_2_payment_type_id": 3,
+    "no_cancelled_solis": true,
+    "mrdt_percentage": 2,
+    "pst_room_percentage": 8,
+    "gst_percentage": 5,
+    "math_total_check": "11900 + 952 + 238 + 595 = 13685 cents PASS",
+    "math_balance_check": "13685 - 500 - 500 = 12685 cents PASS"
+  }
+}

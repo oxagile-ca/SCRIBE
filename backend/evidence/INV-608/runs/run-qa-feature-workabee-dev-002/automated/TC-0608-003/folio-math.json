@@ -1,0 +1,24 @@
+{
+  "source": "folio-dialog DOM read, run-qa-feature-workabee-dev-002",
+  "booking": "BK_J755DICT",
+  "charge_table_rows": [
+    {"item": "326 Room", "from": "07/15/2026", "to": "07/17/2026", "qty": 1, "rate": 119.00, "total": 119.00}
+  ],
+  "subtotal": 119.00,
+  "taxes": {
+    "PST_8_room": 9.52,
+    "PST_7_nonroom": 0.00,
+    "GST_5": 5.95,
+    "MRDT_2": 2.38
+  },
+  "total": 136.85,
+  "deposits": 10.00,
+  "payments": 0.00,
+  "credits": 0.00,
+  "balance_due": 126.85,
+  "math_checks": {
+    "subtotal_plus_taxes": {"calc": "119.00 + 9.52 + 0.00 + 5.95 + 2.38", "result": 136.85, "matches_total": true},
+    "total_minus_deposits_payments": {"calc": "136.85 - 10.00 - 0.00 - 0.00", "result": 126.85, "matches_balance_due": true}
+  },
+  "verdict": "PASS"
+}

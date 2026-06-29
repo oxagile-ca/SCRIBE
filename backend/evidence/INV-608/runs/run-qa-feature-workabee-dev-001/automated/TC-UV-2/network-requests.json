@@ -1,0 +1,12 @@
+8. [GET] https://xin-api-np.wbee.ca/api/v1/user/profile => [200] 
+9. [POST] https://xin-api-np.wbee.ca/api/v1/booking/search => [200] 
+10. [GET] https://xin-api-np.wbee.ca/api/v1/so/invoice?booking_id=8 => [200] 
+11. [POST] https://xin-api-np.wbee.ca/api/v1/inventory/search => [200] 
+12. [GET] https://xin-api-np.wbee.ca/api/v1/so/folio?booking_id=8 => [200] 
+13. [POST] https://xin-api-np.wbee.ca/api/v1/inventory/search => [200] 
+14. [GET] https://xin-api-np.wbee.ca/api/v1/so/invoice?booking_id=8 => [200] 
+15. [GET] https://xin-api-np.wbee.ca/api/v1/so/invoice?booking_id=8 => [200] 
+16. [GET] https://xin-api-np.wbee.ca/api/v1/so/folio?booking_id=8 => [200] 
+17. [GET] https://xin-api-np.wbee.ca/api/v1/so/transactions?booking_id=8 => [200] 
+
+Note: 7 static requests not shown, run with "static" option to see them.

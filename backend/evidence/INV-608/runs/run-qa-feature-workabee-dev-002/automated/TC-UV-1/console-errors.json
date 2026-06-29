@@ -1,0 +1,14 @@
+[
+  {
+    "level": "error",
+    "text": "Failed to load resource: 404 @ https://xin-auth-np.auth.ca-central-1.amazoncognito.com/favicon.ico",
+    "allowlisted": true,
+    "reason": "Third-party Cognito auth page static asset — not app-owned"
+  },
+  {
+    "level": "error",
+    "text": "CORS policy blocked fetch of /api/v1/so/invoice?booking_id=8 (No Access-Control-Allow-Origin header)",
+    "allowlisted": true,
+    "reason": "QA instrumentation artifact — first in-page eval fetch used wrong auth header (document.cookie instead of Bearer token). App's own authenticated fetches to this endpoint returned 200. Not an app-authored error."
+  }
+]

@@ -1,0 +1,3 @@
+TC-UV-6 Snapshot drift — SKIPPED
+No baseline-stable run exists for INV-608 (first QA run for this ticket).
+Visual regression diff cannot be computed without a baseline.

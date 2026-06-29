@@ -1,0 +1,27 @@
+{
+  "source": "live DOM + API /so/folio?booking_id=8",
+  "folio_charge_table": {
+    "rows": [{"item": "326 Room", "from": "07/15/2026", "to": "07/17/2026", "qty": "1", "rate": "$119.00", "total": "$119.00"}],
+    "payment_rows_inline": 0,
+    "deposit_rows_inline": 0,
+    "ac1_charges_only": "PASS"
+  },
+  "folio_summary": {
+    "subtotal": 119.00,
+    "pst_8_room": 9.52,
+    "pst_7_nonroom": 0.00,
+    "gst_5": 5.95,
+    "mrdt_2": 2.38,
+    "total": 136.85,
+    "deposits": 10.00,
+    "payments": 0.00,
+    "credits": 0.00,
+    "balance_due": 126.85
+  },
+  "math_checks": {
+    "subtotal_plus_taxes": "119.00 + 9.52 + 0.00 + 5.95 + 2.38 = 136.85 PASS",
+    "total_minus_deposits": "136.85 - 10.00 - 0.00 - 0.00 = 126.85 PASS",
+    "balance_due_matches_api": "126.85 == 126.85 PASS"
+  },
+  "notes": "MRDT configured at 2% for Totem Lodge (API confirmed). Product context says 3% — hotel-specific rate, not a code bug."
+}

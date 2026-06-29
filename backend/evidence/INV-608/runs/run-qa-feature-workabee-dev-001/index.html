@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Evidence — INV-608 | run-qa-feature-workabee-dev-001</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; background: #f5f5f5; color: #333; }
+  .header { background: #1a1a2e; color: white; padding: 20px 32px; }
+  .header h1 { margin: 0 0 4px; font-size: 22px; }
+  .header .sub { color: #aaa; font-size: 13px; }
+  .verdict-banner { padding: 16px 32px; display: flex; align-items: center; gap: 16px; }
+  .verdict-banner.pass-with-issues { background: #fff3cd; border-bottom: 3px solid #ffc107; }
+  .verdict-pill { padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 14px; background: #ffc107; color: #333; }
+  .confidence { font-size: 28px; font-weight: bold; color: #333; }
+  .confidence .label { font-size: 12px; color: #666; display: block; }
+  .content { max-width: 1100px; margin: 0 auto; padding: 24px 32px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat { background: white; padding: 16px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); text-align: center; }
+  .stat .n { font-size: 32px; font-weight: bold; }
+  .stat .l { font-size: 12px; color: #666; }
+  .n.green { color: #28a745; } .n.red { color: #dc3545; } .n.yellow { color: #ffc107; } .n.gray { color: #999; }
+  table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.1); margin-bottom: 24px; }
+  th { background: #f0f0f0; text-align: left; padding: 10px 14px; font-size: 12px; text-transform: uppercase; color: #555; }
+  td { padding: 10px 14px; border-top: 1px solid #eee; font-size: 13px; vertical-align: top; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge.pass { background: #d4edda; color: #155724; }
+  .badge.fail { background: #f8d7da; color: #721c24; }
+  .badge.needs_review { background: #fff3cd; color: #856404; }
+  .badge.skipped { background: #e2e3e5; color: #383d41; }
+  .badge.blocked { background: #f5c6cb; color: #721c24; }
+  .section-title { font-size: 16px; font-weight: 600; margin: 24px 0 12px; color: #1a1a2e; }
+  .notes-box { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.1); margin-bottom: 24px; }
+  .notes-box ul { margin: 0; padding-left: 20px; }
+  .notes-box li { margin-bottom: 6px; font-size: 13px; }
+  .api-check { background: #e8f5e9; border-left: 3px solid #28a745; padding: 10px 14px; border-radius: 4px; margin: 8px 0; font-size: 12px; font-family: monospace; }
+  .issue-note { background: #fff8e1; border-left: 3px solid #ffc107; padding: 10px 14px; border-radius: 4px; margin: 8px 0; font-size: 12px; }
+  .fix-note { background: #e8f5e9; border-left: 3px solid #28a745; padding: 10px 14px; border-radius: 4px; margin: 8px 0; font-size: 12px; }
+  .footer { text-align: center; padding: 24px; font-size: 12px; color: #999; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>INV-608 — Invoice &amp; Folio: Booking Payment Support</h1>
+  <div class="sub">run-qa-feature-workabee-dev-001 &nbsp;|&nbsp; env: https://xin-np.wbee.ca/ &nbsp;|&nbsp; 2026-06-29 &nbsp;|&nbsp; executor: workabee-dev</div>
+</div>
+
+<div class="verdict-banner pass-with-issues">
+  <span class="verdict-pill">PASS-WITH-ISSUES</span>
+  <div>
+    <span class="confidence">87<span style="font-size:16px">/100</span></span>
+    <span class="label">Confidence</span>
+  </div>
+  <div style="font-size:13px; color:#555; max-width:600px;">
+    All core Folio &amp; Invoice ACs verified. One gap: CANCELLED SOLI handling (TC-0608-006) cannot be tested — seed booking has no cancelled line items.
+    Prior known bug <strong>Invoice Number showing "INV-608.00" is FIXED</strong> — now correctly shows <code>TOTEWCLQEH</code>.
+  </div>
+</div>
+
+<div class="content">
+  <div class="grid">
+    <div class="stat"><div class="n green">8</div><div class="l">Pass</div></div>
+    <div class="stat"><div class="n red">0</div><div class="l">Fail</div></div>
+    <div class="stat"><div class="n yellow">1</div><div class="l">Needs Review</div></div>
+    <div class="stat"><div class="n gray">4</div><div class="l">Skipped/Exempt</div></div>
+    <div class="stat"><div class="n">13</div><div class="l">Total TCs</div></div>
+    <div class="stat"><div class="n">7 min</div><div class="l">Run Time</div></div>
+  </div>
+
+  <div class="fix-note">
+    ✅ <strong>Known Bug FIXED:</strong> Invoice Number previously displayed as "INV-608.00" (placeholder literal). Now correctly returns <code>TOTEWCLQEH</code> from API <code>sales_order_number</code> field.
+  </div>
+
+  <div class="issue-note">
+    ⚠️ <strong>Gap — TC-0608-006 (CANCELLED SOLI):</strong> Seed booking BK_J755DICT has no CANCELLED line items. Cannot verify display treatment of cancelled SOLIs. Requires seed data with a cancelled SOLI or a test booking with a cancelled item to fully verify AC-4.
+  </div>
+
+  <div class="section-title">Test Case Results</div>
+  <table>
+    <thead>
+      <tr>
+        <th>TC ID</th><th>Title</th><th>Status</th><th>Key Finding</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>TC-0608-001</strong></td>
+        <td>Folio charge table: charges only</td>
+        <td><span class="badge pass">PASS</span></td>
+        <td>1 charge row "326 Room". Zero inline DEPOSIT/PAYMENT rows. Item field: "326 Room" ✓</td>
+      </tr>
+      <tr>
+        <td><strong>TC-0608-002</strong></td>
+        <td>Folio payment + deposit summary at bottom</td>
+        <td><span class="badge pass">PASS</span></td>
+        <td>Separate bottom table: Deposits $10.00 | Payments $0.00 | Balance Due $126.85 ✓</td>
+      </tr>
+      <tr>
+        <td><strong>TC-0608-003</strong></td>
+        <td>Folio math reconciles</td>
+        <td><span class="badge pass">PASS</span></td>
+        <td>$119.00 + $9.52 + $5.95 + $2.38 = $136.85 − $10.00 = $126.85 ✓. MRDT 2% = hotel config.</td>
+      </tr>
+      <tr>
+        <td><strong>TC-0608-004</strong></td>
+        <td>Invoice renders with PAYMENT type</td>
+        <td><span class="badge pass">PASS</span></td>
+        <td>Invoice # TOTEWCLQEH ✓. DEPOSIT rows show Payment Method "CASH". API <code>payment_type.name = "CASH"</code> ✓</td>
+      </tr>
+      <tr>
+        <td><strong>TC-0608-005</strong></td>
+        <td>Invoice balance math (running balance)</td>
+        <td><span class="badge pass">PASS</span></td>
+        <td>$119→$128.52→$130.90→$136.85→$131.85→$126.85. Final matches total_due ✓</td>
+      </tr>
+      <tr>
+        <td><strong>TC-0608-006</strong></td>
+        <td>SOLI Cancelled status handling</td>
+        <td><span class="badge needs_review">NEEDS REVIEW</span></td>
+        <td>Seed has no CANCELLED SOLIs (all NEW). Cannot verify cancelled item display. No crash observed.</td>
+      </tr>
+      <tr>
+        <td><strong>TC-0608-007</strong></td>
+        <td>Item + description fields populated</td>
+        <td><span class="badge pass">PASS</span></td>
+        <td>API: <code>name="326 Room"</code>, <code>desc="Hotel Room"</code> both populated. FE shows name in Description col ✓</td>
+      </tr>
+      <tr>
+        <td><strong>TC-UV-1</strong></td>
+        <td>Console error scan</td>
+        <td><span class="badge pass">PASS</span></td>
+        <td>1 error: Cognito favicon 404 (3rd-party, allowlisted). Zero errors from xin-np.wbee.ca ✓</td>
+      </tr>
+      <tr>
+        <td><strong>TC-UV-2</strong></td>
+        <td>Network error scan</td>
+        <td><span class="badge pass">PASS</span></td>
+        <td>All 10 API calls returned 200. /so/invoice, /so/folio, /so/transactions all 200 ✓</td>
+      </tr>
+      <tr>
+        <td><strong>TC-UV-3</strong></td>
+        <td>Broken asset scan</td>
+        <td><span class="badge skipped">SKIPPED</span></td>
+        <td>Print dialogs have no img assets to scan. No failures observed.</td>
+      </tr>
+      <tr>
+        <td><strong>TC-UV-4</strong></td>
+        <td>Document lifecycle smoke</td>
+        <td><span class="badge pass">PASS (EXEMPT)</span></td>
+        <td>Folio/Invoice are read-only renders. API round-trip verified via GET endpoints ✓</td>
+      </tr>
+      <tr>
+        <td><strong>TC-UV-5</strong></td>
+        <td>Accessibility scan</td>
+        <td><span class="badge skipped">SKIPPED</span></td>
+        <td>axe-core not available in headless mode. Manual a11y review recommended.</td>
+      </tr>
+      <tr>
+        <td><strong>TC-UV-6</strong></td>
+        <td>Snapshot drift check</td>
+        <td><span class="badge skipped">SKIPPED</span></td>
+        <td>No baseline-stable run for INV-608 (first run). Baseline not yet established.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">API Verification Summary</div>
+  <div class="api-check">GET /so/invoice?booking_id=8 → 200 OK | sales_order_number: "TOTEWCLQEH" | total_due: 12685¢ | 3 line items | payment_type present on DEPOSIT items</div>
+  <div class="api-check">GET /so/folio?booking_id=8 → 200 OK | Same SO data | folio-specific T&C terms returned</div>
+  <div class="api-check">GET /so/transactions?booking_id=8 → 200 OK</div>
+  <div class="api-check">Line item[0]: ROOM_CHARGE | name="326 Room" | desc="Hotel Room" | payment_type=null | PST 8% + MRDT 2% + GST 5%</div>
+  <div class="api-check">Line item[1,2]: DEPOSIT CREDIT | name="Payment - DEPOSIT CASH" | payment_type={id:3, name:"CASH"} | $5.00 each</div>
+
+  <div class="section-title">Observations &amp; Notes</div>
+  <div class="notes-box">
+    <ul>
+      <li><strong>MRDT rate:</strong> Folio/Invoice show 2% MRDT. Product context says 3%. API confirms percentage=2 for this hotel. This appears to be Totem Lodge's configured rate, not a code bug. ⚠️ Verify with PM whether 2% is intentional for Totem Lodge.</li>
+      <li><strong>Rooms amount discrepancy:</strong> Invoice Summary shows Rooms: $119.00 but Rooms tab shows Est. Total $238.00 (2 nights × $119). The SO has only 1 room-night billed — seed data confirmed.</li>
+      <li><strong>DEPOSIT desc field:</strong> DEPOSIT line items have <code>desc: null</code> in API. FE renders "DEPOSIT" as description. No null-related crash.</li>
+      <li><strong>Booking status UNPAID:</strong> <code>payment_status: "UNPAID"</code> on the booking even with $10 deposit — this appears to be expected behavior (PAID threshold not met).</li>
+    </ul>
+  </div>
+
+  <div class="section-title">Evidence Files</div>
+  <table>
+    <thead><tr><th>File</th><th>TC</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><a href="automated/TC-0608-001/reservation-details.png">TC-0608-001/reservation-details.png</a></td><td>TC-0608-001</td><td>Reservation details page with Invoice Summary visible</td></tr>
+      <tr><td><a href="automated/TC-0608-001/folio-dialog.png">TC-0608-001/folio-dialog.png</a></td><td>TC-0608-001/002/003</td><td>Folio Preview dialog — charge table + summary at bottom</td></tr>
+      <tr><td><a href="automated/TC-0608-004/invoice-dialog.png">TC-0608-004/invoice-dialog.png</a></td><td>TC-0608-004/005/007</td><td>Invoice Preview dialog — line items with running balance + CASH payment type</td></tr>
+      <tr><td><a href="automated/TC-0608-004/payments-tab.png">TC-0608-004/payments-tab.png</a></td><td>TC-0608-004</td><td>Payments tab — Transaction Type and Payment Method options</td></tr>
+      <tr><td><a href="automated/TC-0608-004/api-invoice.json">TC-0608-004/api-invoice.json</a></td><td>TC-0608-004</td><td>API invoice endpoint assertions</td></tr>
+      <tr><td><a href="automated/TC-0608-003/folio-math.json">TC-0608-003/folio-math.json</a></td><td>TC-0608-003</td><td>Folio math verification data</td></tr>
+      <tr><td><a href="automated/TC-0608-005/invoice-balance.json">TC-0608-005/invoice-balance.json</a></td><td>TC-0608-005</td><td>Invoice running balance verification</td></tr>
+      <tr><td><a href="automated/TC-UV-1/console-errors.json">TC-UV-1/console-errors.json</a></td><td>TC-UV-1</td><td>Console errors capture (1 allowlisted)</td></tr>
+      <tr><td><a href="automated/TC-UV-2/network-requests.json">TC-UV-2/network-requests.json</a></td><td>TC-UV-2</td><td>Network requests — all 200</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">
+  Generated by qa-evidence-beeventory | INV-608 | run-qa-feature-workabee-dev-001 | 2026-06-29
+</div>
+</body>
+</html>

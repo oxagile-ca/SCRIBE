@@ -1,0 +1,158 @@
+{
+  "ticket": "INV-608",
+  "verdict": "PASS-WITH-ISSUES",
+  "score": {
+    "pass": 8,
+    "fail": 0,
+    "blocked": 0,
+    "needs_review": 1,
+    "skipped": 4,
+    "total": 13,
+    "pct": 89
+  },
+  "confidence": {
+    "headline": 88,
+    "band": "pass-with-issues",
+    "explanation": "All core Folio and Invoice ACs verified in a fresh isolated browser session (run-002). Folio charges-only table, payment/deposit summary at bottom, math reconciliation, PAYMENT type with CASH method (API confirmed payment_type field), running balance reconciliation, and item/desc fields all pass. One deduction: TC-0608-006 (SOLI Cancelled handling) still cannot be tested — seed booking BK_J755DICT has no CANCELLED SOLIs (all items status=NEW per API). UV-5 (a11y) and UV-6 (no baseline) skipped. CORS console error is a QA instrumentation artifact, not an app bug. Confidence +1 vs run-001 (88 vs 87) due to isolated fresh session confirming no session-state dependence."
+  },
+  "started": "2026-06-29T08:07:00Z",
+  "finished": "2026-06-29T08:20:00Z",
+  "time": "13 minutes",
+  "executor": "workabee-dev",
+  "env": "https://xin-np.wbee.ca/",
+  "seed_booking": "BK_J755DICT",
+  "run_kind": "qa-feature",
+  "isolated": true,
+  "notes": [
+    "Fresh isolated browser session — no cookies/state from prior runs",
+    "Invoice Number TOTEWCLQEH confirmed (not INV-608.00 — prior bug still fixed)",
+    "payment_type: {id:3, name:CASH} confirmed on DEPOSIT line items via API (DB1.7 requirement)",
+    "total_due=12685 cents ($126.85) confirmed via API, matches UI Balance Due",
+    "CORS console error is from QA instrumentation first fetch attempt (wrong auth header), not an app error",
+    "No CANCELLED SOLIs in seed data — TC-0608-006 remains needs_review",
+    "Print Invoice was initially disabled on page load, became enabled after Invoice Summary panel loaded data"
+  ],
+  "test_cases": [
+    {
+      "id": "TC-0608-001",
+      "title": "Folio charge table renders charges only (no inline payment/deposit rows)",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0608-001/reservation-details.png",
+        "automated/TC-0608-001/folio-dialog.png"
+      ],
+      "note": "Folio charge table has exactly 1 row: '326 Room | 07/15/2026 | 07/17/2026 | 1 | $119.00 | $119.00'. No DEPOSIT or PAYMENT rows inline. Item field shows '326 Room'. PASS."
+    },
+    {
+      "id": "TC-0608-002",
+      "title": "Folio payment and deposit summary displayed at bottom",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0608-002/folio-summary.png"
+      ],
+      "note": "Separate bottom table: Deposits $10.00 | Payments $0.00 | Credits $0.00 | Balance Due $126.85. Correctly shown as summary section, not inline charge rows. PASS."
+    },
+    {
+      "id": "TC-0608-003",
+      "title": "Folio math: Subtotal + taxes = Total; Total minus payments/deposits = Balance Due",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0608-003/folio-math.png",
+        "automated/TC-0608-003/folio-math.json"
+      ],
+      "note": "$119.00 + $9.52 + $0.00 + $5.95 + $2.38 = $136.85. $136.85 - $10.00 (deposits) = $126.85. All math reconciles. MRDT 2% is hotel-configured rate. PASS."
+    },
+    {
+      "id": "TC-0608-004",
+      "title": "Invoice renders with PAYMENT type correctly displayed",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0608-004/invoice-dialog.png",
+        "automated/TC-0608-004/payments-tab.png",
+        "automated/TC-0608-004/api-invoice.json"
+      ],
+      "note": "Invoice Number: TOTEWCLQEH. Two DEPOSIT rows show Payment Method: CASH in UI. API confirms payment_type: {id:3, name:'CASH', status:'ENABLED'} on both DEPOSIT line items. DB1.7 requirement verified. PASS."
+    },
+    {
+      "id": "TC-0608-005",
+      "title": "Invoice balance math reconciles (running balance and total)",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0608-005/invoice-balance.png",
+        "automated/TC-0608-005/invoice-balance.json"
+      ],
+      "note": "Running balance: $119.00 → $128.52 → $130.90 → $136.85 → $131.85 → $126.85. All 6 rows reconcile. Final $126.85 = API total_due 12685 cents. PASS."
+    },
+    {
+      "id": "TC-0608-006",
+      "title": "SOLI Cancelled status handled in Folio and Invoice",
+      "status": "needs_review",
+      "evidence": [
+        "automated/TC-0608-006/invoice-no-cancelled.png"
+      ],
+      "note": "Seed booking BK_J755DICT has no CANCELLED SOLIs — API confirms all items status='NEW'. Cannot verify positive display of cancelled items. No rendering crash observed. Recommend seeding a CANCELLED SOLI to verify display treatment."
+    },
+    {
+      "id": "TC-0608-007",
+      "title": "Item and description fields populated correctly in Folio line items",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-0608-007/item-desc-fields.png",
+        "automated/TC-0608-004/api-invoice.json"
+      ],
+      "note": "API: name='326 Room' (populated), desc='Hotel Room' (populated). DEPOSIT items: name='Payment - DEPOSIT CASH'. Folio item column shows '326 Room'. All item/desc fields populated. PASS."
+    },
+    {
+      "id": "TC-UV-1",
+      "title": "Console error scan",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-UV-1/console-errors.json"
+      ],
+      "note": "2 console errors: (1) Cognito favicon 404 — third-party allowlisted. (2) CORS error on /so/invoice — QA instrumentation artifact from first eval fetch with wrong auth header, not an app error. Zero app-authored errors. PASS."
+    },
+    {
+      "id": "TC-UV-2",
+      "title": "Network error scan",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-UV-2/network-requests.json"
+      ],
+      "note": "All 9 app-authored API calls returned 200 OK. 2 FAILED entries are QA instrumentation artifacts. No app 4xx/5xx. PASS."
+    },
+    {
+      "id": "TC-UV-3",
+      "title": "Broken image/asset scan",
+      "status": "skipped",
+      "evidence": [],
+      "note": "Folio and Invoice are print-oriented modals. No <img> room-asset tags. No broken assets observed."
+    },
+    {
+      "id": "TC-UV-4",
+      "title": "Document lifecycle smoke",
+      "status": "pass",
+      "evidence": [
+        "automated/TC-UV-4/exemption.md"
+      ],
+      "note": "EXEMPT — Folio and Invoice are read-only renders. D1-D5 gates do not apply. API round-trip: GET /so/invoice → 200, GET /so/folio → 200. PASS."
+    },
+    {
+      "id": "TC-UV-5",
+      "title": "Accessibility scan",
+      "status": "skipped",
+      "evidence": [
+        "automated/TC-UV-5/axe-skipped.txt"
+      ],
+      "note": "Skipped — axe-core not available in headless Playwright MCP mode."
+    },
+    {
+      "id": "TC-UV-6",
+      "title": "Snapshot drift check",
+      "status": "skipped",
+      "evidence": [
+        "diffs/UV-6-no-baseline.txt"
+      ],
+      "note": "Skipped — no baseline-stable run exists for INV-608."
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+TC-UV-5 Accessibility scan skipped.
+Reason: axe-core not available in headless Playwright MCP mode.
+Manual a11y review recommended for print dialogs (Folio Preview, Invoice Preview).

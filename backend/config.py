@@ -58,6 +58,12 @@ JIRA_TOKEN = os.environ.get("JIRA_TOKEN", "")
 CHEAP_MODEL = "claude-haiku-4-5"
 QA_EVIDENCE_MODEL = os.environ.get("SCRIBE_QA_EVIDENCE_MODEL", CHEAP_MODEL)
 CHAT_MODEL = os.environ.get("SCRIBE_CHAT_MODEL", CHEAP_MODEL)
+# Headless QA EXECUTION (qa_runner) drives the Playwright MCP through the whole
+# multi-phase skill — Haiku can't do that reliably (it abandons the deferred MCP and
+# fabricates non-browser fallbacks), so test execution must NEVER run on Haiku. This
+# is separate from the QA-Evidence *reviewer* (QA_EVIDENCE_MODEL) above. Override the
+# execution model via SCRIBE_QA_RUNNER_MODEL, but it is force-guarded off Haiku.
+QA_RUNNER_MODEL = os.environ.get("SCRIBE_QA_RUNNER_MODEL", "claude-sonnet-4-6")
 
 # Default reference each service uses on stable. Most are k8s-stable.
 DEFAULT_REFERENCE = "k8s-stable"

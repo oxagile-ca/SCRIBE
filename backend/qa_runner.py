@@ -16,6 +16,24 @@ def _claude_bin() -> str:
     return os.environ.get("CLAUDE_BIN", "claude")
 
 
+# Hard floor for QA execution — Haiku is never acceptable for driving the browser MCP.
+_SAFE_QA_MODEL = "claude-sonnet-4-6"
+
+
+def _resolve_model(model: str | None) -> str:
+    """The model for headless QA execution. NEVER Haiku.
+
+    Haiku can't reliably drive the Playwright MCP through the full multi-phase skill —
+    it abandons the deferred MCP and fabricates non-browser fallbacks. So even if a
+    caller or stale config passes a Haiku id, override it to a capable model."""
+    chosen = model or getattr(config, "QA_RUNNER_MODEL", None) or _SAFE_QA_MODEL
+    if "haiku" in str(chosen).lower():
+        chosen = getattr(config, "QA_RUNNER_MODEL", None) or _SAFE_QA_MODEL
+        if "haiku" in str(chosen).lower():  # config itself set to Haiku — refuse it
+            chosen = _SAFE_QA_MODEL
+    return chosen
+
+
 def _mcp_config_path() -> str:
     """Path to the MCP config that wires the Playwright server into the run.
 
@@ -69,7 +87,7 @@ async def run(ticket_key, env_url, *, model=None, idle_timeout_s=300, total_time
     cfg = load_instance_config() or {}
     skill_cmd = cfg.get("skillCommand") or "/qa-evidence"
     command = build_qa_command(ticket_key, env_url, skill_cmd)
-    model = model or getattr(config, "QA_EVIDENCE_MODEL", None)
+    model = _resolve_model(model)
     argv = build_runner_argv(command, model)
 
     baseline = list_runs(ticket_key)

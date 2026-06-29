@@ -53,6 +53,21 @@ def test_build_runner_argv_skips_absent_mcp_config(monkeypatch, tmp_path):
     assert argv[-1] == "PROMPT"
 
 
+def test_resolve_model_never_haiku_by_default():
+    m = qa_runner._resolve_model(None)
+    assert "haiku" not in m.lower()
+
+
+def test_resolve_model_overrides_explicit_haiku():
+    # Even if a caller (or stale config) passes Haiku, QA execution must not use it.
+    m = qa_runner._resolve_model("claude-haiku-4-5")
+    assert "haiku" not in m.lower()
+
+
+def test_resolve_model_keeps_explicit_strong_model():
+    assert qa_runner._resolve_model("claude-opus-4-8") == "claude-opus-4-8"
+
+
 class _FakeStdout:
     def __init__(self, lines): self._lines = list(lines)
     async def readline(self):

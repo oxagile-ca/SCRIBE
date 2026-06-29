@@ -11,7 +11,7 @@ import pdf_export
 import linear_writer
 from agents import generate_html_report, EVIDENCE_DIR
 from instance_config import load_instance_config
-from config import QA_EVIDENCE_MODEL
+from config import QA_RUNNER_MODEL
 
 
 def compute_attach_gate(cfg: dict, *, armed: bool, manual: bool) -> bool:
@@ -78,7 +78,7 @@ def read_run_summary(ticket_key: str, run_name: str) -> dict:
 async def run_and_finalize(ticket_key, env_url, *, armed, manual=False, model=None):
     cfg = load_instance_config() or {}
     env_url = resolve_env_url(cfg, env_url)
-    model = model or QA_EVIDENCE_MODEL
+    model = model or QA_RUNNER_MODEL  # QA execution never uses Haiku (qa_runner guards too)
 
     run_name = None
     async for ev in qa_runner.run(ticket_key, env_url, model=model):

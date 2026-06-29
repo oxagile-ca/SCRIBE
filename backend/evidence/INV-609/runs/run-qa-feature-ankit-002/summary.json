@@ -1,0 +1,94 @@
+{
+  "ticket": "INV-609",
+  "verdict": "PASS-WITH-ISSUES",
+  "score": {
+    "pass": 5,
+    "fail": 0,
+    "blocked": 0,
+    "needs_review": 2,
+    "total": 7,
+    "pct": 71
+  },
+  "confidence": {
+    "headline": 74,
+    "band": "pass-with-issues",
+    "explanation": "Core FE regressions are CLEARED (confirmed across 2 independent runs): Invoice Number shows 'TOTEWCLQEH' (not INV-609.00), Hotel Room charge is $119.00 (not INV-609.00), and running balance reconciles to $126.85 matching API total_due. Two API shape questions remain open: (1) GET /so/invoice has no distinct `invoice_number` field — FE uses `sales_order_number` as Invoice Number (may be by design per INV-613/614/615 spec); (2) `so_number` field absent, only `sales_order_number` present; (3) `currency` is empty string instead of 'CAD'. These are consistent findings across run-001 and run-002 and require dev clarification. Additional note: MRDT rendered as 2% on invoice (product context documents 3%) — internally consistent math but warrants confirmation."
+  },
+  "started": "2026-06-29T10:12:00Z",
+  "finished": "2026-06-29T10:30:00Z",
+  "time": "18 minutes",
+  "executor": "ankit",
+  "env": "https://xin-np.wbee.ca/",
+  "seed_booking": "BK_J755DICT",
+  "run_kind": "qa-feature",
+  "isolated": true,
+  "prior_run_comparison": "run-qa-feature-ankit-001",
+  "test_cases": [
+    {
+      "id": "TC-0609-001",
+      "title": "API — GET /so/invoice returns invoice_number field",
+      "status": "needs-review",
+      "evidence": ["automated/TC-0609-001/api-so-invoice.json", "automated/TC-0609-001/dashboard-authenticated.png", "automated/TC-0609-001/reservation-details.png"],
+      "note": "GET /so/invoice returns HTTP 200. `invoice_number` field ABSENT. `sales_order_number`='TOTEWCLQEH' present and used by FE as Invoice Number. `so_number` ABSENT. `currency`='' (empty, expected CAD). `total_due`=12685 cents ✓. Consistent with run-001. Dev confirmation needed: is sales_order_number intentionally serving as invoice_number per INV-613/614/615?"
+    },
+    {
+      "id": "TC-0609-002",
+      "title": "API — GET /so/invoice response shape includes so_number field",
+      "status": "needs-review",
+      "evidence": ["automated/TC-0609-001/api-so-invoice.json"],
+      "note": "No `so_number` field. `sales_order_number`='TOTEWCLQEH' present. `currency`='' (empty string). Consistent with run-001. Needs dev confirmation on intended field names vs spec."
+    },
+    {
+      "id": "TC-0609-003",
+      "title": "FE — Invoice render shows correct Invoice Number (not ticket ID placeholder)",
+      "status": "pass",
+      "evidence": ["automated/TC-0609-003/invoice-preview-dialog.png", "automated/TC-0609-003/reservation-details-invoice-summary.png", "automated/TC-0609-003/invoice-dom-assertions.json"],
+      "note": "PASS. Invoice Preview dialog opened via Print Invoice button. Invoice Number: 'TOTEWCLQEH' — NOT 'INV-609' or 'INV-609.00'. 326 Room charge: $119.00 — NOT 'INV-609.00'. Balance Due: $126.85. Regression CLEARED (confirmed 2nd run)."
+    },
+    {
+      "id": "TC-0609-004",
+      "title": "FE — Invoice total and running balance reconcile correctly",
+      "status": "pass",
+      "evidence": ["automated/TC-0609-004/math-reconciliation.json"],
+      "note": "PASS. Running balance: $119.00 → +$9.52 PST → $128.52 → +$2.38 MRDT → $130.90 → +$5.95 GST → $136.85 → -$5.00 dep → $131.85 → -$5.00 dep → $126.85. Matches API total_due (12685c). Regression CLEARED. Side note: MRDT shown as 2% (product context says 3%) — math consistent but warrants dev check."
+    },
+    {
+      "id": "TC-UV-1",
+      "title": "Universal — Console error scan",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-1/console-errors.json"],
+      "note": "PASS. 1 error: Cognito favicon.ico 404 (third-party hosted-UI resource, allowlisted). Zero application console errors."
+    },
+    {
+      "id": "TC-UV-2",
+      "title": "Universal — Network error scan (4xx/5xx)",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-2/network-requests.json"],
+      "note": "PASS. All 4 app API calls returned 200: GET /user/profile, POST /booking/search, GET /so/invoice?booking_id=8, POST /inventory/search."
+    },
+    {
+      "id": "TC-UV-3",
+      "title": "Universal — Broken asset/image scan",
+      "status": "pass",
+      "evidence": ["automated/TC-UV-3/asset-report.json"],
+      "note": "PASS. No broken assets on reservation details or invoice preview. Cognito favicon 404 allowlisted."
+    }
+  ],
+  "open_findings": [
+    {
+      "severity": "needs-review",
+      "finding": "GET /so/invoice: no `invoice_number` field — FE uses `sales_order_number` as Invoice Number. Confirm this is by design per INV-613/614/615.",
+      "action": "Dev clarification needed before final sign-off"
+    },
+    {
+      "severity": "needs-review",
+      "finding": "GET /so/invoice: `currency` field is empty string instead of 'CAD'.",
+      "action": "Dev to confirm or fix"
+    },
+    {
+      "severity": "observation",
+      "finding": "MRDT displayed as 2% on Invoice render (product context documents 3%). Math is internally consistent with 2%.",
+      "action": "Dev to confirm correct MRDT rate"
+    }
+  ]
+}

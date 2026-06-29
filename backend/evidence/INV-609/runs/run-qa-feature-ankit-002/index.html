@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Evidence — INV-609 — run-qa-feature-ankit-002</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; background: #f5f5f5; color: #333; }
+  .header { background: #1a1a2e; color: white; padding: 24px 32px; }
+  .header h1 { margin: 0 0 4px; font-size: 22px; }
+  .header p { margin: 0; opacity: 0.7; font-size: 13px; }
+  .verdict-banner { padding: 16px 32px; font-size: 15px; font-weight: 600; }
+  .verdict-pass-issues { background: #fff3cd; border-left: 6px solid #ffc107; color: #856404; }
+  .container { max-width: 1100px; margin: 24px auto; padding: 0 24px; }
+  .card { background: white; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .card h2 { margin: 0 0 16px; font-size: 16px; color: #1a1a2e; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+  .score-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .score-item { text-align: center; padding: 12px; border-radius: 6px; }
+  .score-pass { background: #d4edda; color: #155724; }
+  .score-fail { background: #f8d7da; color: #721c24; }
+  .score-review { background: #fff3cd; color: #856404; }
+  .score-blocked { background: #e2e3e5; color: #383d41; }
+  .score-total { background: #cce5ff; color: #004085; }
+  .score-item .num { font-size: 28px; font-weight: 700; }
+  .score-item .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f8f9fa; text-align: left; padding: 8px 12px; border-bottom: 2px solid #dee2e6; font-weight: 600; color: #555; }
+  td { padding: 8px 12px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:hover td { background: #fafafa; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge-pass { background: #d4edda; color: #155724; }
+  .badge-fail { background: #f8d7da; color: #721c24; }
+  .badge-review { background: #fff3cd; color: #856404; }
+  .badge-blocked { background: #e2e3e5; color: #383d41; }
+  .finding { padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; font-size: 13px; }
+  .finding-review { background: #fff3cd; border-left: 4px solid #ffc107; }
+  .finding-obs { background: #e8f4f8; border-left: 4px solid #17a2b8; }
+  .confidence-bar { height: 8px; background: #eee; border-radius: 4px; margin: 8px 0; }
+  .confidence-fill { height: 100%; border-radius: 4px; background: #ffc107; width: 74%; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
+  .meta-item { display: flex; gap: 8px; }
+  .meta-label { color: #888; min-width: 100px; }
+  .comparison-note { background: #e8f4f8; border: 1px solid #bee5eb; border-radius: 6px; padding: 10px 14px; font-size: 13px; color: #0c5460; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>INV-609 — Invoice Number &amp; Unique Constraints</h1>
+  <p>run-qa-feature-ankit-002 &nbsp;·&nbsp; qa-feature &nbsp;·&nbsp; https://xin-np.wbee.ca/ &nbsp;·&nbsp; 2026-06-29</p>
+</div>
+<div class="verdict-banner verdict-pass-issues">⚠ PASS-WITH-ISSUES &nbsp;·&nbsp; Confidence: 74/100 &nbsp;·&nbsp; 5 pass, 2 needs-review, 0 fail</div>
+<div class="container">
+
+  <div class="card">
+    <h2>Run Metadata</h2>
+    <div class="meta-grid">
+      <div class="meta-item"><span class="meta-label">Ticket</span> INV-609</div>
+      <div class="meta-item"><span class="meta-label">Run ID</span> run-qa-feature-ankit-002</div>
+      <div class="meta-item"><span class="meta-label">Run Kind</span> qa-feature (isolated)</div>
+      <div class="meta-item"><span class="meta-label">Executor</span> ankit</div>
+      <div class="meta-item"><span class="meta-label">Env</span> https://xin-np.wbee.ca/</div>
+      <div class="meta-item"><span class="meta-label">Seed Booking</span> BK_J755DICT (id=8)</div>
+      <div class="meta-item"><span class="meta-label">Duration</span> ~18 minutes</div>
+      <div class="meta-item"><span class="meta-label">Prior Run</span> run-qa-feature-ankit-001 (72/100)</div>
+    </div>
+    <div style="margin-top:12px" class="comparison-note">
+      🔁 <strong>Isolated re-run:</strong> This run independently re-executed all TCs in a fresh browser session. Findings are consistent with run-qa-feature-ankit-001, confirming stability of results.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Score</h2>
+    <div class="score-grid">
+      <div class="score-item score-pass"><div class="num">5</div><div class="lbl">Pass</div></div>
+      <div class="score-item score-fail"><div class="num">0</div><div class="lbl">Fail</div></div>
+      <div class="score-item score-review"><div class="num">2</div><div class="lbl">Needs Review</div></div>
+      <div class="score-item score-blocked"><div class="num">0</div><div class="lbl">Blocked</div></div>
+      <div class="score-item score-total"><div class="num">7</div><div class="lbl">Total</div></div>
+    </div>
+    <div style="margin-top:16px">
+      <strong>Confidence: 74/100</strong>
+      <div class="confidence-bar"><div class="confidence-fill"></div></div>
+      <div style="font-size:12px;color:#666">Core FE regressions cleared (confirmed across 2 independent runs). API field shape questions need dev clarification before final sign-off.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Test Case Results</h2>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Title</th><th>Status</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>TC-0609-001</strong></td>
+          <td>API — GET /so/invoice returns invoice_number field</td>
+          <td><span class="badge badge-review">needs-review</span></td>
+          <td>HTTP 200 ✓. <code>invoice_number</code> ABSENT. <code>sales_order_number</code>='TOTEWCLQEH' present (FE uses as Invoice Number). <code>currency</code>='' (empty). <code>total_due</code>=12685c ✓</td>
+        </tr>
+        <tr>
+          <td><strong>TC-0609-002</strong></td>
+          <td>API — GET /so/invoice includes so_number field</td>
+          <td><span class="badge badge-review">needs-review</span></td>
+          <td>No <code>so_number</code> field. Only <code>sales_order_number</code> present. <code>currency</code>='' empty string. Needs dev confirmation on field naming vs INV-613/614/615 spec.</td>
+        </tr>
+        <tr>
+          <td><strong>TC-0609-003</strong></td>
+          <td>FE — Invoice render shows correct Invoice Number</td>
+          <td><span class="badge badge-pass">pass</span></td>
+          <td>Invoice Number: <strong>TOTEWCLQEH</strong> ✓ (NOT INV-609.00). 326 Room: <strong>$119.00</strong> ✓ (NOT INV-609.00). Regression CLEARED. Confirmed 2nd run.</td>
+        </tr>
+        <tr>
+          <td><strong>TC-0609-004</strong></td>
+          <td>FE — Invoice total and balance reconcile</td>
+          <td><span class="badge badge-pass">pass</span></td>
+          <td>$119→$128.52→$130.90→$136.85→$131.85→<strong>$126.85</strong> ✓. Matches API 12685c. Regression CLEARED. (MRDT=2% shown, docs say 3% — flag for dev.)</td>
+        </tr>
+        <tr>
+          <td><strong>TC-UV-1</strong></td>
+          <td>Universal — Console error scan</td>
+          <td><span class="badge badge-pass">pass</span></td>
+          <td>1 error: Cognito favicon.ico 404 (third-party, allowlisted). Zero app errors.</td>
+        </tr>
+        <tr>
+          <td><strong>TC-UV-2</strong></td>
+          <td>Universal — Network error scan</td>
+          <td><span class="badge badge-pass">pass</span></td>
+          <td>All 4 app API calls returned 200: /user/profile, /booking/search, /so/invoice, /inventory/search.</td>
+        </tr>
+        <tr>
+          <td><strong>TC-UV-3</strong></td>
+          <td>Universal — Broken asset scan</td>
+          <td><span class="badge badge-pass">pass</span></td>
+          <td>No broken assets on reservation details or invoice preview. Cognito favicon 404 allowlisted.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Open Findings</h2>
+    <div class="finding finding-review">
+      <strong>[needs-review] API field naming:</strong> GET /so/invoice response has no <code>invoice_number</code> field. FE renders <code>sales_order_number</code> ('TOTEWCLQEH') as the Invoice Number. No <code>so_number</code> field present either. <em>Action: Dev to confirm this is by design per INV-613/614/615 spec.</em>
+    </div>
+    <div class="finding finding-review">
+      <strong>[needs-review] currency field empty:</strong> GET /so/invoice response has <code>currency: ""</code> (empty string, expected 'CAD'). <em>Action: Dev to confirm or fix.</em>
+    </div>
+    <div class="finding finding-obs">
+      <strong>[observation] MRDT rate:</strong> Invoice renders MRDT at 2%. Product context documents 3%. Math is internally consistent with 2% figure shown. <em>Action: Dev to confirm correct MRDT rate for Totem Lodge.</em>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Evidence Files</h2>
+    <table>
+      <thead><tr><th>TC</th><th>File</th></tr></thead>
+      <tbody>
+        <tr><td>TC-0609-001</td><td><a href="automated/TC-0609-001/api-so-invoice.json">api-so-invoice.json</a> · <a href="automated/TC-0609-001/reservation-details.png">reservation-details.png</a></td></tr>
+        <tr><td>TC-0609-003</td><td><a href="automated/TC-0609-003/invoice-preview-dialog.png">invoice-preview-dialog.png</a> · <a href="automated/TC-0609-003/reservation-details-invoice-summary.png">reservation-details-invoice-summary.png</a> · <a href="automated/TC-0609-003/invoice-dom-assertions.json">invoice-dom-assertions.json</a></td></tr>
+        <tr><td>TC-0609-004</td><td><a href="automated/TC-0609-004/math-reconciliation.json">math-reconciliation.json</a></td></tr>
+        <tr><td>TC-UV-1</td><td><a href="automated/TC-UV-1/console-errors.json">console-errors.json</a></td></tr>
+        <tr><td>TC-UV-2</td><td><a href="automated/TC-UV-2/network-requests.json">network-requests.json</a></td></tr>
+        <tr><td>TC-UV-3</td><td><a href="automated/TC-UV-3/asset-report.json">asset-report.json</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>

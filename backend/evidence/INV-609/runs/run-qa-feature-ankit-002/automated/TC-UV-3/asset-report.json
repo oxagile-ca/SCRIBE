@@ -1,0 +1,11 @@
+{
+  "tc": "TC-UV-3",
+  "run": "run-qa-feature-ankit-002",
+  "pages_checked": [
+    "/reservation/BK_J755DICT",
+    "/reservation/BK_J755DICT (Invoice Preview dialog)"
+  ],
+  "broken_assets": [],
+  "verdict": "PASS",
+  "note": "No broken images or assets observed on reservation details or invoice preview. Cognito favicon 404 is third-party (allowlisted per UV-1)."
+}

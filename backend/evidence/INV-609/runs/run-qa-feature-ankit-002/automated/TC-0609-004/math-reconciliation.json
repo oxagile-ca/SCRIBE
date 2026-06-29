@@ -1,0 +1,36 @@
+{
+  "tc": "TC-0609-004",
+  "run": "run-qa-feature-ankit-002",
+  "running_balance_sequence": [
+    {"line": "326 Room", "charge": 119.00, "deposit": null, "balance": 119.00},
+    {"line": "8% PST (Room Charges)", "charge": 9.52, "deposit": null, "balance": 128.52},
+    {"line": "2% MRDT", "charge": 2.38, "deposit": null, "balance": 130.90},
+    {"line": "5% GST", "charge": 5.95, "deposit": null, "balance": 136.85},
+    {"line": "DEPOSIT CASH (Jun 28)", "charge": null, "deposit": 5.00, "balance": 131.85},
+    {"line": "DEPOSIT CASH (Jun 28)", "charge": null, "deposit": 5.00, "balance": 126.85}
+  ],
+  "summary_table": {
+    "subtotal": 119.00,
+    "pst_8_room": 9.52,
+    "pst_7_non_room": 0.00,
+    "gst_5": 5.95,
+    "mrdt_2": 2.38,
+    "total": 136.85,
+    "deposits": 10.00,
+    "payments": 0.00,
+    "credits": 0.00,
+    "balance_due": 126.85
+  },
+  "api_total_due_cents": 12685,
+  "api_total_due_dollars": 126.85,
+  "math_checks": [
+    {"check": "119.00 + 9.52 = 128.52", "pass": true},
+    {"check": "128.52 + 2.38 = 130.90", "pass": true},
+    {"check": "130.90 + 5.95 = 136.85 (Total)", "pass": true},
+    {"check": "136.85 - 10.00 deposits = 126.85 (Balance Due)", "pass": true},
+    {"check": "Balance Due ($126.85) == API total_due (12685 cents)", "pass": true}
+  ],
+  "verdict": "PASS",
+  "regression_status": "CLEARED — running balance reconciles end-to-end with zero drift",
+  "note": "MRDT rendered as 2% on invoice (product context documents 3%). Math is internally consistent with 2% figure shown. Flag for dev clarification."
+}

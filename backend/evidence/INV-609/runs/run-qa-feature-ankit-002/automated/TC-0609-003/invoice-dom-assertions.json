@@ -1,0 +1,14 @@
+{
+  "tc": "TC-0609-003",
+  "run": "run-qa-feature-ankit-002",
+  "assertions": [
+    {"field": "Invoice Number", "expected": "a real unique identifier (NOT 'INV-609' or 'INV-609.00')", "actual": "TOTEWCLQEH", "pass": true},
+    {"field": "Hotel Room charge (326 Room)", "expected": "dollar amount (NOT 'INV-609.00')", "actual": "$119.00", "pass": true},
+    {"field": "Invoice Number contains 'INV-609'", "expected": false, "actual": false, "pass": true},
+    {"field": "Booking Number shown", "expected": "BK_J755DICT", "actual": "BK_J755DICT", "pass": true},
+    {"field": "Guest name", "expected": "Qaseed Guest 05", "actual": "Qaseed Guest 05", "pass": true},
+    {"field": "Balance Due", "expected": "$126.85", "actual": "$126.85", "pass": true}
+  ],
+  "verdict": "PASS",
+  "regression_status": "CLEARED — INV-609.00 placeholder is not present in Invoice Number or Hotel Room charge"
+}

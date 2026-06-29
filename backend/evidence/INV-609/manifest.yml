@@ -168,3 +168,43 @@ runs:
         status: pass
         note: "No broken assets observed on reservation details or invoice preview."
         method: browser-dom
+
+  - id: run-qa-feature-ankit-002
+    kind: qa-feature
+    env: https://xin-np.wbee.ca/
+    executor: ankit
+    started: 2026-06-29T10:12:00Z
+    finished: 2026-06-29T10:30:00Z
+    verdict: PASS-WITH-ISSUES
+    confidence: 74
+    seed_booking: BK_J755DICT
+    isolated: true
+    results:
+      TC-0609-001:
+        status: needs-review
+        note: "CONFIRMED run-002: invoice_number ABSENT. sales_order_number='TOTEWCLQEH'. currency='' empty. total_due=12685c. Consistent with run-001."
+        method: api-browser
+      TC-0609-002:
+        status: needs-review
+        note: "CONFIRMED run-002: so_number ABSENT. sales_order_number present. currency='' empty. Consistent with run-001."
+        method: api-browser
+      TC-0609-003:
+        status: pass
+        note: "CONFIRMED run-002: Invoice Number TOTEWCLQEH. 326 Room $119.00. No INV-609.00. Balance Due $126.85. Regression CLEARED."
+        method: browser-dom
+      TC-0609-004:
+        status: pass
+        note: "CONFIRMED run-002: Balance $119→$136.85→$126.85. API 12685c. Regression CLEARED. Note: MRDT 2% shown (docs say 3%)."
+        method: browser-dom
+      TC-UV-1:
+        status: pass
+        note: "Cognito favicon 404 allowlisted. Zero app console errors."
+        method: browser-console
+      TC-UV-2:
+        status: pass
+        note: "All 4 app API calls 200: /user/profile, /booking/search, /so/invoice, /inventory/search."
+        method: browser-network
+      TC-UV-3:
+        status: pass
+        note: "No broken assets on reservation details or invoice preview."
+        method: browser-dom

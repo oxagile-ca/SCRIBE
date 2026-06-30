@@ -35,6 +35,7 @@ class TestComputeScore:
         assert s["pct"] == 100
         assert s["verdict"] == "PASS"
         assert s["total"] == 4  # advisory excluded from denominator
+        assert s["advisory_ids"] == ["TC-UV-5", "TC-API-user-1"]
 
     def test_scoring_console_fail_downgrades(self):
         tcs = [_tc("TC-0675-001", "pass"), _tc("TC-UV-1", "fail")]
@@ -54,10 +55,13 @@ class TestComputeScore:
         assert s["verdict"] == "PASS-WITH-ISSUES"
 
     def test_exempt_and_skipped_excluded_from_denominator(self):
-        tcs = [_tc("TC-0675-001", "pass"), _tc("TC-UV-4", "exempt"),
+        # TC-X-003 is a SCORING id with status 'exempt' → exercises the exempt
+        # branch; TC-X-002 exercises 'skipped'. Both are excluded from the denominator.
+        tcs = [_tc("TC-0675-001", "pass"), _tc("TC-X-003", "exempt"),
                _tc("TC-X-002", "skipped")]
         s = qa_scoring.compute_score(tcs)
         assert s["total"] == 1 and s["pct"] == 100 and s["verdict"] == "PASS"
+        assert s["scoring_ids"] == ["TC-0675-001", "TC-X-003", "TC-X-002"]
 
     def test_empty_is_blocked(self):
         s = qa_scoring.compute_score([])

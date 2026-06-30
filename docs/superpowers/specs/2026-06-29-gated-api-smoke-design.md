@@ -30,7 +30,9 @@ scripts, a standalone "Run API suite" UI, scheduling.
 | Classifier | **Pure heuristics** (no LLM) |
 | Runner | **Python `requests`** reusing a shared collection parser (not `newman`) |
 | Scope of requests | **GET / read** requests only, restricted to the endpoints the ticket touches; mutations skipped |
-| Strictness | 2xx → **pass**; 5xx / timeout / connection → **fail**; 4xx → **needs-review** (likely a stale fixture ID after a reseed, not a server regression) |
+| Strictness (TC status) | 2xx → **pass**; 5xx / timeout / connection → **fail**; 4xx → **needs-review** (likely a stale fixture ID after a reseed, not a server regression) |
+| Scoring | **Advisory only** — `TC-API-*` render in the report but NEVER affect the score/verdict (per `2026-06-29-qa-scoring-policy-design.md`). The strictness above sets the TC's displayed status, not the headline. |
+| Expected values | Read from the **current-main snapshot** produced by `2026-06-29-main-reconciliation-design.md`, not the PR |
 | Auth | Mint a Cognito `id_token` via existing `qa_auth.mint_tokens()`; inject as bearer; token never written to evidence |
 
 ## 3. Architecture
@@ -94,9 +96,9 @@ if gate.unclear:                                            # only now do diff I
     endpoints = qa_api_gate.endpoints_from_diff(fetch_pr_diff(ticket))
 if (gate.is_api or endpoints):
     tcs = await qa_api_smoke.run(ticket_key, run_name, api_base, endpoints)
-    merge_api_tcs_into_summary(ticket_key, run_name, tcs)   # append to test_cases,
-                                                            # recompute verdict/score
-generate_html_report(ticket_key, run_name)                  # renders TC-API-* as usual
+    append_api_tcs_to_summary(ticket_key, run_name, tcs)   # append to test_cases ONLY
+# canonical score recomputed by qa_scoring (spec #1) — TC-API-* are advisory, excluded
+generate_html_report(ticket_key, run_name)                 # renders TC-API-* as advisory
 ```
 Ticket label/ACs/description and `api_base` come from `qa_targets` (already fetches Linear
 scope + `api_base`); the PR diff is fetched only on the unclear branch. Gating out is a
@@ -134,12 +136,14 @@ generate_html_report → dashboard report shows TC-API-* alongside UI TCs
 - The whole smoke is wrapped so any exception degrades to a logged `blocked` TC rather than
   failing `run_and_finalize`.
 
-## 7. Verdict/score effect
+## 7. Verdict/score effect — none (advisory)
 
-`merge_api_tcs_into_summary` appends `TC-API-*` to `test_cases` and recomputes
-`score`/`verdict` with the same rules the report already uses: any `fail` → verdict
-downgrades (PASS → PASS-WITH-ISSUES or FAIL per existing thresholds); `needs-review` is
-advisory (no hard downgrade); `blocked` follows existing blocked handling.
+`TC-API-*` are **advisory** per `2026-06-29-qa-scoring-policy-design.md`: the smoke appends
+them to `summary.test_cases` for display, but the **canonical score/verdict computed by
+`qa_scoring.compute_score` excludes them** (and excludes their denominator). A 5xx API
+`fail` therefore surfaces prominently in the report's Advisory section but does **not** drag
+a UI-PASS run down. (This reverses the earlier draft of this section, per the locked scoring
+policy.) `append_api_tcs_to_summary` only appends — it never recomputes the verdict.
 
 ## 8. Testing
 
@@ -159,7 +163,7 @@ advisory (no hard downgrade); `blocked` follows existing blocked handling.
 | `backend/qa_postman.py` | NEW — collection parser → runnable requests |
 | `backend/qa_api_gate.py` | NEW — heuristic API-ticket gate + diff fallback |
 | `backend/qa_api_smoke.py` | NEW — mint token, run reads, assert, write evidence |
-| `backend/qa_orchestrator.py` | wire gate+smoke after the agent run; add `merge_api_tcs_into_summary` |
+| `backend/qa_orchestrator.py` | wire gate+smoke after the agent run; add `append_api_tcs_to_summary` (append only — scoring is qa_scoring's job) |
 | `backend/qa_targets.py` | expose label/ACs/description + `api_base` (+ pr diff ref) if not already returned |
 | `backend/tests/test_qa_postman.py`, `test_qa_api_gate.py`, `test_qa_api_smoke.py`, `test_qa_orchestrator.py` | NEW / extended |
 
@@ -172,6 +176,9 @@ advisory (no hard downgrade); `blocked` follows existing blocked handling.
 - **Endpoint→request matching** is path-based and may over/under-match on shared prefixes;
   unit tests pin the matcher. PR-diff endpoint extraction is best-effort (last resort).
 
-## 11. Related
+## 11. Dependencies & related
+- **Depends on** `2026-06-29-qa-scoring-policy-design.md` (TC-API-* must be advisory there)
+  and `2026-06-29-main-reconciliation-design.md` (expected values from the main snapshot).
+  Build order: scoring policy → reconciliation → **this**.
 - Memory: `scribe-postman-not-executed`, `xinventory-api-postman`, `xin-np-programmatic-auth`,
   `scribe-evidence-report-fixes`. Built on `feat/headless-qa-phase2`.

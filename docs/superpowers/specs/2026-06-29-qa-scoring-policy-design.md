@@ -76,8 +76,10 @@ change in the three SKILL.md files / template), but enforcement does not depend 
 
 ## 6. Error handling
 
-- `summary.test_cases` missing/empty → `compute_score` returns `total:0`, `verdict` falls
-  back to the agent's `verdict` if present else `BLOCKED`; never crashes finalize.
+- `summary.test_cases` missing/empty → `compute_score` returns `total:0`, `verdict:
+  BLOCKED` (a run with no scoring TCs is blocked by definition); never crashes finalize.
+  The orchestrator also accepts the legacy `test_results` key and guards malformed JSON
+  (yields a `done`-failure event rather than crashing the generator).
 - An unknown TC id (neither UV nor API pattern) → treated as **scoring** (fail-safe: a real
   AC-tied TC is never silently dropped from the score).
 

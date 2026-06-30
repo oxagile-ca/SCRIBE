@@ -139,3 +139,42 @@ def test_read_run_summary_missing_file(tmp_path, monkeypatch):
     monkeypatch.setattr(qa_orchestrator, "EVIDENCE_DIR", str(tmp_path))
     result = qa_orchestrator.read_run_summary("INV-NOPE", "run-000")
     assert result == {"score": None, "verdict": None}
+
+
+def test_finalize_overwrites_summary_with_canonical_score(monkeypatch, tmp_path):
+    run_dir = tmp_path / "INV-700" / "runs" / "run-1"
+    run_dir.mkdir(parents=True)
+    # Agent wrote a WRONG score (90) dragged down by an advisory AXE fail; AC TCs all pass.
+    (run_dir / "summary.json").write_text(json.dumps({
+        "ticket": "INV-700", "verdict": "PASS-WITH-ISSUES",
+        "score": {"pass": 2, "fail": 1, "total": 3, "pct": 67},
+        "test_cases": [
+            {"id": "TC-700-001", "status": "pass"},
+            {"id": "TC-UV-1", "status": "pass"},
+            {"id": "TC-UV-5", "status": "fail"},
+            {"id": "TC-API-1", "status": "fail"},
+        ],
+    }), encoding="utf-8")
+
+    async def fake_qa_run(*a, **k):
+        yield {"type": "qa_complete", "success": True, "run_name": "run-1", "error": None}
+    monkeypatch.setattr(qa_orchestrator.qa_runner, "run", fake_qa_run)
+    monkeypatch.setattr(qa_orchestrator, "EVIDENCE_DIR", str(tmp_path))
+    monkeypatch.setattr(qa_orchestrator, "generate_html_report",
+                        lambda k, r: (True, "ok", f"/evidence/{k}/runs/{r}/index.html"))
+    async def fake_pdf(html, **kw): return None
+    monkeypatch.setattr(qa_orchestrator.pdf_export, "export", fake_pdf)
+    monkeypatch.setattr(qa_orchestrator, "load_instance_config", lambda: {})
+    monkeypatch.setattr(qa_orchestrator, "compute_attach_gate", lambda *a, **k: False)
+
+    async def drain():
+        async for _ in qa_orchestrator.run_and_finalize("INV-700", "http://x", armed=False):
+            pass
+    import asyncio
+    asyncio.run(drain())
+
+    out = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    assert out["score"]["pct"] == 100      # advisory fails excluded
+    assert out["score"]["total"] == 2      # TC-700-001 + TC-UV-1
+    assert out["verdict"] == "PASS"
+    assert out["scoring"]["advisory_ids"] == ["TC-UV-5", "TC-API-1"]

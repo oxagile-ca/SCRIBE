@@ -9,6 +9,7 @@ import os
 import qa_runner
 import pdf_export
 import linear_writer
+import qa_scoring
 from agents import generate_html_report, EVIDENCE_DIR
 from instance_config import load_instance_config
 from config import QA_RUNNER_MODEL
@@ -97,6 +98,22 @@ async def run_and_finalize(ticket_key, env_url, *, armed, manual=False, model=No
                "attached": False, "skipped_reason": None,
                "error": "QA run captured no evidence (summary.json missing) — likely browser blocked or did not execute Phase 2"}
         return
+
+    # Canonical score: deterministic, backend-authoritative. Overwrites the agent's
+    # self-reported number so advisory scans (API smoke, AXE, etc.) can't move the
+    # headline. See docs/superpowers/specs/2026-06-29-qa-scoring-policy-design.md.
+    import json as _json
+    with open(summary_path, encoding="utf-8") as _f:
+        _summary = _json.load(_f)
+    _canon = qa_scoring.compute_score(_summary.get("test_cases", []))
+    _summary["score"] = {"pass": _canon["pass"], "fail": _canon["fail"],
+                         "blocked": _canon["blocked"], "total": _canon["total"],
+                         "pct": _canon["pct"]}
+    _summary["verdict"] = _canon["verdict"]
+    _summary["scoring"] = {"scoring_ids": _canon["scoring_ids"],
+                           "advisory_ids": _canon["advisory_ids"]}
+    with open(summary_path, "w", encoding="utf-8") as _f:
+        _json.dump(_summary, _f, indent=2)
 
     ok, msg, report_url = generate_html_report(ticket_key, run_name)
     if not ok:

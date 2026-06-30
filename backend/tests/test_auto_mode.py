@@ -73,6 +73,23 @@ def test_process_skips_when_another_qa_run_in_flight(monkeypatch):
     qa_single_flight.release("OTHER-9")
 
 
+def test_process_releases_lock_when_setup_raises(monkeypatch):
+    """If setup after acquire throws, the global single-flight slot is still freed."""
+    auto_mode.configure(_FakeStore(), None)
+    qa_single_flight._active = None
+
+    def _boom():
+        raise RuntimeError("boom")
+    monkeypatch.setattr(auto_mode, "get_state", _boom)
+    monkeypatch.setattr(auto_mode, "mark_processed", lambda k: None)
+
+    try:
+        asyncio.run(auto_mode._process("INV-1", "http://x"))
+    except RuntimeError:
+        pass  # old code raises out of _process before releasing
+    assert qa_single_flight.active() is None  # released despite the exception
+
+
 def test_process_acquires_and_releases_single_flight(monkeypatch):
     auto_mode.configure(_FakeStore(), None)
     qa_single_flight._active = None

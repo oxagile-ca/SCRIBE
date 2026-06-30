@@ -136,6 +136,29 @@ class TestCheckEvidenceSelection:
         assert calls == [("INV-675", "run-1")]
 
 
+def test_check_new_evidence_coerces_dict_score_to_int(tmp_path, monkeypatch):
+    """check_new_evidence must return score as int, never as a dict."""
+    monkeypatch.setattr(agents, "EVIDENCE_DIR", str(tmp_path))
+    run_dir = os.path.join(str(tmp_path), "INV-XXX", "runs", "run-1")
+    os.makedirs(run_dir)
+    with open(os.path.join(run_dir, "summary.json"), "w", encoding="utf-8") as f:
+        json.dump({"score": {"pass": 2, "fail": 0, "total": 2, "pct": 88}}, f)
+    with open(os.path.join(run_dir, "index.html"), "w", encoding="utf-8") as f:
+        f.write("x" * 100)
+
+    spy_calls = []
+
+    def _spy(key, run=None):
+        spy_calls.append((key, run))
+        return True, "ok", ""
+    monkeypatch.setattr(agents, "generate_html_report", _spy)
+
+    result = agents.check_new_evidence("INV-XXX", [])
+    assert result["found"] is True
+    assert result["score"] == 88
+    assert isinstance(result["score"], int)
+
+
 def test_report_splits_advisory_and_uses_canonical_headline(tmp_path, monkeypatch):
     import json as _json
     monkeypatch.setattr(agents, "EVIDENCE_DIR", str(tmp_path))

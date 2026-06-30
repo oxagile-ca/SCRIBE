@@ -12,7 +12,7 @@ regardless of what the qa-evidence skill wrote into summary.json.
 import re
 
 ADVISORY_UV = {"TC-UV-3", "TC-UV-4", "TC-UV-5", "TC-UV-6"}
-_API_RE = re.compile(r"^TC-API\b", re.IGNORECASE)
+_API_RE = re.compile(r"^TC-API\b")
 FAIL_PCT = 60  # a scoring fail with pass-rate below this is a hard FAIL
 
 

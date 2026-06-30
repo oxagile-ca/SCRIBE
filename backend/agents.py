@@ -687,6 +687,9 @@ def check_new_evidence(ticket_key, baseline_runs=None):
             summary = _json.load(f)
         _raw_conf = summary.get("confidence")
         _score = summary.get("score")
+        if isinstance(_score, dict):
+            _pct = _score.get("pct")
+            _score = round(_pct) if isinstance(_pct, (int, float)) else None
         if _score is None and isinstance(_raw_conf, dict):
             _score = _raw_conf.get("headline")
         elif _score is None and isinstance(_raw_conf, (int, float)):
@@ -2059,7 +2062,7 @@ def generate_html_report(ticket_key, run_name=None):
         _advisory_detail_html = "".join(tc_detail_by_id.get(tc_id, "") for tc_id in _advisory_ids)
         tc_detail_html += (
             '<h3 style="color:#94a3b8;margin:32px 0 16px;font-size:15px">'
-            'Advisory <span style="font-size:11px;color:#475569;font-weight:400">(not scored)</span></h3>'
+            'Advisory <span style="font-size:11px;color:#475569;font-weight:400">— not scored</span></h3>'
             + _advisory_detail_html
         )
 

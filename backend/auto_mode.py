@@ -122,11 +122,12 @@ async def _process(ticket_key: str, env_url: str) -> None:
     # processed so the ticket is retried once the in-flight run frees the slot.
     if not qa_single_flight.try_acquire(ticket_key):
         return
-    _active.add(ticket_key)
-    state = get_state()
-    stream_id = str(uuid.uuid4())
-    stream = _streams.create(stream_id) if _streams else None
+    stream = None
     try:
+        _active.add(ticket_key)
+        state = get_state()
+        stream_id = str(uuid.uuid4())
+        stream = _streams.create(stream_id) if _streams else None
         async for ev in qa_orchestrator.run_and_finalize(
             ticket_key, env_url, armed=state["armed"], manual=False):
             if stream:

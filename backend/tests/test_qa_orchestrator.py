@@ -178,3 +178,69 @@ def test_finalize_overwrites_summary_with_canonical_score(monkeypatch, tmp_path)
     assert out["score"]["total"] == 2      # TC-700-001 + TC-UV-1
     assert out["verdict"] == "PASS"
     assert out["scoring"]["advisory_ids"] == ["TC-UV-5", "TC-API-1"]
+
+
+def test_finalize_scores_legacy_test_results_key(monkeypatch, tmp_path):
+    """A summary using the legacy `test_results` key is scored, not stamped BLOCKED."""
+    run_dir = tmp_path / "INV-702" / "runs" / "run-1"
+    run_dir.mkdir(parents=True)
+    # Old-format summary uses "test_results" instead of "test_cases"
+    (run_dir / "summary.json").write_text(json.dumps({
+        "ticket": "INV-702", "verdict": "UNKNOWN",
+        "test_results": [
+            {"id": "TC-702-001", "status": "pass"},
+            {"id": "TC-702-002", "status": "pass"},
+        ],
+    }), encoding="utf-8")
+
+    async def fake_qa_run(*a, **k):
+        yield {"type": "qa_complete", "success": True, "run_name": "run-1", "error": None}
+    monkeypatch.setattr(qa_orchestrator.qa_runner, "run", fake_qa_run)
+    monkeypatch.setattr(qa_orchestrator, "EVIDENCE_DIR", str(tmp_path))
+    monkeypatch.setattr(qa_orchestrator, "generate_html_report",
+                        lambda k, r: (True, "ok", f"/evidence/{k}/runs/{r}/index.html"))
+    async def fake_pdf(html, **kw): return None
+    monkeypatch.setattr(qa_orchestrator.pdf_export, "export", fake_pdf)
+    monkeypatch.setattr(qa_orchestrator, "load_instance_config", lambda: {})
+    monkeypatch.setattr(qa_orchestrator, "compute_attach_gate", lambda *a, **k: False)
+
+    async def drain():
+        async for _ in qa_orchestrator.run_and_finalize("INV-702", "http://x", armed=False):
+            pass
+    asyncio.run(drain())
+
+    out = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    assert out["verdict"] == "PASS"
+    assert out["score"]["pct"] == 100
+    assert out["score"]["total"] == 2
+
+
+def test_finalize_handles_unreadable_summary(monkeypatch, tmp_path):
+    """Malformed summary.json yields a done-failure event instead of crashing."""
+    run_dir = tmp_path / "INV-703" / "runs" / "run-1"
+    run_dir.mkdir(parents=True)
+    (run_dir / "summary.json").write_text("{ not valid json", encoding="utf-8")
+
+    async def fake_qa_run(*a, **k):
+        yield {"type": "qa_complete", "success": True, "run_name": "run-1", "error": None}
+    monkeypatch.setattr(qa_orchestrator.qa_runner, "run", fake_qa_run)
+    monkeypatch.setattr(qa_orchestrator, "EVIDENCE_DIR", str(tmp_path))
+    monkeypatch.setattr(qa_orchestrator, "generate_html_report",
+                        lambda k, r: (True, "ok", f"/evidence/{k}/runs/{r}/index.html"))
+    async def fake_pdf(html, **kw): return None
+    monkeypatch.setattr(qa_orchestrator.pdf_export, "export", fake_pdf)
+    monkeypatch.setattr(qa_orchestrator, "load_instance_config", lambda: {})
+    monkeypatch.setattr(qa_orchestrator, "compute_attach_gate", lambda *a, **k: False)
+
+    async def collect():
+        out = []
+        async for ev in qa_orchestrator.run_and_finalize("INV-703", "http://x", armed=False):
+            out.append(ev)
+        return out
+    events = asyncio.run(collect())
+
+    done_events = [e for e in events if e.get("type") == "done"]
+    assert done_events, "expected at least one done event"
+    done = done_events[-1]
+    assert done["success"] is False
+    assert "unreadable" in (done.get("error") or "").lower()

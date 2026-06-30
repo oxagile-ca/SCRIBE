@@ -102,10 +102,19 @@ async def run_and_finalize(ticket_key, env_url, *, armed, manual=False, model=No
     # Canonical score: deterministic, backend-authoritative. Overwrites the agent's
     # self-reported number so advisory scans (API smoke, AXE, etc.) can't move the
     # headline. See docs/superpowers/specs/2026-06-29-qa-scoring-policy-design.md.
-    import json as _json
-    with open(summary_path, encoding="utf-8") as _f:
-        _summary = _json.load(_f)
-    _canon = qa_scoring.compute_score(_summary.get("test_cases", []))
+    try:
+        with open(summary_path, encoding="utf-8") as _f:
+            _summary = json.load(_f)
+    except (json.JSONDecodeError, OSError) as _e:
+        yield {"type": "done", "success": False, "report_url": "", "pdf": None,
+               "attached": False, "skipped_reason": None,
+               "error": f"summary.json unreadable: {_e}"}
+        return
+    # Match the consumer's key fallback (agents.generate_html_report supports the
+    # legacy `test_results` key alongside the current `test_cases`); scoring only an
+    # empty `test_cases` would wrongly stamp an old-format run BLOCKED.
+    _tcs = _summary.get("test_cases") or _summary.get("test_results") or []
+    _canon = qa_scoring.compute_score(_tcs)
     _summary["score"] = {"pass": _canon["pass"], "fail": _canon["fail"],
                          "blocked": _canon["blocked"], "total": _canon["total"],
                          "pct": _canon["pct"]}
@@ -113,7 +122,7 @@ async def run_and_finalize(ticket_key, env_url, *, armed, manual=False, model=No
     _summary["scoring"] = {"scoring_ids": _canon["scoring_ids"],
                            "advisory_ids": _canon["advisory_ids"]}
     with open(summary_path, "w", encoding="utf-8") as _f:
-        _json.dump(_summary, _f, indent=2)
+        json.dump(_summary, _f, indent=2)
 
     ok, msg, report_url = generate_html_report(ticket_key, run_name)
     if not ok:

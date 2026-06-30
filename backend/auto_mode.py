@@ -11,6 +11,7 @@ import qa_orchestrator
 import linear_writer
 from agents import generate_html_report, EVIDENCE_DIR
 from instance_config import load_instance_config
+from qa_run_lock import qa_single_flight
 
 _STATE_KEY = "automode"
 _PROCESSED_KEY = "automode_processed"
@@ -115,6 +116,12 @@ async def attach_latest(ticket_key: str):
 
 
 async def _process(ticket_key: str, env_url: str) -> None:
+    # Single-flight across ALL trigger paths: the manual /api/qa-run endpoint also
+    # acquires this slot, so auto-mode and a manual run can't both spawn a run for
+    # the same ticket and produce duplicate -001/-002 evidence. Skip without marking
+    # processed so the ticket is retried once the in-flight run frees the slot.
+    if not qa_single_flight.try_acquire(ticket_key):
+        return
     _active.add(ticket_key)
     state = get_state()
     stream_id = str(uuid.uuid4())
@@ -132,6 +139,7 @@ async def _process(ticket_key: str, env_url: str) -> None:
             stream.end()
         _active.discard(ticket_key)
         mark_processed(ticket_key)
+        qa_single_flight.release(ticket_key)
 
 
 async def run_loop() -> None:

@@ -663,7 +663,15 @@ def check_new_evidence(ticket_key, baseline_runs=None):
         and os.path.exists(index_path)
         and os.path.getmtime(summary_path_check) > os.path.getmtime(index_path)
     )
-    if _run_has_content(latest_path) and (not os.path.exists(index_path) or summary_newer):
+    # Also regenerate when the skill left a thin (image-less) report next to
+    # screenshots — the agent writes summary.json THEN its own index.html, so
+    # summary_newer is usually False and the image-rich report never won.
+    needs_regen = (
+        not os.path.exists(index_path)
+        or summary_newer
+        or _report_missing_screenshots(latest_path)
+    )
+    if _run_has_content(latest_path) and needs_regen:
         generate_html_report(ticket_key, latest_run)
 
     has_html = os.path.exists(os.path.join(latest_path, "index.html"))
@@ -1157,14 +1165,101 @@ async def watch_evidence(ticket_key):
         await asyncio.sleep(10)
 
 
+def _run_confidence(run_dir):
+    """Headline confidence (or score) for a completed run, else None.
+
+    None means the run has no summary.json — i.e. it has not completed.
+    """
+    import json as _json
+    summary_path = os.path.join(run_dir, "summary.json")
+    if not os.path.exists(summary_path):
+        return None
+    try:
+        with open(summary_path, encoding="utf-8") as f:
+            summary = _json.load(f)
+    except Exception:
+        return None
+    conf = summary.get("confidence")
+    if isinstance(conf, dict) and isinstance(conf.get("headline"), (int, float)):
+        return conf["headline"]
+    if isinstance(conf, (int, float)):
+        return conf
+    score = summary.get("score")
+    if isinstance(score, dict) and isinstance(score.get("pct"), (int, float)):
+        return score["pct"]
+    if isinstance(score, (int, float)):
+        return score
+    return None
+
+
+def _select_display_run(runs_path):
+    """Pick the run the dashboard should display.
+
+    Prefer the highest-confidence COMPLETED run (one with a summary.json),
+    tie-breaking on the newest run id. Fall back to the newest run when none have
+    completed yet (in-progress/partial). Returns a run name or None.
+
+    Replaces a bare ``sorted(reverse=True)[0]`` that always showed the
+    lexicographically-latest run — so a redundant/lower-quality re-run (e.g. a
+    PASS-WITH-ISSUES retry numbered -002) would shadow the cleaner finished -001.
+    """
+    if not os.path.isdir(runs_path):
+        return None
+    run_names = sorted(
+        [n for n in os.listdir(runs_path) if os.path.isdir(os.path.join(runs_path, n))],
+        reverse=True,
+    )
+    if not run_names:
+        return None
+    completed = [n for n in run_names
+                 if os.path.exists(os.path.join(runs_path, n, "summary.json"))]
+    if not completed:
+        return run_names[0]
+    # run_names is newest-first; max() over (confidence, name) tie-breaks to the
+    # newest run id when confidences are equal.
+    def _rank(n):
+        c = _run_confidence(os.path.join(runs_path, n))
+        return (c if isinstance(c, (int, float)) else -1, n)
+    return max(completed, key=_rank)
+
+
+def _report_missing_screenshots(run_dir):
+    """True when a run has screenshots on disk but its index.html embeds none.
+
+    The qa-evidence skill sometimes writes a thin (link-only) index.html that the
+    backend's image-embedding generator never overwrote. A regenerated report
+    embeds base64 PNGs and is large, so a small report sitting next to PNGs is the
+    thin one to regenerate. The size check avoids reading the whole file on polls.
+    """
+    index_path = os.path.join(run_dir, "index.html")
+    if not os.path.exists(index_path):
+        return False  # 'report missing' is handled by a separate branch
+    try:
+        if os.path.getsize(index_path) > 60_000:
+            return False  # already image-rich
+    except OSError:
+        return False
+    automated = os.path.join(run_dir, "automated")
+    if not os.path.isdir(automated):
+        return False
+    for _root, _dirs, files in os.walk(automated):
+        if any(f.lower().endswith((".png", ".jpg", ".jpeg")) for f in files):
+            return True
+    return False
+
+
 def _report_url_for(ticket_key, run_name, run_dir=None):
     """Build the dashboard URL for the View Report button.
 
-    Only returns a URL when `index.html` (the Phase 7 portal) exists. The
-    earlier fallback to summary.json / headless.log made the button open
-    raw JSON or a log file under a label that promises a rendered report,
-    which confused reviewers. If the portal is missing, return "" so the
-    button hides entirely — that's a signal to regenerate the run.
+    Only returns a URL when `index.html` (the Phase 7 portal) exists. The earlier
+    fallback to summary.json / headless.log made the button open raw JSON or a log
+    file under a label that promises a rendered report, which confused reviewers.
+    If the portal is missing, return "" so the button hides entirely — a signal to
+    regenerate the run.
+
+    Appends ``?v=<index mtime>`` so a regenerated report is fetched fresh rather
+    than served from the browser/StaticFiles cache (the URL is otherwise stable
+    across regenerations, which made screenshots appear only after a hard refresh).
     """
     if not run_name:
         return ""
@@ -1172,8 +1267,12 @@ def _report_url_for(ticket_key, run_name, run_dir=None):
     if run_dir is None:
         # Caller has no on-disk handle; trust the caller checked.
         return f"{base}/index.html"
-    if os.path.exists(os.path.join(run_dir, "index.html")):
-        return f"{base}/index.html"
+    index_path = os.path.join(run_dir, "index.html")
+    if os.path.exists(index_path):
+        try:
+            return f"{base}/index.html?v={int(os.path.getmtime(index_path))}"
+        except OSError:
+            return f"{base}/index.html"
     return ""
 
 
@@ -1194,8 +1293,16 @@ def check_evidence(ticket_key):
     if not runs:
         return {"status": "manifest", "score": None, "time": "", "reportPath": "", "reportUrl": "", "needsReport": False}
 
-    latest_run_name = runs[0]
+    latest_run_name = _select_display_run(runs_path) or runs[0]
     latest_run = os.path.join(runs_path, latest_run_name)
+    # Heal a thin/image-less report for the run we're about to display, so the
+    # dashboard always serves the screenshot-embedded version (one-time per run —
+    # a regenerated report is large, so _report_missing_screenshots goes False).
+    if _report_missing_screenshots(latest_run):
+        try:
+            generate_html_report(ticket_key, latest_run_name)
+        except Exception:
+            pass
     report_path = os.path.join(latest_run, "index.html")
     # A 0-byte index.html counts as missing — some generators leave an empty
     # placeholder in the run dir while writing the real portal to the ticket root.
@@ -1352,6 +1459,12 @@ def generate_html_report(ticket_key, run_name=None):
         explanation = (summary.get("confidence_explanation") or
                        summary.get("score_breakdown", {}).get("explanation", "") or
                        manifest_conf.get("explanation", ""))
+
+    # Task 4: prefer canonical pct from Task 3 scoring block (summary["score"]["pct"]).
+    # Also handles the case where raw_score was incorrectly set to the dict itself.
+    _score_block = summary.get("score")
+    if isinstance(_score_block, dict) and _score_block.get("pct") is not None:
+        score = _score_block["pct"]
 
     env_val = summary.get("env", "") or summary.get("env_passed", "")
     if isinstance(env_val, dict):
@@ -1571,7 +1684,7 @@ def generate_html_report(ticket_key, run_name=None):
 </div>'''
 
     # --- TC summary table ---
-    tc_rows_html = ""
+    tc_row_by_id = {}
     for tc_id in tc_ids:
         tc_data = tc_detail_map.get(tc_id, {})
         result = tc_data.get("status") or tc_results_legacy.get(tc_id, "unknown")
@@ -1585,7 +1698,7 @@ def generate_html_report(ticket_key, run_name=None):
             for a in ac_tags
         )
         acs_plain = ", ".join(ac_tags)
-        tc_rows_html += (
+        tc_row_by_id[tc_id] = (
             f'<tr onclick="document.getElementById(\'{tc_id}\').scrollIntoView({{behavior:\'smooth\'}})" '
             f'style="cursor:pointer">'
             f'<td><span style="color:#818cf8;font-weight:700">{_esc(tc_id)}</span></td>'
@@ -1596,7 +1709,7 @@ def generate_html_report(ticket_key, run_name=None):
         )
 
     # --- TC detail cards ---
-    tc_detail_html = ""
+    tc_detail_by_id = {}
     for tc_id in tc_ids:
         tc_data = tc_detail_map.get(tc_id, {})
         result = tc_data.get("status") or tc_results_legacy.get(tc_id, "unknown")
@@ -1897,7 +2010,7 @@ def generate_html_report(ticket_key, run_name=None):
         skip_html = (f'<div style="color:#f59e0b;font-size:12px;padding:8px 12px;background:rgba(245,158,11,0.1);'
                      f'border-radius:6px;margin-bottom:8px">Skipped: {_esc(skip_reason)}</div>') if skip_reason else ""
 
-        tc_detail_html += f'''
+        tc_detail_by_id[tc_id] = f'''
 <div id="{tc_id}" style="background:#1e293b;border-radius:10px;padding:20px;margin-bottom:20px;border:1px solid #334155;scroll-margin-top:80px">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
     <div>
@@ -1922,6 +2035,33 @@ def generate_html_report(ticket_key, run_name=None):
   {markups_html}
 </div>
 '''
+
+    # --- Split TCs into scored vs advisory; reassemble two-group HTML ---
+    import qa_scoring as _qa_scoring
+    _tcs_for_split = [{"id": tc_id} for tc_id in tc_ids]
+    _scored_tcs, _advisory_tcs = _qa_scoring.split_test_cases(_tcs_for_split)
+    _scored_ids = [t["id"] for t in _scored_tcs]
+    _advisory_ids = [t["id"] for t in _advisory_tcs]
+
+    # Summary table rows: scored first, then advisory with separator
+    tc_rows_html = "".join(tc_row_by_id.get(tc_id, "") for tc_id in _scored_ids)
+    if _advisory_ids:
+        tc_rows_html += (
+            '<tr><td colspan="4" style="background:#0f172a;color:#64748b;font-size:10px;'
+            'font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding:8px 12px">'
+            'Advisory — not scored</td></tr>'
+        )
+        tc_rows_html += "".join(tc_row_by_id.get(tc_id, "") for tc_id in _advisory_ids)
+
+    # Detail cards: scored section first, then advisory section under separate heading
+    tc_detail_html = "".join(tc_detail_by_id.get(tc_id, "") for tc_id in _scored_ids)
+    if _advisory_ids:
+        _advisory_detail_html = "".join(tc_detail_by_id.get(tc_id, "") for tc_id in _advisory_ids)
+        tc_detail_html += (
+            '<h3 style="color:#94a3b8;margin:32px 0 16px;font-size:15px">'
+            'Advisory <span style="font-size:11px;color:#475569;font-weight:400">(not scored)</span></h3>'
+            + _advisory_detail_html
+        )
 
     # --- Flat automated screenshots (not in subdirs) ---
     flat_shots_html = ""

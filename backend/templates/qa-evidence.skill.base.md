@@ -495,6 +495,14 @@ step 6. Each is non-skippable; an exemption requires
 - Skip with explicit exemption only if no baseline exists AND
   `--no-baseline-warning` is passed.
 
+### Scoring policy (enforced by backend `qa_scoring`)
+
+**Scoring policy (enforced by the backend `qa_scoring`):** the headline score is computed
+from AC-tied TCs plus `TC-UV-1` (console) and `TC-UV-2` (network) ONLY. `TC-API-*`,
+`TC-UV-3/4/5/6` (incl. AXE accessibility) are **advisory** — report them, but do NOT
+reduce confidence or verdict when they are skipped, incomplete, or failing. The backend
+overwrites `summary.json` score/verdict with the canonical value regardless.
+
 ## Phase 2.7 — Live API Verification (for API-based tickets)
 
 If this product has an **API Surface (generated)** section above, many tickets
@@ -698,6 +706,12 @@ Writes `confidence:` block to manifest:
 - Do NOT deduct for: programmatic verification (DOM reads are valid
   evidence), single brand when the component is shared, theoretical
   edge cases not mentioned in the ticket.
+
+**Scoring policy (enforced by the backend `qa_scoring`):** the headline score is computed
+from AC-tied TCs plus `TC-UV-1` (console) and `TC-UV-2` (network) ONLY. `TC-API-*`,
+`TC-UV-3/4/5/6` (incl. AXE accessibility) are **advisory** — report them, but do NOT
+reduce confidence or verdict when they are skipped, incomplete, or failing. The backend
+overwrites `summary.json` score/verdict with the canonical value regardless.
 
 ## Phase 8 — Gap gate
 

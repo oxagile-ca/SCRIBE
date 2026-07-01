@@ -105,6 +105,23 @@ async def run_and_finalize(ticket_key, env_url, *, armed, manual=False, model=No
     env_url = resolve_env_url(cfg, env_url)
     model = model or QA_RUNNER_MODEL  # QA execution never uses Haiku (qa_runner guards too)
 
+    # Reconcile BEFORE the agent runs (spec §4): current main HEAD is authoritative.
+    # Cache to the ticket dir so the skill's Phase-1 derives ACs/expected values from the
+    # main snapshot (not the raw PR diff), and reuse the same result for the finalize
+    # divergence guard — one reconciliation, no double gh work.
+    recon = reconcile_ticket(ticket_key, cfg)
+    if recon is not None:
+        try:
+            ticket_dir = os.path.join(EVIDENCE_DIR, ticket_key)
+            os.makedirs(ticket_dir, exist_ok=True)
+            with open(os.path.join(ticket_dir, "reconcile.json"), "w", encoding="utf-8") as _rf:
+                json.dump(recon, _rf, indent=2)
+        except OSError:
+            pass
+        yield {"type": "log", "data": (
+            f"Main reconciliation: {recon.get('status')}, "
+            f"{len(recon.get('divergences') or [])} divergence(s) — main is authoritative")}
+
     run_name = None
     async for ev in qa_runner.run(ticket_key, env_url, model=model):
         if ev.get("type") == "qa_complete":
@@ -139,27 +156,24 @@ async def run_and_finalize(ticket_key, env_url, *, armed, manual=False, model=No
     # empty `test_cases` would wrongly stamp an old-format run BLOCKED.
     _tcs = _summary.get("test_cases") or _summary.get("test_results") or []
 
-    # Main reconciliation (divergence guard): current main HEAD is authoritative. A PR
-    # value main has since changed — or a degraded reconciliation — injects a
-    # needs-review TC-RECON (an AC-tied scoring TC) so the run cannot silently PASS on a
-    # stale/unverified value. reconcile.json is cached in the run dir for the report.
-    _recon = reconcile_ticket(ticket_key, cfg)
-    if _recon is not None:
+    # Divergence guard: fold the (pre-agent) reconciliation into scoring. A PR value main
+    # has since changed — or a degraded reconciliation — injects a needs-review TC-RECON
+    # (an AC-tied scoring TC) so the run cannot silently PASS on a stale/unverified value.
+    # reconcile.json is also copied into the run dir for the evidence report.
+    if recon is not None:
         run_dir = os.path.dirname(summary_path)
         try:
             with open(os.path.join(run_dir, "reconcile.json"), "w", encoding="utf-8") as _rf:
-                json.dump(_recon, _rf, indent=2)
+                json.dump(recon, _rf, indent=2)
         except OSError:
             pass
-        _recon_tcs = qa_reconcile.build_reconcile_tcs(_recon)
+        _recon_tcs = qa_reconcile.build_reconcile_tcs(recon)
         if _recon_tcs:
             _tcs = list(_tcs) + _recon_tcs
             _summary["test_cases"] = _tcs
-        _summary["reconcile"] = {"status": _recon.get("status"),
-                                 "degraded_reason": _recon.get("degraded_reason"),
-                                 "divergences": _recon.get("divergences") or []}
-        yield {"type": "log", "data": (f"Main reconciliation: {_recon.get('status')}, "
-                                       f"{len(_recon.get('divergences') or [])} divergence(s)")}
+        _summary["reconcile"] = {"status": recon.get("status"),
+                                 "degraded_reason": recon.get("degraded_reason"),
+                                 "divergences": recon.get("divergences") or []}
 
     _canon = qa_scoring.compute_score(_tcs)
     _summary["score"] = {"pass": _canon["pass"], "fail": _canon["fail"],

@@ -189,6 +189,18 @@ its description and flag for review — do NOT substitute the linked ticket's sc
    Never invent test cases blind — anchor each TC to either a diff hunk OR the
    ticket's explicit described behavior/ACs.
 
+2b. **Main reconciliation — current main HEAD is authoritative (not the PR snapshot).**
+   If `<evidence_root>/<JIRA-KEY>/reconcile.json` exists (the backend writes it before
+   this run), current main has already been fetched for the PR's touched files. Use it:
+   - Derive expected AC values from `main_snapshot["<repo>:<path>"]`, NOT the raw PR
+     diff. Where a value differs, **main wins** — the PR value may be stale.
+   - Each entry in `divergences[]` is a PR value a later main commit changed
+     (`pr_hint` → `main_hint`). Assert the **`main_hint`** value; a TC that passes on the
+     PR's old value is WRONG. Cite the divergence in the TC `notes`.
+   - If `reconcile.json` is absent or `status: "degraded"`, proceed from the PR diff as
+     usual (the backend's finalize guard adds a `TC-RECON` needs-review so a stale or
+     unverified value can't silently pass).
+
 3. **Map every non-trivial change to a TC.** Walk the diff. For each
    file with behavior changes (exclude: pure refactor with identical
    AST, dep-version bumps, doc-only, test-only):
@@ -216,6 +228,19 @@ its description and flag for review — do NOT substitute the linked ticket's sc
    - `notes`: cite the diff hunk(s) this TC covers
    - `annotations_hint`: optional, but recommended for every screenshot
      TC since markup runs on all of them
+
+5b. **Harvest the Error Handling / validation section into negative TCs (never skip).**
+   Many tickets carry an explicit `## Error Handling` / validation / alternate-response
+   section listing required failure responses (e.g. SN-codes → INVALID_PARAMETERS /
+   UNAUTHORIZED / SYSTEM_ERROR). Those ARE acceptance criteria. For EACH scenario emit a
+   negative TC `TC-ERR-<code>` (e.g. `TC-ERR-SN4`) asserting the documented status + error
+   code, and classify it:
+   - **live-testable** (missing/invalid/non-existent id, missing/invalid auth, out-of-scope
+     id) → exercise it live in Phase 2.7 and save `automated/TC-ERR-<code>/api-*.json`.
+   - **fault-injection-only** (missing customer/location, DB/calc/serialization failure →
+     SYSTEM_ERROR) → not reproducible against a clean env; verify the error BRANCH exists in
+     the PR diff (cite `file:line` + ErrorCode) and set the TC `method: code-review`.
+   An untested error AC is a GAP, not a pass — report it as blocked/observation, never omit it.
 
 6. **Append the Universal Validation Suite (Phase 2.6 spec)** to the manifest
    with TC ids `TC-UV-1` … `TC-UV-6`. These run on every non-baseline run
@@ -525,6 +550,11 @@ already makes it. A generated helper ships beside this skill as
 
 **Assert:**
 - HTTP 2xx — or the documented expected error.
+- **Error-handling AC coverage (every `TC-ERR-*` from Phase 1):** drive each documented
+  failure — omit/garble the param, drop the bearer token, use an out-of-scope id — and assert
+  the EXACT HTTP status + ErrorCode the ticket specifies. Save `automated/TC-ERR-<code>/api-*.json`.
+  Fault-injection-only scenarios that can't be driven live stay `method: code-review` with a PR
+  `file:line` citation — count them as verified-by-review, never as untested-passed.
 - Expected fields present (from the diff + the API Surface catalog).
 - Value correctness when the ticket is about math (totals, taxes, fees, counts).
 - Scope/permission: a call carrying another tenant's/bucket's scope id is rejected.

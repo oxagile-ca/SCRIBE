@@ -79,6 +79,8 @@ def test_finalize_divergence_guard_blocks_clean_pass(monkeypatch, tmp_path):
     assert out["verdict"] == "PASS-WITH-ISSUES"          # needs-review -> not clean PASS
     assert out["reconcile"]["status"] == "ok"
     assert (run_dir / "reconcile.json").exists()
+    # pre-agent: also cached at the ticket level so the skill's Phase-1 reads the main snapshot
+    assert (tmp_path / "INV-800" / "reconcile.json").exists()
 
 
 def test_finalize_degraded_reconcile_blocks_clean_pass(monkeypatch, tmp_path):

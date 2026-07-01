@@ -10,9 +10,33 @@ import qa_runner
 import pdf_export
 import linear_writer
 import qa_scoring
+import qa_reconcile
 from agents import generate_html_report, EVIDENCE_DIR
 from instance_config import load_instance_config
 from config import QA_RUNNER_MODEL
+
+
+def reconcile_ticket(ticket_key, cfg, *, resolve_pr_refs=None, run_reconcile=None):
+    """Reconcile a ticket's PRs against current main HEAD (the divergence guard's
+    data). Returns None when there's nothing to anchor (no vcs config or no linked
+    PRs). Degrades (never raises) on a resolver error so the caller emits a
+    needs-review TC-RECON instead of silently passing on PR-only values.
+
+    resolve_pr_refs / run_reconcile are injectable for tests; live defaults resolve PR
+    links from Linear and reconcile via the GitHub API.
+    See docs/superpowers/specs/2026-06-29-main-reconciliation-design.md."""
+    repos = ((cfg or {}).get("vcs") or {}).get("repos") or []
+    if not repos:
+        return None
+    resolve_pr_refs = resolve_pr_refs or qa_reconcile.fetch_ticket_pr_refs
+    run_reconcile = run_reconcile or qa_reconcile.reconcile_live
+    try:
+        refs = resolve_pr_refs(ticket_key) or []
+    except Exception as e:
+        return qa_reconcile._degraded(f"PR resolution failed: {e}")
+    if not refs:
+        return None
+    return run_reconcile(ticket_key, refs)
 
 
 def compute_attach_gate(cfg: dict, *, armed: bool, manual: bool) -> bool:
@@ -114,6 +138,29 @@ async def run_and_finalize(ticket_key, env_url, *, armed, manual=False, model=No
     # legacy `test_results` key alongside the current `test_cases`); scoring only an
     # empty `test_cases` would wrongly stamp an old-format run BLOCKED.
     _tcs = _summary.get("test_cases") or _summary.get("test_results") or []
+
+    # Main reconciliation (divergence guard): current main HEAD is authoritative. A PR
+    # value main has since changed — or a degraded reconciliation — injects a
+    # needs-review TC-RECON (an AC-tied scoring TC) so the run cannot silently PASS on a
+    # stale/unverified value. reconcile.json is cached in the run dir for the report.
+    _recon = reconcile_ticket(ticket_key, cfg)
+    if _recon is not None:
+        run_dir = os.path.dirname(summary_path)
+        try:
+            with open(os.path.join(run_dir, "reconcile.json"), "w", encoding="utf-8") as _rf:
+                json.dump(_recon, _rf, indent=2)
+        except OSError:
+            pass
+        _recon_tcs = qa_reconcile.build_reconcile_tcs(_recon)
+        if _recon_tcs:
+            _tcs = list(_tcs) + _recon_tcs
+            _summary["test_cases"] = _tcs
+        _summary["reconcile"] = {"status": _recon.get("status"),
+                                 "degraded_reason": _recon.get("degraded_reason"),
+                                 "divergences": _recon.get("divergences") or []}
+        yield {"type": "log", "data": (f"Main reconciliation: {_recon.get('status')}, "
+                                       f"{len(_recon.get('divergences') or [])} divergence(s)")}
+
     _canon = qa_scoring.compute_score(_tcs)
     _summary["score"] = {"pass": _canon["pass"], "fail": _canon["fail"],
                          "blocked": _canon["blocked"], "total": _canon["total"],

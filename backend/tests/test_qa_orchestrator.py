@@ -4,6 +4,126 @@ import os
 import qa_orchestrator
 
 
+# --- Layer C: reconcile_ticket logic (injected resolvers; no live calls) ---
+
+def test_reconcile_ticket_skips_without_vcs_or_prs():
+    assert qa_orchestrator.reconcile_ticket("INV-1", {}) is None          # no vcs
+    cfg = {"vcs": {"repos": ["xinventory-ux"]}}
+    assert qa_orchestrator.reconcile_ticket(                              # vcs, but 0 PRs
+        "INV-1", cfg, resolve_pr_refs=lambda k: []) is None
+
+
+def test_reconcile_ticket_delegates_when_prs_found():
+    cfg = {"vcs": {"repos": ["xinventory-ux"]}}
+    refs = [{"owner": "O", "repo": "xinventory-ux", "id": 238}]
+    seen = {}
+
+    def run_reconcile(key, prs):
+        seen["key"], seen["prs"] = key, prs
+        return {"status": "ok", "divergences": [], "degraded_reason": None}
+
+    res = qa_orchestrator.reconcile_ticket(
+        "INV-651", cfg, resolve_pr_refs=lambda k: refs, run_reconcile=run_reconcile)
+    assert res["status"] == "ok"
+    assert seen == {"key": "INV-651", "prs": refs}
+
+
+def test_reconcile_ticket_degrades_on_resolver_error():
+    cfg = {"vcs": {"repos": ["xinventory-ux"]}}
+
+    def boom(k):
+        raise RuntimeError("linear 500")
+
+    res = qa_orchestrator.reconcile_ticket("INV-1", cfg, resolve_pr_refs=boom)
+    assert res["status"] == "degraded"
+    assert "500" in res["degraded_reason"]
+
+
+def _stub_finalize_collaborators(monkeypatch, tmp_path):
+    monkeypatch.setattr(qa_orchestrator, "EVIDENCE_DIR", str(tmp_path))
+    monkeypatch.setattr(qa_orchestrator, "generate_html_report",
+                        lambda k, r: (True, "ok", f"/evidence/{k}/runs/{r}/index.html"))
+
+    async def fake_pdf(html, **kw):
+        return None
+    monkeypatch.setattr(qa_orchestrator.pdf_export, "export", fake_pdf)
+    monkeypatch.setattr(qa_orchestrator, "load_instance_config", lambda: {})
+    monkeypatch.setattr(qa_orchestrator, "compute_attach_gate", lambda *a, **k: False)
+
+    async def fake_qa_run(*a, **k):
+        yield {"type": "qa_complete", "success": True, "run_name": "run-1", "error": None}
+    monkeypatch.setattr(qa_orchestrator.qa_runner, "run", fake_qa_run)
+
+
+def test_finalize_divergence_guard_blocks_clean_pass(monkeypatch, tmp_path):
+    run_dir = tmp_path / "INV-800" / "runs" / "run-1"
+    run_dir.mkdir(parents=True)
+    (run_dir / "summary.json").write_text(json.dumps({
+        "ticket": "INV-800", "verdict": "PASS",
+        "test_cases": [{"id": "TC-800-001", "status": "pass"}],
+    }), encoding="utf-8")
+    _stub_finalize_collaborators(monkeypatch, tmp_path)
+    # A later main commit superseded a PR value -> one mapped divergence.
+    monkeypatch.setattr(qa_orchestrator, "reconcile_ticket", lambda k, cfg: {
+        "status": "ok", "degraded_reason": None,
+        "divergences": [{"repo": "xinventory-ux", "path": "fees.py", "region": "MRDT",
+                         "pr_hint": "MRDT = 0.03", "main_hint": "MRDT = 0.02"}]})
+
+    async def drain():
+        async for _ in qa_orchestrator.run_and_finalize("INV-800", "http://x", armed=False):
+            pass
+    asyncio.run(drain())
+
+    out = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    assert "TC-RECON-1" in [t["id"] for t in out["test_cases"]]
+    assert out["verdict"] == "PASS-WITH-ISSUES"          # needs-review -> not clean PASS
+    assert out["reconcile"]["status"] == "ok"
+    assert (run_dir / "reconcile.json").exists()
+
+
+def test_finalize_degraded_reconcile_blocks_clean_pass(monkeypatch, tmp_path):
+    run_dir = tmp_path / "INV-801" / "runs" / "run-1"
+    run_dir.mkdir(parents=True)
+    (run_dir / "summary.json").write_text(json.dumps({
+        "ticket": "INV-801", "verdict": "PASS",
+        "test_cases": [{"id": "TC-801-001", "status": "pass"}],
+    }), encoding="utf-8")
+    _stub_finalize_collaborators(monkeypatch, tmp_path)
+    monkeypatch.setattr(qa_orchestrator, "reconcile_ticket", lambda k, cfg: {
+        "status": "degraded", "degraded_reason": "gh down", "divergences": []})
+
+    async def drain():
+        async for _ in qa_orchestrator.run_and_finalize("INV-801", "http://x", armed=False):
+            pass
+    asyncio.run(drain())
+
+    out = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    assert "TC-RECON" in [t["id"] for t in out["test_cases"]]
+    assert out["verdict"] != "PASS"                      # degraded can't silently pass
+
+
+def test_finalize_skips_reconcile_when_none(monkeypatch, tmp_path):
+    """reconcile_ticket -> None (no PRs) leaves scoring untouched and writes no reconcile.json."""
+    run_dir = tmp_path / "INV-802" / "runs" / "run-1"
+    run_dir.mkdir(parents=True)
+    (run_dir / "summary.json").write_text(json.dumps({
+        "ticket": "INV-802", "verdict": "PASS",
+        "test_cases": [{"id": "TC-802-001", "status": "pass"}],
+    }), encoding="utf-8")
+    _stub_finalize_collaborators(monkeypatch, tmp_path)
+    monkeypatch.setattr(qa_orchestrator, "reconcile_ticket", lambda k, cfg: None)
+
+    async def drain():
+        async for _ in qa_orchestrator.run_and_finalize("INV-802", "http://x", armed=False):
+            pass
+    asyncio.run(drain())
+
+    out = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    assert out["verdict"] == "PASS"
+    assert "reconcile" not in out
+    assert not (run_dir / "reconcile.json").exists()
+
+
 def test_gate_truth_table():
     write_on = {"issueTracker": {"access": {"write": True}}}
     write_off = {"issueTracker": {"access": {"write": False}}}

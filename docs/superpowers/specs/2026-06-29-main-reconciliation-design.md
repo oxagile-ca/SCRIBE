@@ -3,6 +3,20 @@
 **Status:** Approved design (2026-06-29). Build second (after scoring policy).
 **Sub-project 2 of 3.**
 
+> **Implementation status (2026-07-01):** Engine + divergence guard BUILT via TDD (93
+> unit tests green, live-validated). New `backend/github_client.py` (PR adapter + gh-API
+> shells; token via `gh auth token`, see memory `scribe-gh-token-reconcile`) and
+> `backend/qa_reconcile.py` (`reconcile`/`reconcile_live`/`fetch_ticket_pr_refs`/
+> `build_reconcile_tcs`). PR→ticket link is resolved from **Linear attachment URLs** (not
+> branch names — those often omit the key). Wired into `qa_orchestrator.reconcile_ticket`
+> + `run_and_finalize` as a **finalize-time guard** (writes `reconcile.json`, injects
+> needs-review `TC-RECON` into `summary.test_cases` before canonical scoring). Refinements
+> beyond this doc, from real-data validation: (a) **test/mock/snapshot/story files are
+> excluded** (a changed fixture is not a stale AC); (b) scoring TCs are **grouped one per
+> file** (a refactored file yielded 24 TCs otherwise). **REMAINING:** §4's pre-agent path —
+> running reconcile BEFORE the agent so skill Phase-1 derives ACs from the MAIN snapshot
+> (edits the 3 skill files + template) — is NOT yet done; only the guard runs today.
+
 ## 1. Problem
 
 QA anchors a ticket's acceptance criteria and expected values to its **PR snapshot**. When a

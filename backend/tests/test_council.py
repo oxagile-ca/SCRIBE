@@ -15,18 +15,28 @@ def _set_stub(monkeypatch, name):
     monkeypatch.setenv("CLAUDE_BIN", path)
 
 
-def test_build_reviewer_cmd_is_argv_with_prompt_intact():
-    # Regression: the reviewer command must be an argv list (consumed by
-    # create_subprocess_exec), NOT a shell-quoted string. The old shell+shlex.quote
-    # build mangled the prompt on Windows (cmd.exe ignores POSIX single quotes), so
-    # claude received a stray `'You` instead of the prompt and never returned a
-    # VERDICT -> council BLOCKed every ticket.
+def test_build_reviewer_cmd_is_argv_without_prompt():
+    # Regression: the reviewer command is an argv list (consumed by
+    # create_subprocess_exec), NOT a shell-quoted string, AND the prompt is NOT
+    # embedded in the argv — it's fed via stdin. A large council prompt as an argv
+    # element overflows the Windows ~32K command-line limit -> [WinError 206] "The
+    # filename or extension is too long", which crashed the orchestrator into a
+    # spurious BLOCK. See _build_reviewer_cmd for the full rationale.
     from council import _build_reviewer_cmd
-    prompt = "You are the QA reviewer.\nEnd with exactly: VERDICT: PASS or BLOCK."
-    cmd = _build_reviewer_cmd(prompt)
+    cmd = _build_reviewer_cmd()
     assert isinstance(cmd, list)
-    assert cmd[-1] == prompt  # whole prompt arrives as ONE argument, unsplit
     assert "-p" in cmd
+    assert cmd[-1] != "--"  # no dangling prompt separator
+
+
+def test_build_reviewer_cmd_stays_short_for_huge_prompt():
+    # The command line must NOT grow with prompt size — that's the WinError 206
+    # regression. _build_reviewer_cmd takes no prompt now, so the argv is a small
+    # fixed set of flags regardless of how big the reviewer prompt is.
+    from council import _build_reviewer_cmd
+    cmd = _build_reviewer_cmd()
+    joined = " ".join(cmd)
+    assert len(joined) < 500  # flags only; nowhere near the 32K Windows limit
 
 
 def test_parse_simple_pass():
@@ -278,17 +288,15 @@ def test_synthesize_carries_per_reviewer_usage():
 
 def test_build_reviewer_cmd_includes_model_when_set():
     from council import _build_reviewer_cmd
-    cmd = _build_reviewer_cmd("PROMPT TEXT", "claude-haiku-4-5")
+    cmd = _build_reviewer_cmd("claude-haiku-4-5")
     assert "--model" in cmd
     assert cmd[cmd.index("--model") + 1] == "claude-haiku-4-5"
-    assert cmd[-1] == "PROMPT TEXT"   # prompt stays the final argv element
 
 
 def test_build_reviewer_cmd_omits_model_when_none():
     from council import _build_reviewer_cmd
-    cmd = _build_reviewer_cmd("PROMPT TEXT")
+    cmd = _build_reviewer_cmd()
     assert "--model" not in cmd
-    assert cmd[-1] == "PROMPT TEXT"
 
 
 def test_default_reviewers_use_configured_models():

@@ -3,6 +3,7 @@
 Used by both the single-ticket /api/qa-run endpoint and the auto-mode loop, so the
 behaviour and the write-gate are identical in both paths.
 """
+import asyncio
 import json
 import os
 
@@ -109,7 +110,9 @@ async def run_and_finalize(ticket_key, env_url, *, armed, manual=False, model=No
     # Cache to the ticket dir so the skill's Phase-1 derives ACs/expected values from the
     # main snapshot (not the raw PR diff), and reuse the same result for the finalize
     # divergence guard — one reconciliation, no double gh work.
-    recon = reconcile_ticket(ticket_key, cfg)
+    # reconcile_ticket does BLOCKING I/O (httpx + the gh subprocess); run it off the event
+    # loop or it stalls :8000 long enough for the health watchdog to kill the backend.
+    recon = await asyncio.to_thread(reconcile_ticket, ticket_key, cfg)
     if recon is not None:
         try:
             ticket_dir = os.path.join(EVIDENCE_DIR, ticket_key)

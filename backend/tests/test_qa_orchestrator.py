@@ -104,6 +104,67 @@ def test_finalize_degraded_reconcile_blocks_clean_pass(monkeypatch, tmp_path):
     assert out["verdict"] != "PASS"                      # degraded can't silently pass
 
 
+def test_append_api_tcs_to_summary_appends():
+    s = {"test_cases": [{"id": "TC-1", "status": "pass"}]}
+    merged = qa_orchestrator.append_api_tcs_to_summary(
+        s, [{"id": "TC-API-User-1", "status": "fail"}])
+    assert [t["id"] for t in s["test_cases"]] == ["TC-1", "TC-API-User-1"]
+    assert merged is s["test_cases"] or merged == s["test_cases"]
+    # legacy test_results key + empty api list
+    s2 = {"test_results": [{"id": "TC-9", "status": "pass"}]}
+    assert qa_orchestrator.append_api_tcs_to_summary(s2, []) == [{"id": "TC-9", "status": "pass"}]
+
+
+def test_finalize_api_smoke_tcs_are_advisory(monkeypatch, tmp_path):
+    """A TC-API fail lands in the report but never drags the UI verdict below PASS."""
+    run_dir = tmp_path / "INV-900" / "runs" / "run-1"
+    run_dir.mkdir(parents=True)
+    (run_dir / "summary.json").write_text(json.dumps({
+        "ticket": "INV-900", "verdict": "PASS",
+        "test_cases": [{"id": "TC-900-001", "status": "pass"}],
+    }), encoding="utf-8")
+    _stub_finalize_collaborators(monkeypatch, tmp_path)
+    monkeypatch.setattr(qa_orchestrator, "reconcile_ticket", lambda k, cfg: None)
+
+    async def fake_smoke(ticket_key, cfg, run_name):
+        return [{"id": "TC-API-SalesOrder-1", "status": "fail", "note": "500", "evidence": None}]
+    monkeypatch.setattr(qa_orchestrator, "run_api_smoke", fake_smoke)
+
+    async def drain():
+        async for _ in qa_orchestrator.run_and_finalize("INV-900", "http://x", armed=False):
+            pass
+    asyncio.run(drain())
+
+    out = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    ids = [t["id"] for t in out["test_cases"]]
+    assert "TC-API-SalesOrder-1" in ids               # rendered in the report
+    assert out["verdict"] == "PASS"                    # but advisory — UI verdict unchanged
+    assert "TC-API-SalesOrder-1" in out["scoring"]["advisory_ids"]
+
+
+def test_finalize_no_api_smoke_leaves_summary_untouched(monkeypatch, tmp_path):
+    run_dir = tmp_path / "INV-901" / "runs" / "run-1"
+    run_dir.mkdir(parents=True)
+    (run_dir / "summary.json").write_text(json.dumps({
+        "ticket": "INV-901", "verdict": "PASS",
+        "test_cases": [{"id": "TC-901-001", "status": "pass"}],
+    }), encoding="utf-8")
+    _stub_finalize_collaborators(monkeypatch, tmp_path)
+    monkeypatch.setattr(qa_orchestrator, "reconcile_ticket", lambda k, cfg: None)
+
+    async def no_smoke(ticket_key, cfg, run_name):
+        return []
+    monkeypatch.setattr(qa_orchestrator, "run_api_smoke", no_smoke)
+
+    async def drain():
+        async for _ in qa_orchestrator.run_and_finalize("INV-901", "http://x", armed=False):
+            pass
+    asyncio.run(drain())
+
+    out = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    assert [t["id"] for t in out["test_cases"]] == ["TC-901-001"]
+
+
 def test_finalize_skips_reconcile_when_none(monkeypatch, tmp_path):
     """reconcile_ticket -> None (no PRs) leaves scoring untouched and writes no reconcile.json."""
     run_dir = tmp_path / "INV-802" / "runs" / "run-1"

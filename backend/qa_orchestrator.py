@@ -12,9 +12,76 @@ import pdf_export
 import linear_writer
 import qa_scoring
 import qa_reconcile
+import qa_api_gate
+import qa_api_smoke
+import qa_postman
 from agents import generate_html_report, EVIDENCE_DIR
 from instance_config import load_instance_config
 from config import QA_RUNNER_MODEL
+
+
+def append_api_tcs_to_summary(summary: dict, api_tcs: list) -> list:
+    """Append advisory TC-API-* to summary['test_cases'] (append only — qa_scoring keeps
+    them out of the headline). Returns the merged list."""
+    base = list(summary.get("test_cases") or summary.get("test_results") or [])
+    if not api_tcs:
+        return base
+    base.extend(api_tcs)
+    summary["test_cases"] = base
+    return base
+
+
+def _api_smoke_inputs(ticket_key: str, cfg: dict):
+    """(label, acs, description, api_base, collection_groups) for the gate, or None to
+    skip. Guarded so no Linear call happens unless a collection AND api_base are configured
+    (keeps gate-out a true no-op). BLOCKING — call via to_thread."""
+    coll = ((cfg or {}).get("api") or {}).get("postmanCollectionPath")
+    if not coll:
+        return None
+    import qa_targets
+    api_base = qa_targets._api_base(cfg)
+    if not api_base:
+        return None
+    groups = sorted({r["group"] for r in qa_postman.load_requests(coll) if r.get("group")})
+    ticket = qa_targets._fetch_linear_ticket(ticket_key) or {}
+    description = "\n".join(p for p in (ticket.get("summary"), ticket.get("description")) if p)
+    return ticket.get("labels") or [], [], description, api_base, groups
+
+
+def _fetch_ticket_diff(ticket_key: str, cfg: dict) -> str:
+    """Best-effort PR diff for the gate's unclear branch (patches of the linked PRs)."""
+    try:
+        import github_client
+        parts = []
+        for r in qa_reconcile.fetch_ticket_pr_refs(ticket_key):
+            for f in github_client.fetch_pr_files(r["repo"], r["id"]):
+                if f.get("patch"):
+                    parts.append(f["patch"])
+        return "\n".join(parts)
+    except Exception:
+        return ""
+
+
+async def run_api_smoke(ticket_key: str, cfg: dict, run_name: str) -> list:
+    """Gated deterministic API smoke: classify (pure) -> diff fallback if unclear -> fire
+    the matched read endpoints. Returns advisory TC-API-* (or [] when gated out). Never
+    raises — degrades to a blocked TC. See 2026-06-29-gated-api-smoke-design.md."""
+    inputs = await asyncio.to_thread(_api_smoke_inputs, ticket_key, cfg)
+    if inputs is None:
+        return []
+    label, acs, description, api_base, groups = inputs
+    gate = qa_api_gate.classify(label, acs, description, groups)
+    endpoints = gate["endpoints"]
+    if gate["unclear"]:
+        diff = await asyncio.to_thread(_fetch_ticket_diff, ticket_key, cfg)
+        endpoints = qa_api_gate.endpoints_from_diff(diff)
+    if not (gate["is_api"] or endpoints):
+        return []
+    try:
+        return await qa_api_smoke.run(ticket_key, run_name, api_base, endpoints)
+    except Exception as e:
+        return [{"id": "TC-API", "title": "API smoke", "status": "blocked",
+                 "note": f"API smoke error: {type(e).__name__}", "evidence": None}]
 
 
 def reconcile_ticket(ticket_key, cfg, *, resolve_pr_refs=None, run_reconcile=None):
@@ -177,6 +244,17 @@ async def run_and_finalize(ticket_key, env_url, *, armed, manual=False, model=No
         _summary["reconcile"] = {"status": recon.get("status"),
                                  "degraded_reason": recon.get("degraded_reason"),
                                  "divergences": recon.get("divergences") or []}
+
+    # Gated API smoke (spec #3): for API-relevant tickets, deterministically fire the
+    # touched read endpoints and append advisory TC-API-* for the report. qa_scoring
+    # excludes them from the headline, so a 5xx surfaces without dragging a UI-PASS down.
+    try:
+        _api_tcs = await run_api_smoke(ticket_key, cfg, run_name)
+    except Exception:
+        _api_tcs = []
+    if _api_tcs:
+        _tcs = append_api_tcs_to_summary(_summary, _api_tcs)
+        yield {"type": "log", "data": f"API smoke: {len(_api_tcs)} TC-API check(s)"}
 
     _canon = qa_scoring.compute_score(_tcs)
     _summary["score"] = {"pass": _canon["pass"], "fail": _canon["fail"],

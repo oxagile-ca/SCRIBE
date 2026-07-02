@@ -158,6 +158,8 @@ def parse_linear_issue(data):
         "summary": n.get("title"),
         "description": n.get("description"),
         "state": (n.get("state") or {}).get("name"),
+        "labels": [lb.get("name") for lb in ((n.get("labels") or {}).get("nodes") or [])
+                   if lb.get("name")],
     }
 
 
@@ -224,7 +226,8 @@ def _fetch_linear_ticket(key):
         return None
     query = (
         '{ issues(first:1, filter:{ number:{ eq:%d }, team:{ key:{ eq:"%s" } } })'
-        '{ nodes{ identifier title state{name} description } } }' % (number, team)
+        '{ nodes{ identifier title state{name} description labels{ nodes{ name } } } } }'
+        % (number, team)
     )
     try:
         with httpx.Client(timeout=20) as c:

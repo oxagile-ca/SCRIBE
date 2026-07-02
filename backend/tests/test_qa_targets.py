@@ -151,12 +151,21 @@ def test_split_ticket_key():
 def test_parse_linear_issue():
     data = {"data": {"issues": {"nodes": [
         {"identifier": "INV-602", "title": "[SD4.12.0] Apply Payment to Booking",
-         "description": "New API to apply a payment...", "state": {"name": "Ready for Testing"}}
+         "description": "New API to apply a payment...", "state": {"name": "Ready for Testing"},
+         "labels": {"nodes": [{"name": "Backend"}, {"name": "P1"}]}}
     ]}}}
     got = qa_targets.parse_linear_issue(data)
     assert got["summary"] == "[SD4.12.0] Apply Payment to Booking"
     assert got["description"].startswith("New API to apply a payment")
     assert got["state"] == "Ready for Testing"
+    assert got["labels"] == ["Backend", "P1"]       # for the API-smoke gate
+
+
+def test_parse_linear_issue_labels_default_empty():
+    data = {"data": {"issues": {"nodes": [
+        {"identifier": "INV-1", "title": "x", "description": "y", "state": {"name": "s"}}
+    ]}}}
+    assert qa_targets.parse_linear_issue(data)["labels"] == []
 
 
 def test_parse_linear_issue_empty_or_error():

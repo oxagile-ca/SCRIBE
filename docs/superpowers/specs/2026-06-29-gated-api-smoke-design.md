@@ -1,6 +1,14 @@
 # Design — Gated deterministic API smoke (run the Postman collection for API tickets)
 
-**Status:** Approved design (2026-06-29). Ready for an implementation plan.
+**Status:** Approved design (2026-06-29). **IMPLEMENTED 2026-07-01** (TDD, 116 tests green,
+live-validated). New `qa_postman.py` (collection→runnable requests, 61 reqs/21 GETs),
+`qa_api_gate.py` (pure classify + endpoints_from_diff), `qa_api_smoke.py` (mint→fire GET
+reads→PII-scrubbed `automated/TC-API-*/api-*.json`, no token leak; 2xx pass/5xx-timeout
+fail/4xx needs-review). Wired in `qa_orchestrator.run_api_smoke` + finalize (append-only;
+`qa_scoring` keeps TC-API advisory). `qa_targets` now returns Linear `labels`. Live: minted a
+Cognito token and hit `/api/v1/user/profile`→200 pass, `/api/v1/so/transactions`→400
+needs-review. GOTCHA: fire against api_base's HOST + the request's full `/api/v1/…` path —
+joining api_base (which includes the `/api/v1` prefix) doubles it.
 **Context:** Today the Postman collection (`~/.scribe/xinventory-api.postman_collection.json`,
 61 requests / 21 GETs) is parsed only at onboarding to *count* endpoints
 (`onboarding._parse_postman_endpoints` → `config.api.postmanCollectionPath`). Nothing

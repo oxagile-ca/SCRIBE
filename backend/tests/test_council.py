@@ -291,9 +291,32 @@ def test_build_reviewer_cmd_omits_model_when_none():
     assert cmd[-1] == "PROMPT TEXT"
 
 
-def test_default_reviewers_sets_model_only_on_qa_evidence():
+def test_default_reviewers_use_configured_models():
+    # Policy (memory qa-no-haiku-testing): qa-evidence -> lower Sonnet, code-reviewer ->
+    # Opus. Neither may be Haiku. (Was previously asserting code-reviewer inherits None.)
     import config
     from council import _default_reviewers
     by_name = {r.name: r for r in _default_reviewers()}
     assert by_name["qa-evidence"].model == config.QA_EVIDENCE_MODEL
-    assert by_name["code-reviewer"].model is None
+    assert by_name["code-reviewer"].model == config.CODE_REVIEWER_MODEL
+    assert "haiku" not in (by_name["qa-evidence"].model or "").lower()
+    assert "haiku" not in (by_name["code-reviewer"].model or "").lower()
+
+
+def test_fetch_diffs_uses_github_when_vcs_is_github(monkeypatch):
+    """On the live GitHub instance the code reviewer must get REAL diffs (not empty
+    Bitbucket) — otherwise it reviews nothing and rubber-stamps."""
+    import asyncio
+    import council, github_client, instance_config
+    monkeypatch.setattr(instance_config, "load_instance_config",
+                        lambda: {"vcs": {"type": "github"}})
+    seen = {}
+
+    def fake_diff(repo, pr_id, owner="Workabee-Technologies"):
+        seen[(repo, pr_id)] = True
+        return f"diff --git a/x b/x\n+for {repo}#{pr_id}"
+    monkeypatch.setattr(github_client, "fetch_pr_diff", fake_diff)
+
+    diffs = asyncio.run(council._fetch_diffs([{"repo": "xinventory-ux", "pr_id": "238"}]))
+    assert "for xinventory-ux#238" in diffs["xinventory-ux/238"]
+    assert ("xinventory-ux", 238) in seen        # pr_id coerced to int for the gh API

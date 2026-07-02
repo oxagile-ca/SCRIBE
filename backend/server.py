@@ -635,7 +635,25 @@ async def _gather_pr_refs(ticket_key: str) -> List[dict]:
 
     Returns a list of {repo, pr_id, title} dicts. Empty on any failure so
     the council can still run (code-reviewer will PASS when there are no PRs).
+
+    On a GitHub instance, resolve PRs from Linear attachments (the reliable
+    ticket→PR link); the Jira dev-info path below is the fallback. Without this the
+    live code reviewer got zero PRs and rubber-stamped.
     """
+    import asyncio as _asyncio
+    from instance_config import load_instance_config
+    cfg = load_instance_config() or {}
+    if ((cfg.get("vcs") or {}).get("type") or "").lower() == "github":
+        try:
+            import qa_reconcile
+            refs = await _asyncio.to_thread(qa_reconcile.fetch_ticket_pr_refs, ticket_key)
+            gh = [{"repo": r["repo"], "pr_id": str(r["id"]), "title": ""}
+                  for r in (refs or []) if r.get("repo") and r.get("id")]
+            if gh:
+                return gh
+        except Exception:
+            pass  # fall through to the Jira/dev-info path
+
     import httpx
     from config import JIRA_BASE_URL
     from jira_client import _headers, _get_dev_info

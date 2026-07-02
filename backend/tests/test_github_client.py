@@ -2,7 +2,7 @@
 (repo/branch/destBranch/prStatus, matching the Bitbucket adapter + _consolidate_prs)."""
 from github_client import (
     normalize_pr, prs_for_ticket_from_list, pr_file_from_api,
-    parse_pr_url, pr_refs_from_urls,
+    parse_pr_url, pr_refs_from_urls, format_unified_diff,
 )
 
 PR_OPEN = {
@@ -72,6 +72,23 @@ def test_parse_pr_url_rejects_non_pr_urls():
     assert parse_pr_url("https://linear.app/workabee/issue/INV-651") is None
     assert parse_pr_url("") is None
     assert parse_pr_url(None) is None
+
+
+def test_format_unified_diff_renders_git_headers_for_code_reviewer():
+    files = [
+        {"path": "src/fees.ts", "status": "modified", "patch": "@@ -1 +1 @@\n-a\n+b"},
+        {"path": "logo.png", "status": "added", "patch": None},   # binary: no patch
+    ]
+    out = format_unified_diff(files)
+    # a diff --git header the reviewer (and _extract_changed_files) recognizes
+    assert "diff --git a/src/fees.ts b/src/fees.ts" in out
+    assert "+b" in out
+    # binary file noted but doesn't crash / emit a bogus patch
+    assert "logo.png" in out
+
+
+def test_format_unified_diff_empty():
+    assert format_unified_diff([]) == ""
 
 
 def test_pr_refs_from_urls_keeps_only_github_prs():

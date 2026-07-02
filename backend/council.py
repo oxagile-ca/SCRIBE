@@ -261,22 +261,45 @@ def configure(streams_registry, pipeline_store_instance):
 
 def _default_reviewers() -> list:
     from council_prompts import build_qa_evidence_prompt, build_code_reviewer_prompt
-    from config import QA_EVIDENCE_MODEL
+    from config import QA_EVIDENCE_MODEL, CODE_REVIEWER_MODEL
     return [
         Reviewer(name="qa-evidence", prompt_builder=build_qa_evidence_prompt,
-                 model=QA_EVIDENCE_MODEL),
-        Reviewer(name="code-reviewer", prompt_builder=build_code_reviewer_prompt),
-        # code-reviewer: model stays None → no --model flag → CLI default
+                 model=QA_EVIDENCE_MODEL),  # low-value → lower Sonnet (never Haiku)
+        Reviewer(name="code-reviewer", prompt_builder=build_code_reviewer_prompt,
+                 model=CODE_REVIEWER_MODEL),  # high-value → Opus (policy)
     ]
 
 
 async def _fetch_diffs(pr_refs: list) -> dict:
-    """Fetch diffs from Bitbucket for each PR. Failures degrade to '(unavailable)'."""
-    from bitbucket_client import get_pr_diff
+    """Fetch each PR's diff for the code reviewer, from the CONFIGURED VCS.
+
+    The live instance is GitHub; using the Bitbucket client there returned empty diffs,
+    so the code reviewer reviewed nothing and rubber-stamped. Pick the client by
+    vcs.type; failures degrade to a visible marker (never a silent empty).
+    """
+    try:
+        from instance_config import load_instance_config
+        vcs_type = ((load_instance_config() or {}).get("vcs") or {}).get("type", "").lower()
+    except Exception:
+        vcs_type = ""
+
     diffs: dict = {}
+    if vcs_type == "github":
+        import github_client
+        for pr in pr_refs:
+            repo, pr_id = pr.get("repo", ""), pr.get("pr_id", "")
+            if not repo or not pr_id:
+                continue
+            try:
+                text = await asyncio.to_thread(github_client.fetch_pr_diff, repo, int(pr_id))
+            except Exception as e:
+                text = f"(diff fetch failed: {e})"
+            diffs[f"{repo}/{pr_id}"] = text or "(diff empty)"
+        return diffs
+
+    from bitbucket_client import get_pr_diff
     for pr in pr_refs:
-        repo = pr.get("repo", "")
-        pr_id = pr.get("pr_id", "")
+        repo, pr_id = pr.get("repo", ""), pr.get("pr_id", "")
         if not repo or not pr_id:
             continue
         try:

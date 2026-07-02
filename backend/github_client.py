@@ -64,6 +64,23 @@ def prs_for_ticket_from_list(prs, ticket_key: str, repo: str) -> list:
             if key in ((pr.get("head") or {}).get("ref") or "").upper()]
 
 
+def format_unified_diff(files) -> str:
+    """PR files (from fetch_pr_files) -> a unified-diff string for the code reviewer.
+
+    Emits a `diff --git a/<path> b/<path>` header per file so both the reviewer and
+    _extract_changed_files recognize it; binary/large files (no patch) are noted."""
+    parts = []
+    for f in files or []:
+        path = f.get("path") or "?"
+        parts.append(f"diff --git a/{path} b/{path}")
+        patch = f.get("patch")
+        if patch:
+            parts.append(patch)
+        else:
+            parts.append(f"(no textual patch — {f.get('status') or 'binary/large'})")
+    return "\n".join(parts)
+
+
 def pr_file_from_api(row: dict) -> dict:
     """One row of GET pulls/{n}/files -> reconcile's {path, status, patch} shape.
 
@@ -165,6 +182,11 @@ def fetch_pr_files(repo: str, pr_id, owner: str = GH_OWNER) -> list:
                 break
             page += 1
     return out
+
+
+def fetch_pr_diff(repo: str, pr_id, owner: str = GH_OWNER) -> str:
+    """A PR's changes as a unified-diff string (for the council code reviewer)."""
+    return format_unified_diff(fetch_pr_files(repo, pr_id, owner))
 
 
 def fetch_blob(repo: str, ref: str, path: str, owner: str = GH_OWNER):

@@ -81,6 +81,44 @@ def list_runs(ticket_key: str) -> set[str]:
     return set()
 
 
+def _resolve_run_outcome(evidence_dir: str, ticket_key: str, baseline: set):
+    """(run_name, ok, error) for the run the agent just produced.
+
+    A run is a SUCCESS only if it actually captured evidence — i.e. wrote summary.json.
+    A run dir with no summary.json means Phase 2 (browser testing) never completed; that
+    is a FAILURE, not a pass (otherwise an all-UNKNOWN scaffold masquerades as done)."""
+    runs_path = os.path.join(evidence_dir, ticket_key, "runs")
+    current = set(os.listdir(runs_path)) if os.path.isdir(runs_path) else set()
+    new_runs = sorted(current - set(baseline or ()))
+    if not new_runs:
+        return None, False, "QA run produced no new evidence run"
+    run_name = new_runs[-1]
+    if os.path.exists(os.path.join(runs_path, run_name, "summary.json")):
+        return run_name, True, None
+    return (run_name, False,
+            "Phase 2 did not complete: no summary.json (no evidence captured) — "
+            "see agent-log.jsonl in the run dir")
+
+
+def _finalize_transcript(partial_path: str, evidence_dir: str, ticket_key: str,
+                         run_name: str | None) -> str | None:
+    """Move the buffered agent stream to its resting place: the run dir when one was
+    produced, else a ticket-level agent-log-failed.jsonl so an aborted run still leaves
+    a trace to diagnose. Returns the destination (None if there was nothing to move)."""
+    if not partial_path or not os.path.exists(partial_path):
+        return None
+    if run_name:
+        dest = os.path.join(evidence_dir, ticket_key, "runs", run_name, "agent-log.jsonl")
+    else:
+        dest = os.path.join(evidence_dir, ticket_key, "agent-log-failed.jsonl")
+    try:
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        os.replace(partial_path, dest)
+    except OSError:
+        return partial_path
+    return dest
+
+
 async def run(ticket_key, env_url, *, model=None, idle_timeout_s=300, total_timeout_s=1800):
     """Spawn the qa-evidence skill and stream events. Terminal event is qa_complete."""
     from instance_config import load_instance_config
@@ -94,6 +132,16 @@ async def run(ticket_key, env_url, *, model=None, idle_timeout_s=300, total_time
     yield {"type": "log", "data": f"Running QA for {ticket_key} server-side…"}
     yield {"type": "progress", "pct": 5, "eta": "starting"}
 
+    # Persist the agent's raw stream so a failed/aborted run is diagnosable (Phase-2
+    # failures were invisible: qa_runner streamed to the browser and kept no transcript).
+    partial_log = os.path.join(EVIDENCE_DIR, ticket_key, "agent-log.partial.jsonl")
+    logf = None
+    try:
+        os.makedirs(os.path.dirname(partial_log), exist_ok=True)
+        logf = open(partial_log, "w", encoding="utf-8")
+    except OSError:
+        logf = None
+
     error = None
     killed = False
     try:
@@ -101,6 +149,8 @@ async def run(ticket_key, env_url, *, model=None, idle_timeout_s=300, total_time
             *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         )
     except Exception as e:
+        if logf:
+            logf.close()
         yield {"type": "qa_complete", "success": False, "run_name": None, "error": f"spawn failed: {e}"}
         return
 
@@ -122,6 +172,8 @@ async def run(ticket_key, env_url, *, model=None, idle_timeout_s=300, total_time
             text = line.decode("utf-8", errors="replace").strip()
             if not text:
                 continue
+            if logf:
+                logf.write(text + "\n")
             try:
                 event = json.loads(text)
             except Exception:
@@ -139,21 +191,28 @@ async def run(ticket_key, env_url, *, model=None, idle_timeout_s=300, total_time
             except ProcessLookupError:
                 pass
         await proc.wait()
+        if logf:
+            logf.close()
+
+    # Resolve the run + relocate the transcript in EVERY terminal path, so even a
+    # timed-out / crashed / no-evidence run leaves a diagnosable agent-log.
+    run_name, ok, outcome_err = _resolve_run_outcome(EVIDENCE_DIR, ticket_key, baseline)
+    log_dest = _finalize_transcript(partial_log, EVIDENCE_DIR, ticket_key, run_name)
+    if log_dest:
+        yield {"type": "log", "data": f"Agent transcript saved: {log_dest}"}
 
     if error:
-        yield {"type": "qa_complete", "success": False, "run_name": None, "error": error}
+        yield {"type": "qa_complete", "success": False, "run_name": run_name, "error": error}
         return
     if proc.returncode != 0:
         stderr = (await proc.stderr.read()).decode("utf-8", errors="replace") if proc.stderr else ""
-        yield {"type": "qa_complete", "success": False, "run_name": None,
+        yield {"type": "qa_complete", "success": False, "run_name": run_name,
                "error": f"claude exited {proc.returncode}: {stderr[-200:]}"}
         return
-
-    new_runs = sorted(list_runs(ticket_key) - baseline)
-    run_name = new_runs[-1] if new_runs else None
-    if not run_name:
-        yield {"type": "qa_complete", "success": False, "run_name": None,
-               "error": "QA run produced no new evidence run"}
+    if not ok:
+        # Agent exited cleanly but captured no evidence (no summary.json) — a FAILURE,
+        # not a pass. Prevents an all-UNKNOWN scaffold from masquerading as a done run.
+        yield {"type": "qa_complete", "success": False, "run_name": run_name, "error": outcome_err}
         return
     yield {"type": "log", "data": f"QA run complete: {run_name}"}
     yield {"type": "qa_complete", "success": True, "run_name": run_name, "error": None}

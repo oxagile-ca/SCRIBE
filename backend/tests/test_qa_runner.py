@@ -93,8 +93,11 @@ def test_run_streams_and_completes(monkeypatch, tmp_path):
     monkeypatch.setattr(qa_runner, "EVIDENCE_DIR", str(tmp_path))
 
     async def fake_exec(*args, **kwargs):
-        # Simulate claude emitting one assistant line, then the skill creating a run dir.
-        (runs / "2026-06-25-new").mkdir()
+        # Simulate claude emitting one assistant line, then the skill creating a run dir
+        # AND writing summary.json (a real, evidence-producing run).
+        new = runs / "2026-06-25-new"
+        new.mkdir()
+        (new / "summary.json").write_text('{"score": 90}', encoding="utf-8")
         return _FakeProc([b'{"type":"assistant","message":{"content":[{"type":"text","text":"working"}]}}\n'])
     monkeypatch.setattr(qa_runner.asyncio, "create_subprocess_exec", fake_exec)
 
@@ -108,3 +111,74 @@ def test_run_streams_and_completes(monkeypatch, tmp_path):
     assert terminal["type"] == "qa_complete"
     assert terminal["success"] is True
     assert terminal["run_name"] == "2026-06-25-new"
+    import os
+    assert os.path.exists(str(runs / "2026-06-25-new" / "agent-log.jsonl"))  # transcript saved
+
+
+def test_run_marks_failure_when_no_summary(monkeypatch, tmp_path):
+    """A run dir created without summary.json (Phase 2 aborted) must report FAILED —
+    not masquerade as a completed run (the INV-683 case)."""
+    import os
+    runs = tmp_path / "INV-9" / "runs"
+    runs.mkdir(parents=True)
+    monkeypatch.setattr(qa_runner, "EVIDENCE_DIR", str(tmp_path))
+
+    async def fake_exec(*args, **kwargs):
+        (runs / "2026-06-25-empty").mkdir()          # scaffold, but no summary.json
+        return _FakeProc([b'{"type":"assistant","message":{"content":[{"type":"text","text":"x"}]}}\n'])
+    monkeypatch.setattr(qa_runner.asyncio, "create_subprocess_exec", fake_exec)
+
+    async def collect():
+        return [ev async for ev in qa_runner.run("INV-9", "https://x", model=None)]
+    events = asyncio.run(collect())
+    terminal = events[-1]
+    assert terminal["type"] == "qa_complete"
+    assert terminal["success"] is False
+    assert "summary.json" in (terminal["error"] or "").lower()
+    assert os.path.exists(str(runs / "2026-06-25-empty" / "agent-log.jsonl"))  # failed run still logged
+
+
+# --- honest run outcome: a run dir without summary.json is a FAILURE, not success ---
+
+def test_resolve_run_outcome_success_needs_summary(tmp_path):
+    import os
+    runs = tmp_path / "INV-1" / "runs" / "r-new"
+    runs.mkdir(parents=True)
+    (runs / "summary.json").write_text("{}", encoding="utf-8")
+    name, ok, err = qa_runner._resolve_run_outcome(str(tmp_path), "INV-1", set())
+    assert name == "r-new" and ok is True and err is None
+
+
+def test_resolve_run_outcome_no_summary_is_failure(tmp_path):
+    runs = tmp_path / "INV-1" / "runs" / "r-new"
+    runs.mkdir(parents=True)  # dir created but Phase 2 never wrote summary.json
+    name, ok, err = qa_runner._resolve_run_outcome(str(tmp_path), "INV-1", set())
+    assert name == "r-new" and ok is False
+    assert "summary.json" in (err or "").lower()
+
+
+def test_resolve_run_outcome_no_new_run(tmp_path):
+    (tmp_path / "INV-1" / "runs").mkdir(parents=True)
+    name, ok, err = qa_runner._resolve_run_outcome(str(tmp_path), "INV-1", set())
+    assert name is None and ok is False and err
+
+
+def test_finalize_transcript_to_run_dir(tmp_path):
+    import os
+    partial = tmp_path / "p.jsonl"
+    partial.write_text("l1\nl2\n", encoding="utf-8")
+    (tmp_path / "INV-1" / "runs" / "r").mkdir(parents=True)
+    dest = qa_runner._finalize_transcript(str(partial), str(tmp_path), "INV-1", "r")
+    assert dest.endswith("agent-log.jsonl") and os.sep + "r" + os.sep in dest
+    assert open(dest, encoding="utf-8").read() == "l1\nl2\n"
+    assert not os.path.exists(str(partial))          # moved, not copied
+
+
+def test_finalize_transcript_no_run_keeps_ticket_level(tmp_path):
+    import os
+    partial = tmp_path / "p.jsonl"
+    partial.write_text("x\n", encoding="utf-8")
+    (tmp_path / "INV-1").mkdir(parents=True)
+    dest = qa_runner._finalize_transcript(str(partial), str(tmp_path), "INV-1", None)
+    assert "agent-log-failed.jsonl" in dest        # a totally-failed run still leaves a log
+    assert open(dest, encoding="utf-8").read() == "x\n"

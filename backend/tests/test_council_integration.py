@@ -115,6 +115,10 @@ def test_override_blocks_then_succeeds():
         state = pipeline_store.get("pipe-B")
         assert state["councilStatus"] == "overridden"
         assert state["councilOverride"]["reason"] == "flake, see slack"
+        # Regression: the in-memory read-through copy that /api/pipeline-states
+        # (the board's hydration source) serves must ALSO reflect the override,
+        # else the lane reverts from green to 'block' on a page refresh.
+        assert pipeline_states["pipe-B"]["councilStatus"] == "overridden"
     finally:
         pipeline_states.pop("pipe-B", None)
 

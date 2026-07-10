@@ -694,6 +694,12 @@ async def api_council_override(pipeline_id: str, req: CouncilOverrideRequest):
         payload = await council.override(pipeline_id, req.reason, user=os.environ.get("USER", "unknown"))
     except ValueError as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
+    # council.override writes straight to pipeline_store, bypassing
+    # _update_pipeline_state — so re-snapshot the in-memory read-through copy here.
+    # Without this, /api/pipeline-states (the board's hydration source) keeps
+    # serving the stale 'block' and the override is lost on a page refresh.
+    pipeline_states.clear()
+    pipeline_states.update(pipeline_store.all_states())
     return {"ok": True, "override": payload}
 
 

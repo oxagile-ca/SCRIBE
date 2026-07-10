@@ -68,6 +68,40 @@ async def test_check_evidence_starts_council_on_pass(tmp_path, monkeypatch):
         server.pipeline_states.pop("pipe-A", None)
 
 
+@pytest.mark.asyncio
+async def test_check_evidence_passes_run_name_to_council(tmp_path, monkeypatch):
+    """Regression: the Check Evidence path must hand the council the ACTUAL run
+    name. It previously read result.get('latestRun') (never top-level on
+    check_new_evidence, which returns 'run'), so run_name was '' and the
+    qa-evidence reviewer was pointed at ~/evidence/<KEY>/runs//summary.json —
+    a nonexistent path — and falsely BLOCKed with 'evidence structure missing'.
+    """
+    _seed_evidence(tmp_path, monkeypatch)  # seeds run dir "2026-06-07_15-32-11"
+
+    import server
+    captured = {}
+
+    async def _fake_gather(_key):
+        return []
+
+    def _fake_start(*, ticket_key, run_name, pipeline_id, pr_refs):
+        captured["run_name"] = run_name
+        return "stream-xyz"
+
+    monkeypatch.setattr(server, "_gather_pr_refs", _fake_gather)
+    monkeypatch.setattr(server.council, "start", _fake_start)
+
+    server.pipeline_states["pipe-runname"] = {"ticketKey": "PROJ-COUNCIL", "stage": "inspector"}
+    try:
+        client = TestClient(server.app)
+        resp = client.post("/api/check-evidence/PROJ-COUNCIL", json={"baseline_runs": []})
+        assert resp.status_code == 200
+        assert resp.json().get("found") is True
+        assert captured.get("run_name") == "2026-06-07_15-32-11"
+    finally:
+        server.pipeline_states.pop("pipe-runname", None)
+
+
 def test_override_blocks_then_succeeds():
     from server import app, pipeline_states, pipeline_store
     pipeline_states["pipe-B"] = {"ticketKey": "PROJ-OVR", "stage": "inspector", "councilStatus": "block", "councilPayload": {"verdict": "BLOCK"}}

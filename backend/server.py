@@ -619,7 +619,7 @@ async def api_check_evidence(key: str, req: CheckEvidenceRequest):
     except Exception:
         pr_refs = []
 
-    run_name = result.get("latestRun") or ""
+    run_name = result.get("run") or ""
     council_stream_id = council.start(
         ticket_key=key,
         run_name=run_name,

@@ -29,27 +29,20 @@ import instance_config as ic
 import qa_auth
 
 
-# The five QA-seed bookings on Totem (see memory beeventory-seed-bookings-via-api).
-SEED_BOOKING_NUMBERS = [
-    "BK_X077IUKO", "BK_9IRRVC4P", "BK_CP8WAXM4", "BK_CRKCYYNI", "BK_J755DICT",
-]
-
-# Ticket types that require an EXISTING booking's invoice/folio/payment surface.
-# These must navigate to a seed booking — never the Create-Reservation room grid.
-BOOKING_DEPENDENT_TYPES = frozenset(
-    {"invoice", "folio", "payment", "deposit", "checkin", "checkout"}
-)
-
-# Keyword → type, most specific first. First matching rule wins. Keywords are kept
-# tight on purpose: a stray broad word (e.g. "label") must not pull an unrelated
-# ticket into a wrong bucket.
-_CLASSIFY_RULES = [
-    ("folio",     ("folio",)),
-    ("invoice",   ("invoice",)),
-    ("deposit",   ("deposit",)),
-    ("payment",   ("payment", "refund")),
-    ("checkout",  ("check out", "check-out", "checkout")),
-    ("checkin",   ("check in", "check-in", "checkin")),
+# ── QA-targeting config (app-agnostic) ──────────────────────────────────────
+# SCRIBE onboards ANY application, so the domain-specific targeting knowledge —
+# which ticket types need an existing seed entity, the seed entity ids, and the
+# ticket-classifier keywords — is NOT hardcoded here. It comes from the
+# per-customer instance config's `qaTargets` block (see instance.config.example.json
+# and onboarding.py). A hotel app configures folio/invoice/checkin + its bookings;
+# an e-commerce app configures cart/order + its seed orders; etc.
+#
+# When a customer's config omits `qaTargets`, we fall back to this GENERIC ruleset
+# covering UI concepts common to any web app (filter, config, nav, dashboard,
+# display), with NO seed entities and NO entity-dependent types — so a brand-new
+# customer's tickets still classify and run e2e; they just won't auto-target a
+# seed entity until they configure one.
+_GENERIC_CLASSIFY_RULES = [
     ("filter",    ("filter",)),
     ("config",    ("config", "setting")),
     ("nav",       ("navigation", "navbar", "nav item", "breadcrumb")),
@@ -59,32 +52,76 @@ _CLASSIFY_RULES = [
 ]
 
 
-def classify_ticket_type(text):
+def _load_qa_targets(instance_cfg=None):
+    """Resolve QA-targeting config from the instance config's `qaTargets` block,
+    with a generic, domain-neutral fallback. App-specific values live per-customer,
+    never in this repo.
+
+    `qaTargets` schema (all optional):
+        {
+          "seedEntities": ["<id>", ...],          # existing records to target
+          "entityDependentTypes": ["<type>", ...],# types needing a seed entity
+          "classifyRules": [                       # first match wins, order matters
+            {"type": "<type>", "keywords": ["<kw>", ...]}, ...
+          ]
+        }
+
+    Returns {"seed_entities": [...], "entity_dependent_types": frozenset,
+             "classify_rules": [(type, (kw, ...)), ...]}.
+    """
+    if instance_cfg is None:
+        instance_cfg = ic.load_instance_config() or {}
+    qt = (instance_cfg or {}).get("qaTargets") or {}
+    rules_cfg = qt.get("classifyRules")
+    if rules_cfg:
+        rules = [(r["type"], tuple(r.get("keywords") or ())) for r in rules_cfg]
+    else:
+        rules = list(_GENERIC_CLASSIFY_RULES)
+    return {
+        "seed_entities": list(qt.get("seedEntities") or []),
+        "entity_dependent_types": frozenset(qt.get("entityDependentTypes") or ()),
+        "classify_rules": rules,
+    }
+
+
+def classify_ticket_type(text, rules=None):
     """Classify a ticket from its OWN summary+description text. 'other' if unknown.
 
     Deliberately ignores any Related/linked-ticket text — the caller passes only
-    this ticket's own scope (see the Phase 0/1 scoping guard)."""
+    this ticket's own scope (see the Phase 0/1 scoping guard).
+
+    `rules` is a list of (type, keywords) tuples; when None it is loaded from the
+    instance config's qaTargets block (generic fallback if unconfigured)."""
     if not text:
         return "other"
+    if rules is None:
+        rules = _load_qa_targets()["classify_rules"]
     low = text.lower()
-    for ttype, keywords in _CLASSIFY_RULES:
+    for ttype, keywords in rules:
         if any(k in low for k in keywords):
             return ttype
     return "other"
 
 
-def classify_ticket(summary, description=None):
+def classify_ticket(summary, description=None, rules=None):
     """Classify preferring the title/summary; fall back to summary+description only if
     the title is inconclusive. A verbose description often name-drops domain words
     (e.g. 'DEPOSIT' as an example value) that would otherwise mis-bucket the ticket."""
-    by_title = classify_ticket_type(summary)
+    if rules is None:
+        rules = _load_qa_targets()["classify_rules"]
+    by_title = classify_ticket_type(summary, rules)
     if by_title != "other":
         return by_title
-    return classify_ticket_type("\n".join(p for p in (summary, description) if p))
+    return classify_ticket_type("\n".join(p for p in (summary, description) if p), rules)
 
 
-def is_booking_dependent(ticket_type):
-    return ticket_type in BOOKING_DEPENDENT_TYPES
+def is_booking_dependent(ticket_type, dependent_types=None):
+    """True when the ticket type needs an existing seed entity (e.g. a hotel app's
+    invoice/folio). `dependent_types` defaults to the instance config's
+    qaTargets.entityDependentTypes (empty by default → nothing is entity-dependent)."""
+    if dependent_types is None:
+        dependent_types = _load_qa_targets()["entity_dependent_types"]
+    return ticket_type in dependent_types
 
 
 def _invoice_total_due(invoice):
@@ -106,13 +143,15 @@ def _invoice_total_due(invoice):
     return None
 
 
-def select_seed_booking(bookings, get_invoice, preferred_numbers=SEED_BOOKING_NUMBERS):
+def select_seed_booking(bookings, get_invoice, preferred_numbers=None):
     """Pick a CONFIRMED booking whose invoice renders (get_invoice(id) non-None).
 
-    Prefers the QA-seed booking numbers. ``get_invoice`` is injected so this core
-    stays pure and offline-testable. Returns
+    Prefers the configured seed entity ids (qaTargets.seedEntities); ``get_invoice``
+    is injected so this core stays pure and offline-testable. Returns
     {booking_id, booking_number, invoice_total_due} or None.
     """
+    if preferred_numbers is None:
+        preferred_numbers = _load_qa_targets()["seed_entities"]
     preferred = set(preferred_numbers or [])
     confirmed = [b for b in bookings if b.get("status") == "CONFIRMED"]
     confirmed.sort(key=lambda b: 0 if b.get("booking_number") in preferred else 1)
@@ -186,18 +225,19 @@ def gather(key, env_url, *, ticket_text, seed_booking, instance_cfg, evidence_ro
     ticket_summary/description carry the ticket scope (backend-fetched headlessly)
     so the skill's Phase 1 can build a real manifest without the Linear OAuth MCP."""
     testauth = (instance_cfg.get("environments") or {}).get("testAuth") or {}
+    qt = _load_qa_targets(instance_cfg)
     # Title-first when we have a structured summary (Linear); else classify the blob.
     if ticket_summary:
-        ticket_type = classify_ticket(ticket_summary, ticket_description)
+        ticket_type = classify_ticket(ticket_summary, ticket_description, rules=qt["classify_rules"])
     else:
-        ticket_type = classify_ticket_type(ticket_text)
+        ticket_type = classify_ticket_type(ticket_text, rules=qt["classify_rules"])
     return {
         "key": key,
         "login_url": testauth.get("loginUrl") or env_url,
         "username": testauth.get("username"),
         "password_secret": _secret_name(testauth.get("password")),
         "ticket_type": ticket_type,
-        "booking_dependent": is_booking_dependent(ticket_type),
+        "booking_dependent": is_booking_dependent(ticket_type, dependent_types=qt["entity_dependent_types"]),
         "ticket_summary": ticket_summary,
         "ticket_description": ticket_description,
         "ticket_state": ticket_state,

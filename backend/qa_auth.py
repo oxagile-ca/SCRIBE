@@ -17,10 +17,15 @@ import httpx
 
 import instance_config as ic
 
-COGNITO_REGION = os.environ.get("COGNITO_REGION", "ca-central-1")
-COGNITO_POOL = os.environ.get("COGNITO_POOL", "ca-central-1_neYwqi0bO")
+# Cognito params for the test-login mint are per-customer, NOT hardcoded to any one
+# app. They come from the instance config's environments.testAuth.cognito block
+# (env vars override for local runs); a neutral region default + empty pool/client
+# when unconfigured, so importing this module never assumes a specific customer.
+_cognito_cfg = ((ic.load_instance_config() or {}).get("environments") or {}).get("testAuth", {}).get("cognito") or {}
+COGNITO_REGION = os.environ.get("COGNITO_REGION") or _cognito_cfg.get("region") or "us-east-1"
+COGNITO_POOL = os.environ.get("COGNITO_POOL") or _cognito_cfg.get("userPoolId") or ""
 # SPA app client id (from the SPA's oidc.user storage key / Postman CLIENT_ID).
-COGNITO_CLIENT_ID = os.environ.get("COGNITO_CLIENT_ID", "3tnsfqpjgti5rbgae396t13u89")
+COGNITO_CLIENT_ID = os.environ.get("COGNITO_CLIENT_ID") or _cognito_cfg.get("clientId") or ""
 COGNITO_ISSUER = f"https://cognito-idp.{COGNITO_REGION}.amazonaws.com/{COGNITO_POOL}"
 _IDP_URL = f"https://cognito-idp.{COGNITO_REGION}.amazonaws.com/"
 _HEADERS = {

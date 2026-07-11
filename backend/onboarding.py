@@ -137,6 +137,11 @@ def build_instance_config(answers: dict) -> tuple[dict, dict]:
         "knowledge": knowledge,
         "api": copy.deepcopy(answers.get("api", {})),
     }
+    # QA-targeting taxonomy (seed entities + classify rules) is app-specific and
+    # optional; include it only when onboarding provides it so a minimal config
+    # stays lean and qa_targets falls back to its generic ruleset otherwise.
+    if answers.get("qaTargets"):
+        config["qaTargets"] = copy.deepcopy(answers["qaTargets"])
     return config, secrets
 
 

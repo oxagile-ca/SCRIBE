@@ -5,8 +5,41 @@ invoice fetch) is exercised only by the live verification, never here.
 """
 import json
 
+import pytest
+
 import config
 import qa_targets
+
+
+# A sample HOTEL customer's qaTargets — the Beeventory-style taxonomy. It lives
+# here (test data), NOT in qa_targets, proving the engine is fed domain rules from
+# config. A brand-new customer supplies their own; see test_adapts_to_a_different_app_domain.
+_HOTEL_QA_TARGETS = {
+    "seedEntities": ["BK_X077IUKO", "BK_9IRRVC4P", "BK_CP8WAXM4", "BK_CRKCYYNI", "BK_J755DICT"],
+    "entityDependentTypes": ["invoice", "folio", "payment", "deposit", "checkin", "checkout"],
+    "classifyRules": [
+        {"type": "folio", "keywords": ["folio"]},
+        {"type": "invoice", "keywords": ["invoice"]},
+        {"type": "deposit", "keywords": ["deposit"]},
+        {"type": "payment", "keywords": ["payment", "refund"]},
+        {"type": "checkout", "keywords": ["check out", "check-out", "checkout"]},
+        {"type": "checkin", "keywords": ["check in", "check-in", "checkin"]},
+        {"type": "filter", "keywords": ["filter"]},
+        {"type": "config", "keywords": ["config", "setting"]},
+        {"type": "nav", "keywords": ["navigation", "navbar", "nav item", "breadcrumb"]},
+        {"type": "dashboard", "keywords": ["dashboard"]},
+        {"type": "display", "keywords": ["display", "render", "email", "website", "card",
+                                          "tooltip", "badge", "icon", "logo"]},
+    ],
+}
+
+
+@pytest.fixture(autouse=True)
+def _hotel_instance_config(monkeypatch):
+    """Feed qa_targets a hotel customer's qaTargets via the instance config, so the
+    classification/dependence tests below exercise the real config-driven path
+    instead of relying on rules baked into the module."""
+    monkeypatch.setattr(qa_targets.ic, "load_instance_config", lambda *a, **k: {"qaTargets": _HOTEL_QA_TARGETS})
 
 
 # --- ticket-type classification -------------------------------------------
@@ -132,10 +165,51 @@ def test_invoice_total_due_nested_response():
     assert qa_targets._invoice_total_due(resp) == 13685
 
 
-def test_seed_booking_numbers_present():
-    # The five QA-seed bookings from the plan must be the preferred defaults.
-    for n in ("BK_X077IUKO", "BK_9IRRVC4P", "BK_CP8WAXM4", "BK_CRKCYYNI", "BK_J755DICT"):
-        assert n in qa_targets.SEED_BOOKING_NUMBERS
+def test_seed_entities_come_from_config_not_code():
+    # Seed entities are per-customer config, never hardcoded in qa_targets.
+    qt = qa_targets._load_qa_targets({"qaTargets": {"seedEntities": ["E1", "E2"]}})
+    assert qt["seed_entities"] == ["E1", "E2"]
+    # Unconfigured → empty (no app-specific seeds baked into the tool).
+    assert qa_targets._load_qa_targets({})["seed_entities"] == []
+    assert not hasattr(qa_targets, "SEED_BOOKING_NUMBERS")
+
+
+# --- app-agnostic: generic fallback + a different customer domain -----------
+
+def test_generic_fallback_classifies_universal_types_only():
+    """With no qaTargets configured, generic rules classify universal UI concepts,
+    but app-specific words (a hotel's 'folio'/'invoice') are NOT baked in → 'other'."""
+    g = qa_targets._load_qa_targets({})["classify_rules"]
+    assert qa_targets.classify_ticket_type("Filter popover auto-apply", rules=g) == "filter"
+    assert qa_targets.classify_ticket_type("Dashboard widget layout", rules=g) == "dashboard"
+    assert qa_targets.classify_ticket_type("Nav item ordering", rules=g) == "nav"
+    # App-specific hotel words are not baked in → generic ruleset returns 'other'
+    # (text chosen to avoid generic keywords like 'render' which maps to display).
+    assert qa_targets.classify_ticket_type("Folio line items totals", rules=g) == "other"
+    assert qa_targets.classify_ticket_type("Invoice balance due", rules=g) == "other"
+    # Nothing is entity-dependent by default.
+    assert qa_targets._load_qa_targets({})["entity_dependent_types"] == frozenset()
+
+
+def test_adapts_to_a_different_app_domain():
+    """A non-hotel customer (e-commerce) supplies its own taxonomy + seed entities;
+    the SAME engine classifies and entity-targets its domain with zero code change."""
+    cfg = {"qaTargets": {
+        "seedEntities": ["ORD-1001"],
+        "entityDependentTypes": ["order", "refund"],
+        "classifyRules": [
+            {"type": "cart", "keywords": ["cart", "basket"]},
+            {"type": "order", "keywords": ["order", "checkout"]},
+            {"type": "refund", "keywords": ["refund", "return"]},
+        ],
+    }}
+    qt = qa_targets._load_qa_targets(cfg)
+    assert qa_targets.classify_ticket_type("Cart badge shows wrong count", rules=qt["classify_rules"]) == "cart"
+    assert qa_targets.classify_ticket_type("Order confirmation page", rules=qt["classify_rules"]) == "order"
+    assert qa_targets.classify_ticket_type("Refund flow rounding", rules=qt["classify_rules"]) == "refund"
+    assert qa_targets.is_booking_dependent("order", dependent_types=qt["entity_dependent_types"]) is True
+    assert qa_targets.is_booking_dependent("cart", dependent_types=qt["entity_dependent_types"]) is False
+    assert qt["seed_entities"] == ["ORD-1001"]
 
 
 # --- Linear ticket fetch (backend token, no OAuth MCP) ---------------------
@@ -207,6 +281,7 @@ _INSTANCE_CFG = {
         "password": "${secret:TEST_LOGIN_PASSWORD}",
     }},
     "api": {"baseUrl": "https://xin-api-np.wbee.ca", "prefix": "/api/v1"},
+    "qaTargets": _HOTEL_QA_TARGETS,
 }
 
 

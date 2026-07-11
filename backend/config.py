@@ -14,7 +14,9 @@ QA_ASSIGNEE_FIELD = "customfield_10000"
 EVIDENCE_DIR = os.path.expanduser("~/evidence")
 STREAMS_DIR = os.path.expanduser("~/qa-dashboard/streams")
 STREAMS_RETENTION_DAYS = 7
-PIPELINE_DB = os.path.expanduser("~/qa-dashboard/pipeline-state.db")
+# Env-overridable so tests can point at a throwaway DB instead of the real board
+# DB (SCRIBE_PIPELINE_DB is set in tests/conftest.py).
+PIPELINE_DB = os.environ.get("SCRIBE_PIPELINE_DB") or os.path.expanduser("~/qa-dashboard/pipeline-state.db")
 PIPELINE_RETENTION_DAYS = 30
 POLL_INTERVAL = 60
 def _envs_from_env_var() -> list[str]:

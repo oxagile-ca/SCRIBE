@@ -62,6 +62,23 @@ yarn.lock
 # QA test-auth env file — holds Cognito test-login creds. NEVER commit.
 .env.qa
 
-# Loose screenshots dropped at the backend root by ad-hoc QA runs (committed
-# evidence lives under backend/evidence/<TICKET>/, not here).
+# QA evidence is per-run, customer-specific data — NEVER commit it. The live
+# dashboard reads it from ~/evidence/ (config.EVIDENCE_DIR); backend/evidence/
+# is only a local scratch copy.
+backend/evidence/
+backend/.qa-screenshots/
+backend/automated/
+
+# Ad-hoc QA output dumps dropped at the backend root by manual runs. Not code.
 backend/*.png
+backend/tc-*.json
+backend/tc0*.json
+backend/TC-*.json
+backend/api-*.json
+backend/network-*.json
+backend/console-*.json
+backend/summary.json
+backend/*_REPORT.md
+backend/QA_EVIDENCE_*.md
+backend/FINAL_QA_SUMMARY.md
+backend/HANDOFF_*.md

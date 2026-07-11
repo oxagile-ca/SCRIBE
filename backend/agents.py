@@ -670,6 +670,7 @@ def check_new_evidence(ticket_key, baseline_runs=None):
         not os.path.exists(index_path)
         or summary_newer
         or _report_missing_screenshots(latest_path)
+        or _report_status_stale(latest_path)
     )
     if _run_has_content(latest_path) and needs_regen:
         generate_html_report(ticket_key, latest_run)
@@ -1249,6 +1250,44 @@ def _report_missing_screenshots(run_dir):
         if any(f.lower().endswith((".png", ".jpg", ".jpeg")) for f in files):
             return True
     return False
+
+
+def _report_status_stale(run_dir):
+    """True when index.html still shows UNKNOWN TC badges while summary.json already
+    carries real verdicts (pass/fail/blocked/...).
+
+    The qa-evidence agent writes summary.json AND its own index.html, sometimes
+    emitting the report before its per-TC verdicts are final — leaving an all-UNKNOWN
+    report. Because the agent writes that report LAST, `summary_newer` is False, and
+    because the report can still be large/image-rich, `_report_missing_screenshots` is
+    False too — so the stale report would never be replaced. This catches that case so
+    the authoritative summary.json render (which has the real statuses) wins.
+    """
+    index_path = os.path.join(run_dir, "index.html")
+    summary_path = os.path.join(run_dir, "summary.json")
+    if not (os.path.exists(index_path) and os.path.exists(summary_path)):
+        return False
+    import json as _json
+    try:
+        with open(summary_path, encoding="utf-8") as f:
+            summary = _json.load(f)
+    except Exception:
+        return False
+    tcs = summary.get("test_results") or summary.get("test_cases") or []
+    real = {str((tc.get("status") or "")).lower() for tc in tcs}
+    has_real_verdicts = bool(real & {
+        "pass", "fail", "blocked", "incomplete", "skipped", "not-executed",
+    })
+    if not has_real_verdicts:
+        return False  # summary has nothing better to render — leave the report alone
+    try:
+        with open(index_path, encoding="utf-8", errors="replace") as f:
+            html = f.read()
+    except Exception:
+        return False
+    # The TC status badge renders the upper-cased status as ">STATUS<". An UNKNOWN
+    # badge present while summary has real verdicts means the report is stale.
+    return ">UNKNOWN<" in html
 
 
 def _report_url_for(ticket_key, run_name, run_dir=None):
@@ -1910,6 +1949,54 @@ def generate_html_report(ticket_key, run_name=None):
   </table>
 </div>'''
 
+        # ---- API / JSON evidence (api-*.json, console-errors.json, network-requests.json, …) ----
+        # These artifacts are captured on disk and listed in tc evidence, but were never
+        # surfaced in the report — so the API-flow proof was invisible. steps-log.json and
+        # field-assertions.json are already rendered as rich tables above, so skip them.
+        _json_already_rendered = {"steps-log.json", "field-assertions.json"}
+        _json_candidates = {}  # basename -> full path
+        for _ep in evidence_paths:
+            if str(_ep).lower().endswith(".json"):
+                _bn = os.path.basename(_ep)
+                _full = os.path.join(run_dir, _ep)
+                if _bn not in _json_already_rendered and os.path.exists(_full):
+                    _json_candidates[_bn] = _full
+        if os.path.isdir(tc_path):
+            for _fn in sorted(os.listdir(tc_path)):
+                if _fn.lower().endswith(".json") and _fn not in _json_already_rendered:
+                    _full = os.path.join(tc_path, _fn)
+                    if os.path.isfile(_full):
+                        _json_candidates.setdefault(_fn, _full)
+        json_evidence_html = ""
+        if _json_candidates:
+            _blocks = ""
+            for _fn in sorted(_json_candidates):
+                try:
+                    with open(_json_candidates[_fn], encoding="utf-8", errors="replace") as _jf:
+                        _raw = _jf.read()
+                    try:
+                        _pretty = _json.dumps(_json.loads(_raw), indent=2)
+                    except Exception:
+                        _pretty = _raw
+                    _trunc = len(_pretty) > 6000
+                    _body = _esc(_pretty[:6000]) + ("\n… (truncated)" if _trunc else "")
+                except Exception:
+                    _body = "(could not read artifact)"
+                _blocks += (
+                    f'<details style="margin-bottom:8px">'
+                    f'<summary style="color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;'
+                    f'letter-spacing:0.05em;cursor:pointer;user-select:none">{_esc(_fn)}</summary>'
+                    f'<pre style="background:#0f172a;padding:10px;border-radius:6px;font-size:10px;'
+                    f'white-space:pre-wrap;max-height:340px;overflow-y:auto;color:#94a3b8;margin-top:8px">{_body}</pre>'
+                    f'</details>'
+                )
+            json_evidence_html = (
+                '<div style="margin-bottom:14px">'
+                '<div style="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;'
+                'letter-spacing:0.05em;margin-bottom:8px">API / JSON Evidence</div>'
+                f'{_blocks}</div>'
+            )
+
         # ---- Assertion hints checklist (fallback when no steps-log) ----
         hints_html = ""
         m_tc = manifest_tc_map.get(tc_id, {})
@@ -2032,6 +2119,7 @@ def generate_html_report(ticket_key, run_name=None):
   {steps_log_table_html}
   {field_assert_html}
   {console_log_html}
+  {json_evidence_html}
   {notes_html}
   {skip_html}
   {shots_html}

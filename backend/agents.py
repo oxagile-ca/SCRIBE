@@ -1490,6 +1490,14 @@ def generate_html_report(ticket_key, run_name=None):
             break
 
     ticket_summary = summary.get("ticket_summary", "") or summary.get("summary", "")
+    # Tracker deep-link from the onboarded issueTracker config — app-agnostic, not
+    # hardcoded to any one tracker/host. Linear: <baseUrl>/issue/<KEY>; Jira: /browse/.
+    from instance_config import load_instance_config
+    _rissue = (load_instance_config() or {}).get("issueTracker") or {}
+    _rbase = (_rissue.get("baseUrl") or "").rstrip("/")
+    ticket_url = ("" if not _rbase else
+                  f"{_rbase}/issue/{ticket_key}" if _rissue.get("type") == "linear"
+                  else f"{_rbase}/browse/{ticket_key}")
     verdict_raw = summary.get("verdict", "") or summary.get("verdict_reason", "")
     # verdict may be a long sentence — extract the first word for the badge
     verdict_word = verdict_raw.split()[0] if verdict_raw else ""
@@ -2369,7 +2377,7 @@ def generate_html_report(ticket_key, run_name=None):
 
 <!-- Sticky nav -->
 <div class="sticky-nav">
-  <a href="https://acme.atlassian.net/browse/{_esc(ticket_key)}" target="_blank"
+  <a href="{_esc(ticket_url)}" target="_blank"
      style="font-weight:800;font-size:15px;color:#818cf8">{_esc(ticket_key)}</a>
   {f'<span style="color:#cbd5e1;font-size:13px">{_esc(ticket_summary)}</span>' if ticket_summary else ""}
   <span style="flex:1"></span>

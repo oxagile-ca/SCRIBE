@@ -38,6 +38,7 @@ export type ScoreTally = {
 
 export interface EvidenceHistoryItem {
   key: string
+  url?: string
   status: string
   // Backend normalises to number | null, but tolerate a tally dict in case an
   // old summary.json slips through.

@@ -356,6 +356,19 @@ async def api_release_env(req: ReleaseEnvRequest):
     return {"ok": True}
 
 
+def _ticket_url(issue: dict, itype: str, key: str) -> str:
+    """Build a ticket's tracker URL from the onboarded issueTracker config — app-
+    agnostic, never hardcoded to any one tracker/host. Linear issues live at
+    <baseUrl>/issue/<KEY>; Jira at <baseUrl>/browse/<KEY>. Returns "" when no
+    baseUrl is configured so the frontend can render the key without a bogus link."""
+    base = (issue.get("baseUrl") or "").rstrip("/")
+    if not base:
+        return ""
+    if itype == "linear":
+        return f"{base}/issue/{key}"
+    return f"{base}/browse/{key}"
+
+
 @app.get("/api/tickets")
 async def api_tickets(project: str = Query(default=DEFAULT_PROJECT)):
     """Fetch tickets from the configured issue tracker. Dispatches by the onboarded
@@ -377,6 +390,7 @@ async def api_tickets(project: str = Query(default=DEFAULT_PROJECT)):
     for t in tickets:
         t["statusCategory"] = categorize_status(t.get("status", ""), mapping)
         t["evidence"] = check_evidence(t["key"])
+        t["url"] = _ticket_url(issue, itype, t["key"])
         label, dscore = ticket_difficulty.compute_difficulty(t.get("description", ""))
         t["difficulty"] = label
         t["difficultyScore"] = dscore
@@ -449,6 +463,9 @@ async def api_evidence_history():
     """
     if not os.path.isdir(EVIDENCE_DIR):
         return []
+    _cfg = load_instance_config() or {}
+    _issue = _cfg.get("issueTracker") or {}
+    _itype = _issue.get("type")
     results = []
     for entry in sorted(os.listdir(EVIDENCE_DIR)):
         ticket_dir = os.path.join(EVIDENCE_DIR, entry)
@@ -469,6 +486,7 @@ async def api_evidence_history():
                         latest_mtime = mt
         results.append({
             "key": entry,
+            "url": _ticket_url(_issue, _itype, entry),
             "status": ev["status"],
             "score": ev["score"],
             "time": ev["time"],

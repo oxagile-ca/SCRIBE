@@ -11,6 +11,10 @@ export interface AgentStatus {
 
 export interface Ticket {
   key: string
+  // Tracker deep-link for this ticket, built server-side from the onboarded
+  // issueTracker config (Linear /issue/<KEY>, Jira /browse/<KEY>). "" when no
+  // baseUrl is configured.
+  url?: string
   summary: string
   status: string
   statusCategory?: 'ready_for_qa' | 'in_qa' | 'other'

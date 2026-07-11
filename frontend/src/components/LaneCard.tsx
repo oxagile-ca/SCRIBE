@@ -93,7 +93,7 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
         <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
           <a
             className="lane-card__key"
-            href={`https://acme.atlassian.net/browse/${ticket.key}`}
+            href={ticket.url || undefined}
             target="_blank"
             rel="noopener noreferrer"
           >

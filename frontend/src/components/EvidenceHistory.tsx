@@ -107,7 +107,7 @@ export default function EvidenceHistory({ items, onGenerateReport }: Props) {
                 }}
               >
                 <a
-                  href={`https://acme.atlassian.net/browse/${item.key}`}
+                  href={item.url || undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: 'var(--accent)', fontWeight: 700, minWidth: 100, textDecoration: 'none' }}

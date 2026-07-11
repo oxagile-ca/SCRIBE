@@ -697,6 +697,9 @@ def check_new_evidence(ticket_key, baseline_runs=None):
             _score = _raw_conf
         return {
             "found": True,
+            # summary.json present → the run finished and scored itself. Only a
+            # complete run should fire the adversarial council (see api_check_evidence).
+            "complete": True,
             "run": latest_run,
             "score": _score,
             "time": summary.get("time", "") or summary.get("date", ""),
@@ -704,10 +707,16 @@ def check_new_evidence(ticket_key, baseline_runs=None):
             "evidence": check_evidence(ticket_key),
         }
 
-    # No summary.json — check if run has actual content (screenshots, logs, etc.)
+    # No summary.json — the run has some artifacts (a shell index.html, a partial
+    # log) but never scored itself: it stalled or was killed before collecting
+    # evidence. Surface it (found:True) so the lane card gets a clickable target,
+    # but mark it INCOMPLETE so the council does NOT fire on empty evidence (which
+    # otherwise produces a spurious "summary.json absent" BLOCK every time a run
+    # doesn't finish).
     if _run_has_content(latest_path):
         return {
             "found": True,
+            "complete": False,
             "run": latest_run,
             "score": None,
             "time": "",

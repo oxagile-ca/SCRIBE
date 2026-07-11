@@ -599,6 +599,13 @@ async def api_check_evidence(key: str, req: CheckEvidenceRequest):
     if not result.get("found"):
         return result
 
+    # Only fire the council on a COMPLETE run (summary.json present). A partial run
+    # — one that stalled or was killed before scoring itself — is surfaced in the
+    # lane card but must NOT spawn reviewers, or the qa-evidence reviewer reads an
+    # empty run and BLOCKs with "summary.json absent" every time a run doesn't finish.
+    if not result.get("complete"):
+        return result
+
     # Find the pipeline for this ticket (latest running/most recently updated)
     pipeline_id = None
     best_updated = -1.0
@@ -1095,7 +1102,9 @@ async def api_resume_pipeline(pipeline_id: str):
         ticket_key = state.get("ticketKey", "")
         ev = check_new_evidence(ticket_key, state.get("baselineRuns") or []) or {}
         run_name = ev.get("run", "") if isinstance(ev, dict) else ""
-        if run_name:
+        # Only resume the council on a COMPLETE run (summary.json present); a partial
+        # run must not spawn reviewers (see api_check_evidence for the rationale).
+        if run_name and ev.get("complete"):
             try:
                 pr_refs = await _gather_pr_refs(ticket_key)
             except Exception:

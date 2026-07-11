@@ -30,6 +30,8 @@
   "issueTracker": {
     "type": "linear",
     "baseUrl": "https://linear.app/acme/",
+    "_comment_ticketUrlTemplate": "Exact ticket deep-link, {key} = ticket id. Use this to control the URL directly; if omitted, it's built from baseUrl by convention (Linear /issue/<KEY>, Jira /browse/<KEY>).",
+    "ticketUrlTemplate": "https://linear.app/acme/issue/{key}",
     "projects": ["SHOP"],
     "email": "qa@acme.example.com",
     "token": "${secret:LINEAR_TOKEN}",

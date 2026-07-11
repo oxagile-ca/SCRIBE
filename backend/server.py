@@ -357,10 +357,17 @@ async def api_release_env(req: ReleaseEnvRequest):
 
 
 def _ticket_url(issue: dict, itype: str, key: str) -> str:
-    """Build a ticket's tracker URL from the onboarded issueTracker config — app-
-    agnostic, never hardcoded to any one tracker/host. Linear issues live at
-    <baseUrl>/issue/<KEY>; Jira at <baseUrl>/browse/<KEY>. Returns "" when no
-    baseUrl is configured so the frontend can render the key without a bogus link."""
+    """Resolve a ticket's tracker URL from the onboarded issueTracker config — app-
+    agnostic, never hardcoded to any one tracker/host.
+
+    Prefers the user-provided `ticketUrlTemplate` (a full URL with a `{key}`
+    placeholder) so the link is EXACTLY what the user configured. When no template
+    is set, fall back to building it from `baseUrl` by tracker convention
+    (Linear <baseUrl>/issue/<KEY>, Jira <baseUrl>/browse/<KEY>). Returns "" when
+    nothing is configured so the frontend renders the key without a bogus link."""
+    tmpl = (issue.get("ticketUrlTemplate") or "").strip()
+    if tmpl:
+        return tmpl.replace("{key}", key) if "{key}" in tmpl else f"{tmpl.rstrip('/')}/{key}"
     base = (issue.get("baseUrl") or "").rstrip("/")
     if not base:
         return ""

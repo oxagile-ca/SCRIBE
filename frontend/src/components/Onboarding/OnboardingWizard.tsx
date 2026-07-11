@@ -200,6 +200,9 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
             <Field label="Base URL / workspace">
               <input value={it.baseUrl} onChange={(e) => set('issueTracker', { baseUrl: e.target.value })} placeholder="https://acme.atlassian.net" />
             </Field>
+            <Field label="Ticket URL ({key} = ticket id)">
+              <input value={it.ticketUrlTemplate || ''} onChange={(e) => set('issueTracker', { ticketUrlTemplate: e.target.value })} placeholder="https://linear.app/acme/issue/{key}" />
+            </Field>
             <Field label="Project keys (one per line)">
               <ListTextarea rows={2} value={it.projects} onChange={(projects) => set('issueTracker', { projects })} />
             </Field>

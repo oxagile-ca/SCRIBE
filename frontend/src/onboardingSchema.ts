@@ -32,6 +32,7 @@ export interface OnboardingAnswers {
   issueTracker: {
     type: IssueType
     baseUrl: string
+    ticketUrlTemplate?: string
     projects: string[]
     email: string
     token: string
@@ -86,6 +87,7 @@ export function emptyAnswers(): OnboardingAnswers {
     issueTracker: {
       type: 'jira',
       baseUrl: '',
+      ticketUrlTemplate: '',
       projects: [],
       email: '',
       token: '',

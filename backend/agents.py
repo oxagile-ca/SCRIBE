@@ -1490,14 +1490,19 @@ def generate_html_report(ticket_key, run_name=None):
             break
 
     ticket_summary = summary.get("ticket_summary", "") or summary.get("summary", "")
-    # Tracker deep-link from the onboarded issueTracker config — app-agnostic, not
-    # hardcoded to any one tracker/host. Linear: <baseUrl>/issue/<KEY>; Jira: /browse/.
+    # Tracker deep-link from the onboarded issueTracker config — app-agnostic.
+    # Prefer the user-provided ticketUrlTemplate ({key} placeholder); else build
+    # from baseUrl by convention (Linear /issue/<KEY>, Jira /browse/<KEY>).
     from instance_config import load_instance_config
     _rissue = (load_instance_config() or {}).get("issueTracker") or {}
-    _rbase = (_rissue.get("baseUrl") or "").rstrip("/")
-    ticket_url = ("" if not _rbase else
-                  f"{_rbase}/issue/{ticket_key}" if _rissue.get("type") == "linear"
-                  else f"{_rbase}/browse/{ticket_key}")
+    _rtmpl = (_rissue.get("ticketUrlTemplate") or "").strip()
+    if _rtmpl:
+        ticket_url = _rtmpl.replace("{key}", ticket_key) if "{key}" in _rtmpl else f"{_rtmpl.rstrip('/')}/{ticket_key}"
+    else:
+        _rbase = (_rissue.get("baseUrl") or "").rstrip("/")
+        ticket_url = ("" if not _rbase else
+                      f"{_rbase}/issue/{ticket_key}" if _rissue.get("type") == "linear"
+                      else f"{_rbase}/browse/{ticket_key}")
     verdict_raw = summary.get("verdict", "") or summary.get("verdict_reason", "")
     # verdict may be a long sentence — extract the first word for the badge
     verdict_word = verdict_raw.split()[0] if verdict_raw else ""

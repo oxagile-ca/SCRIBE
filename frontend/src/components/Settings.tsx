@@ -77,6 +77,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
         <section>
           <h4>Issue tracker</h4>
           <Field label="Base URL"><input value={it.baseUrl} onChange={(e) => set('issueTracker', { baseUrl: e.target.value })} /></Field>
+          <Field label="Ticket URL ({key} = ticket id)"><input value={it.ticketUrlTemplate || ''} placeholder="https://linear.app/acme/issue/{key}" onChange={(e) => set('issueTracker', { ticketUrlTemplate: e.target.value })} /></Field>
           <Field label="Project keys (one per line)"><ListTextarea rows={2} value={it.projects} onChange={(projects) => set('issueTracker', { projects })} /></Field>
           <Field label="Account email"><input value={it.email} onChange={(e) => set('issueTracker', { email: e.target.value })} /></Field>
           <Field label="API token"><SecretInput isSet={!!secretsSet['issueTracker.token']} value={it.token} onChange={(token) => set('issueTracker', { token })} /></Field>

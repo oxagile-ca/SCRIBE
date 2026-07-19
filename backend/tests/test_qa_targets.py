@@ -347,3 +347,24 @@ def test_secret_name_extraction():
     assert qa_targets._secret_name("${secret:TEST_LOGIN_PASSWORD}") == "TEST_LOGIN_PASSWORD"
     assert qa_targets._secret_name("plain-literal") is None
     assert qa_targets._secret_name(None) is None
+
+
+def test_merge_added_test_cases_appends_to_scope():
+    text, desc = qa_targets.merge_added_test_cases(
+        "Ticket body", "Ticket description", ["Refund at $500 boundary", "Unicode city"])
+    assert "## Added Test Cases (SCRIBE)" in text
+    assert "- [ ] Refund at $500 boundary" in text
+    assert "- [ ] Unicode city" in desc
+    # the original content is preserved, block appended
+    assert text.startswith("Ticket body")
+    assert desc.startswith("Ticket description")
+
+
+def test_merge_added_test_cases_noop_when_none():
+    assert qa_targets.merge_added_test_cases("t", "d", []) == ("t", "d")
+    assert qa_targets.merge_added_test_cases(None, None, []) == (None, None)
+
+
+def test_merge_added_test_cases_tolerates_missing_scope():
+    text, desc = qa_targets.merge_added_test_cases(None, None, ["only case"])
+    assert "- [ ] only case" in text and "- [ ] only case" in desc

@@ -88,6 +88,60 @@ export async function submitOnboarding(answers: unknown): Promise<OnboardingResu
   return res.json().catch(() => ({ ok: false, error: `status ${res.status}` }))
 }
 
+export interface TestCase { id: string; text: string; ts: string }
+
+/** User-added, SCRIBE-local test cases for a ticket (never written to the tracker). */
+export async function fetchTestCases(key: string): Promise<TestCase[]> {
+  try {
+    const res = await fetch(`${BASE}/test-cases/${encodeURIComponent(key)}`)
+    const data = await res.json().catch(() => null)
+    return data && Array.isArray(data.cases) ? data.cases : []
+  } catch { return [] }
+}
+
+export async function addTestCase(key: string, text: string): Promise<TestCase | null> {
+  try {
+    const res = await fetch(`${BASE}/test-cases/${encodeURIComponent(key)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+    const data = await res.json().catch(() => null)
+    return data && data.ok && data.case ? data.case : null
+  } catch { return null }
+}
+
+export async function deleteTestCase(key: string, id: string): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `${BASE}/test-cases/${encodeURIComponent(key)}/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+    )
+    const data = await res.json().catch(() => null)
+    return !!(data && data.ok)
+  } catch { return false }
+}
+
+export type VerifyTarget = 'issueTracker' | 'vcs' | 'environment' | 'anthropic'
+export interface VerifyResult { ok: boolean; detail: string; hint: string }
+
+/** Live-check one integration the wizard just configured. Never throws — a network or
+ *  server failure comes back as { ok:false } with a hint, so callers just render it. */
+export async function verifyConnection(target: VerifyTarget, answers: unknown): Promise<VerifyResult> {
+  try {
+    const res = await fetch(`${BASE}/onboarding/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target, answers }),
+    })
+    const data = await res.json().catch(() => null)
+    if (data && typeof data.ok === 'boolean') return data
+    return { ok: false, detail: '', hint: `Verify failed (status ${res.status}).` }
+  } catch (e) {
+    return { ok: false, detail: '', hint: `Could not reach the server: ${String(e)}` }
+  }
+}
+
 export async function startBuild(repo: string, branch: string): Promise<string> {
   const res = await fetch(`${BASE}/build`, {
     method: 'POST',

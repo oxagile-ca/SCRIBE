@@ -113,3 +113,36 @@ def test_record_is_error_roundtrips(tmp_path):
     with open(p, encoding="utf-8") as f:
         rec = json.loads(f.read().splitlines()[0])
     assert rec["is_error"] is True
+
+
+def test_reset_archives_and_starts_fresh(tmp_path):
+    ledger = str(tmp_path / "usage-ledger.jsonl")
+    ul.record(task="qa", ticket="A-1", pipeline_id="p1", model="m",
+              usage={"cost_usd": 1.5, "input_tokens": 10, "output_tokens": 5}, path=ledger)
+    ul.record(task="qa", ticket="A-2", pipeline_id="p2", model="m",
+              usage={"cost_usd": 2.0}, path=ledger)
+    assert ul.summary(ledger)["allTime"]["cost_usd"] == 3.5  # sanity: spend is counted
+
+    res = ul.reset(ledger)
+    assert res["records"] == 2
+    assert res["archived"] and os.path.exists(res["archived"])
+    # active ledger is gone → a fresh product reads $0.00
+    assert not os.path.exists(ledger)
+    assert ul.summary(ledger)["allTime"]["cost_usd"] == 0.0
+    # history is preserved in the archive, never deleted
+    with open(res["archived"], encoding="utf-8") as f:
+        assert sum(1 for line in f if line.strip()) == 2
+
+
+def test_reset_is_noop_when_no_ledger(tmp_path):
+    assert ul.reset(str(tmp_path / "nope.jsonl")) == {"archived": None, "records": 0}
+
+
+def test_record_after_reset_starts_a_new_ledger(tmp_path):
+    ledger = str(tmp_path / "usage-ledger.jsonl")
+    ul.record(task="qa", ticket="A-1", pipeline_id="p", model="m",
+              usage={"cost_usd": 5.0}, path=ledger)
+    ul.reset(ledger)
+    ul.record(task="qa", ticket="B-1", pipeline_id="p", model="m",
+              usage={"cost_usd": 0.25}, path=ledger)
+    assert ul.summary(ledger)["allTime"]["cost_usd"] == 0.25  # only the post-reset record

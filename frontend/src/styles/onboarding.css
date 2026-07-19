@@ -93,3 +93,22 @@
 .ob-done { padding: 28px 24px; text-align: center; }
 .ob-done h2 { margin-top: 0; }
 .ob-done .ob-primary { margin-top: 16px; padding: 10px 20px; border-radius: 8px; }
+
+/* Connection checks (onboarding verify) */
+.ob-check { display: flex; align-items: center; gap: 10px; margin: 8px 0 2px; flex-wrap: wrap; }
+.ob-check-btn {
+  padding: 5px 12px; font-size: 12px; border-radius: 6px;
+  border: 1px solid var(--border, #2c313a); background: transparent;
+  color: var(--fg, #e6e8eb); cursor: pointer;
+}
+.ob-check-btn:hover:not(:disabled) { border-color: var(--accent, #5b8cff); }
+.ob-check-btn:disabled { opacity: 0.6; cursor: default; }
+.ob-check-ok { font-size: 12px; color: #3fb950; }
+.ob-check-fail { font-size: 12px; color: #f0806c; }
+.ob-check-muted { font-size: 12px; color: var(--muted, #9aa3af); }
+.ob-check-warn { font-size: 12px; color: #f0806c; margin: 8px 0 0; }
+
+.ob-preflight { margin-top: 16px; padding: 12px; border: 1px solid var(--border, #2c313a); border-radius: 8px; }
+.ob-preflight-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.ob-preflight ul { margin: 0; padding-left: 0; list-style: none; line-height: 1.9; font-size: 13px; }
+.ob-preflight-label { color: var(--muted, #9aa3af); }

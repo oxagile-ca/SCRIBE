@@ -71,6 +71,38 @@ def record(*, task: str, ticket: Optional[str], pipeline_id: Optional[str],
     return rec
 
 
+def reset(path: Optional[str] = None) -> dict:
+    """Archive the current ledger so usage counters start at zero.
+
+    Called when a new product is onboarded: the previous product's spend shouldn't
+    carry into the new one (the header would otherwise keep showing a stale all-time
+    total). The existing ledger is *renamed* to ``<name>.archived-<UTC stamp>.jsonl``
+    beside it — history is preserved, never deleted — so the next record() begins a
+    fresh ledger. Returns {"archived": <path|None>, "records": <count moved>}.
+    """
+    path = path or LEDGER_PATH
+    with _LOCK:
+        if not os.path.exists(path):
+            return {"archived": None, "records": 0}
+        try:
+            with open(path, encoding="utf-8") as f:
+                count = sum(1 for line in f if line.strip())
+        except OSError:
+            count = 0
+        if count == 0:
+            return {"archived": None, "records": 0}
+        stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
+        root, ext = os.path.splitext(path)
+        ext = ext or ".jsonl"
+        archive = f"{root}.archived-{stamp}{ext}"
+        n = 1
+        while os.path.exists(archive):  # two resets in the same second
+            archive = f"{root}.archived-{stamp}-{n}{ext}"
+            n += 1
+        os.replace(path, archive)
+    return {"archived": archive, "records": count}
+
+
 def _iter(path: str):
     if not os.path.exists(path):
         return

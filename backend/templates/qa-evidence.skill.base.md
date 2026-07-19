@@ -143,31 +143,63 @@ browser session across tickets (see Phase 2.8 browser-session isolation).
 1. Parse ticket, run kind, env, optional flags. If required fields missing, STOP.
 2. Check reachability of `env:`. If non-200 and looks like a Deploy env,
    run `deploycli wake --env <extracted-from-url>` and retry.
-3. `git fetch origin`. If `test-evidence/<JIRA-KEY>` exists remotely:
-   `git worktree add .claude/worktrees/<JIRA-KEY> test-evidence/<JIRA-KEY>`.
-   Else: `git worktree add -b test-evidence/<JIRA-KEY> .claude/worktrees/<JIRA-KEY>`.
-4. Chdir into the worktree. All subsequent file writes happen there.
+3. **Do NOT create a git worktree or branch.** All run output goes to the absolute
+   `evidence_root` from `qa_targets` (`~/evidence/<JIRA-KEY>/runs/…`) — the path the
+   dashboard reads. Stay in the backend dir; never `chdir` into a repo checkout.
 
 ## Phase 1 — Build the manifest (first run only)
 
-Skip if `<evidence_root>/<JIRA-KEY>/manifest.yml` exists.
+Skip if `<evidence_root>/<JIRA-KEY>/manifest.yml` exists **and is a real manifest**
+(ACs/TCs tied to this ticket's scope). A placeholder/blocked manifest left by a prior
+failed run (title like `[Placeholder]`, scope `other`, or TCs `[TBD]`) must be
+REBUILT, not reused.
 
-1. Fetch Jira ticket via MCP. Capture summary, description, assignee, ALL
-   comments, linked issues.
+**SCOPING GUARD (read before generating any TC).** Build the manifest from
+**THIS ticket's own** title + description + ITS OWN PR diff — nothing else. A
+`Related: <KEY>` / "blocked by" / "part of" link is **context only**; never adopt
+the related ticket's feature scope (e.g. a display-only ticket that *links* an
+invoice ticket must NOT be tested as invoice rendering). Test what THIS ticket's
+description says. If this ticket's own scope is genuinely unclear, draft TCs from
+its description and flag for review — do NOT substitute the linked ticket's scope.
 
-2. **PR analysis is MANDATORY before generating test cases.** Acquire a diff
-   via, in order:
-   - `pr:` URL passed explicitly, OR
-   - The first OPEN PR from the Phase -1 Jira dev-info lookup whose
-     destination is `main`/`master`/`develop`/`release-*` (skip e2e or
-     stacked PRs), OR
-   - Bitbucket search by ticket key:
-     `GET /repositories/<workspace>/<repo>/pullrequests?q=source.branch.name~"<TICKET>"`.
+1. Acquire the ticket's scope (summary + description + ACs).
+   - **Interactive:** fetch via the issue-tracker MCP — summary, description,
+     assignee, ALL comments, linked issues.
+   - **Headless (`--headless`):** an OAuth-http tracker MCP is NOT loaded in the
+     `claude -p` subprocess. If the backend ships a `qa_targets.py` resolver, run it
+     (`python qa_targets.py <JIRA-KEY> <env-url>`, §2.0) and use its `ticket_summary`
+     / `ticket_description` / `ticket_state` — fetched via the backend's tracker
+     token. That is the authoritative scope source headlessly. Do NOT block merely
+     because the tracker MCP is unreachable. Only if no ticket scope is obtainable AND
+     no `pr:` / `--text` was supplied: STOP with verdict `blocked`.
 
-   If no diff is reachable, STOP. Print:
-   `Cannot build manifest without PR context — supply pr: <url> or fix the
-   Jira dev info link for <TICKET>.`
-   Never invent test cases blind. A test plan with no diff anchor is noise.
+2. **PR analysis before generating test cases (best-effort).** Acquire a diff via,
+   in order: `pr:` URL passed explicitly, OR the first OPEN PR from the dev-info
+   lookup whose destination is `main`/`master`/`develop`/`release-*`, OR VCS search
+   by ticket key.
+
+   If no diff is reachable:
+   - **Interactive:** STOP — `Cannot build manifest without PR context — supply
+     pr: <url> or fix the dev-info link for <TICKET>.`
+   - **Headless:** the VCS MCP is also absent in the subprocess, so a diff is often
+     unreachable. If the ticket SCOPE is available (step 1), do NOT stop — build a
+     **scope/repro-anchored** manifest: set `pr_context.diff_found: false`, anchor
+     each TC to the ticket's described behavior + ACs, and proceed to Phase 2. Only
+     STOP if BOTH the diff AND the ticket scope are unavailable.
+   Never invent test cases blind — anchor each TC to either a diff hunk OR the
+   ticket's explicit described behavior/ACs.
+
+2b. **Main reconciliation — current main HEAD is authoritative (not the PR snapshot).**
+   If `<evidence_root>/<JIRA-KEY>/reconcile.json` exists (the backend writes it before
+   this run), current main has already been fetched for the PR's touched files. Use it:
+   - Derive expected AC values from `main_snapshot["<repo>:<path>"]`, NOT the raw PR
+     diff. Where a value differs, **main wins** — the PR value may be stale.
+   - Each entry in `divergences[]` is a PR value a later main commit changed
+     (`pr_hint` → `main_hint`). Assert the **`main_hint`** value; a TC that passes on the
+     PR's old value is WRONG. Cite the divergence in the TC `notes`.
+   - If `reconcile.json` is absent or `status: "degraded"`, proceed from the PR diff as
+     usual (the backend's finalize guard adds a `TC-RECON` needs-review so a stale or
+     unverified value can't silently pass).
 
 3. **Map every non-trivial change to a TC.** Walk the diff. For each
    file with behavior changes (exclude: pure refactor with identical
@@ -197,6 +229,19 @@ Skip if `<evidence_root>/<JIRA-KEY>/manifest.yml` exists.
    - `annotations_hint`: optional, but recommended for every screenshot
      TC since markup runs on all of them
 
+5b. **Harvest the Error Handling / validation section into negative TCs (never skip).**
+   Many tickets carry an explicit `## Error Handling` / validation / alternate-response
+   section listing required failure responses (e.g. SN-codes → INVALID_PARAMETERS /
+   UNAUTHORIZED / SYSTEM_ERROR). Those ARE acceptance criteria. For EACH scenario emit a
+   negative TC `TC-ERR-<code>` (e.g. `TC-ERR-SN4`) asserting the documented status + error
+   code, and classify it:
+   - **live-testable** (missing/invalid/non-existent id, missing/invalid auth, out-of-scope
+     id) → exercise it live in Phase 2.7 and save `automated/TC-ERR-<code>/api-*.json`.
+   - **fault-injection-only** (missing customer/location, DB/calc/serialization failure →
+     SYSTEM_ERROR) → not reproducible against a clean env; verify the error BRANCH exists in
+     the PR diff (cite `file:line` + ErrorCode) and set the TC `method: code-review`.
+   An untested error AC is a GAP, not a pass — report it as blocked/observation, never omit it.
+
 6. **Append the Universal Validation Suite (Phase 2.6 spec)** to the manifest
    with TC ids `TC-UV-1` … `TC-UV-6`. These run on every non-baseline run
    regardless of PR scope. Do NOT skip them when the diff looks small —
@@ -211,29 +256,118 @@ Skip if `<evidence_root>/<JIRA-KEY>/manifest.yml` exists.
 
 ## Phase 2 — Execute
 
-1. Generate run ID: `run-<kind>-<user-slug>-<seq>` (increment `seq` if prior
-   runs of same kind+user exist).
+Phase 2 drives a **real browser via the Playwright MCP** — codifying what the
+interactive agent does by hand so the headless `claude -p` run (no human to adapt)
+performs real QA instead of stopping. **There is NO `pnpm` / Playwright "evidence"
+project — do not look for one or try to install one.** Use the Playwright MCP
+browser tools (the run harness wires in the `playwright` MCP server via
+`--mcp-config`, so they appear as `mcp__playwright__browser_*`): `browser_navigate`,
+`browser_snapshot`, `browser_type`, `browser_click`, `browser_take_screenshot`,
+`browser_evaluate`, `browser_console_messages`, `browser_network_requests`,
+`browser_wait_for`.
+
+**Load the browser tools FIRST, and wait for the MCP to connect.** In the headless
+`claude -p` subprocess these tools are **deferred** and the `npx @playwright/mcp`
+server takes a few seconds to come up. Before Phase 2.2, run **ToolSearch** with
+`select:mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_type,mcp__playwright__browser_click,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_evaluate,mcp__playwright__browser_console_messages,mcp__playwright__browser_network_requests,mcp__playwright__browser_wait_for`
+to load their schemas. If the first attempt returns nothing, the server is still
+connecting — **wait ~5s and retry, up to ~6 times (~60s total)** before concluding
+it is unavailable.
+
+**NEVER fabricate a substitute execution path.** Do NOT write a Python/`requests`
+script, a `playwright` Python harness, a `pnpm`/spec runner, or any API-only "test"
+in place of driving the browser — those produce no real UI evidence and are
+forbidden. The ONLY acceptable Phase-2 engines are these Playwright MCP browser
+tools. If after the retries the tools genuinely will not load, STOP with verdict
+`blocked` (reason: "Playwright MCP unavailable"), write summary.json + index.html,
+and exit — do not improvise.
+
+### 2.0 Resolve targets (deterministic — strips guesswork)
+If the backend ships a `qa_targets.py` resolver, run it from the backend dir and
+parse its JSON:
+
+    python qa_targets.py <JIRA-KEY> <env-url>
+
+It returns `login_url`, `username`, `password_secret` (the env-var NAME of the
+password — read its VALUE from `.secrets.env`, never echo it), `ticket_type`,
+`booking_dependent` (whether the surface needs an existing record), `evidence_root`,
+`runs_dir`, `api_base`, and a `seed_record` (e.g. `seed_booking`) or `null`. If no
+resolver exists, derive the same values from the instance config (`environments.testAuth`,
+`api.baseUrl`) and the product context above.
+
+**Use the absolute `evidence_root` for ALL run output** — the path the dashboard
+reads (the backend's `config.EVIDENCE_DIR`, i.e. `~/evidence`), NOT a relative
+`evidence/` under the cwd. Writing elsewhere produces evidence the
+dashboard never registers.
+
+### 2.1 Run scaffolding
+1. Generate run ID: `run-<kind>-<user-slug>-<seq>` (increment `seq` if prior runs
+   of the same kind+user exist).
 2. Create `<evidence_root>/<JIRA-KEY>/runs/<run-id>/` with subfolders
    `automated/`, `manual/`, `markup/`, `diffs/`.
-3. Append a `runs[]` entry to the manifest with the run metadata (kind, env,
-   executor, started, etc.).
-4. Export env vars the reporter needs:
-   - `QA_EVIDENCE_RUN_ID=<run-id>`
-   - `QA_EVIDENCE_TICKET=<JIRA-KEY>`
-   - `QA_EVIDENCE_ROOT=<evidence_root>`
-5. Per run kind:
-   - `dev-local`, `qa-feature`, `qa-main`, `ad-hoc`: run
-     `pnpm playwright test --project=evidence --grep @<JIRA-KEY>`.
-   - `baseline-stable`: skip automated test execution. For each TC with
-     `markup` in `evidence_required`, navigate to the relevant URL on the
-     stable env (read-only) and capture `baseline.png` into
-     `automated/<TC-ID>/`. No interactions, no assertions.
-6. The reporter files artifacts automatically as tests complete.
-7. On failure, retry up to 3x per TC: read trace + error + relevant source,
-   apply test-only fixes (never product code), re-run the single spec. After
-   3 attempts still failing, mark `status: fail` and continue.
-   - If `--headless` is set: do NOT pause for human input on failures.
-     Mark `status: fail`, capture error screenshot, and continue to next TC.
+3. Append a `runs[]` entry to the manifest with run metadata (kind, env,
+   executor, started).
+4. Export: `QA_EVIDENCE_RUN_ID=<run-id>`, `QA_EVIDENCE_TICKET=<JIRA-KEY>`,
+   `QA_EVIDENCE_ROOT=<evidence_root>`.
+
+### 2.2 Authenticate (drive the real login form)
+Token / session-storage injection does NOT log most SPAs in — type the real creds:
+`browser_navigate(login_url)`; `browser_snapshot` to find the fields; `browser_type`
+the username; `browser_type` the password (VALUE from `.secrets.env`
+`<password_secret>` — NEVER write it to logs, console, screenshots, or evidence);
+submit; `browser_wait_for` an authenticated element. If login fails, screenshot it,
+mark the run `blocked`, write summary.json + index.html (§2.5), and stop.
+
+### 2.3 Per test case — navigate, capture, assert
+`baseline-stable`: skip assertions; capture `baseline.png` read-only for each
+`markup` TC. Otherwise, for each non-UV TC:
+1. **Navigate to the surface (data-dependent nav rule — see below):** a TC whose
+   surface needs an EXISTING record (an invoice / document / detail page) MUST open
+   an existing seed record (`qa_targets.seed_record`) THROUGH THE UI; it must NEVER
+   create one through an interactive flow headless Playwright cannot drive. Other
+   TCs `browser_navigate` directly to the page/route.
+2. `browser_take_screenshot` → `automated/<TC-ID>/<tc-id>.png`.
+3. Assert the AC with `browser_snapshot` / `browser_evaluate` (DOM reads are valid
+   evidence); for numeric/API-backed surfaces cross-check against `api_base`
+   (Phase 2.7). Record `pass` / `fail` with an observed-vs-expected note.
+
+### 2.4 Universal Validation Suite (deterministic, every non-baseline run)
+- UV-1 console: `browser_console_messages` → `automated/TC-UV-1/console-errors.json`.
+- UV-2 network: `browser_network_requests` → `automated/TC-UV-2/non-2xx.json`.
+- UV-3 / UV-5 / UV-6 (asset / a11y / snapshot-drift) as feasible headlessly; log skips.
+
+### 2.5 Write the dashboard evidence (REQUIRED — the run only counts WITH these)
+Into `<evidence_root>/<JIRA-KEY>/runs/<run-id>/`, write **BOTH** `summary.json` and
+a non-empty `index.html` (write it, or call the backend helper
+`generate_html_report("<JIRA-KEY>", "<run-id>")`). Also write per-TC outcomes into
+the manifest `runs[<this-run>].results` map. `summary.json` schema:
+```json
+{
+  "ticket": "<JIRA-KEY>",
+  "verdict": "PASS | PASS-WITH-ISSUES | NEEDS-REVIEW | BLOCKED",
+  "score": {"pass": N, "fail": N, "blocked": N, "total": N, "pct": 0-100},
+  "confidence": {"headline": 0-100, "band": "...", "explanation": "..."},
+  "time": "<minutes or ISO>", "started": "<iso>", "finished": "<iso>",
+  "executor": "<user>", "env": "<env-url>",
+  "test_cases": [{"id": "TC-XXXX-001", "title": "...",
+                  "status": "pass|fail|blocked", "evidence": ["automated/.../tc.png"],
+                  "note": "observed vs expected"}]
+}
+```
+`score` may be a single number; `confidence.headline` is the fallback. Always
+include `test_cases` and a top-level `verdict`.
+
+### 2.6 Headless failure rule (keep)
+On a TC failure do NOT pause: mark `status: fail`, `browser_take_screenshot` into
+`automated/<TC-ID>/error.png`, continue. Retry a flaky TC up to 3× (re-navigate /
+re-assert only — never edit product code) before marking `fail`.
+
+### Data-dependent navigation rule (HARD)
+A TC whose surface depends on an existing record MUST reach it through an EXISTING
+seed record via the UI — never by creating one through an interactive flow headless
+Playwright cannot drive (the class of blocker that stalls headless runs). If no seed
+record is available, mark the affected TCs `blocked`, set the run verdict `BLOCKED`,
+write summary.json + index.html anyway (so the dashboard registers it), and stop.
 
 ## Phase 2.5 — Document Lifecycle Gates (HARD REQUIREMENT)
 
@@ -386,6 +520,14 @@ step 6. Each is non-skippable; an exemption requires
 - Skip with explicit exemption only if no baseline exists AND
   `--no-baseline-warning` is passed.
 
+### Scoring policy (enforced by backend `qa_scoring`)
+
+**Scoring policy (enforced by the backend `qa_scoring`):** the headline score is computed
+from AC-tied TCs plus `TC-UV-1` (console) and `TC-UV-2` (network) ONLY. `TC-API-*`,
+`TC-UV-3/4/5/6` (incl. AXE accessibility) are **advisory** — report them, but do NOT
+reduce confidence or verdict when they are skipped, incomplete, or failing. The backend
+overwrites `summary.json` score/verdict with the canonical value regardless.
+
 ## Phase 2.7 — Live API Verification (for API-based tickets)
 
 If this product has an **API Surface (generated)** section above, many tickets
@@ -408,6 +550,11 @@ already makes it. A generated helper ships beside this skill as
 
 **Assert:**
 - HTTP 2xx — or the documented expected error.
+- **Error-handling AC coverage (every `TC-ERR-*` from Phase 1):** drive each documented
+  failure — omit/garble the param, drop the bearer token, use an out-of-scope id — and assert
+  the EXACT HTTP status + ErrorCode the ticket specifies. Save `automated/TC-ERR-<code>/api-*.json`.
+  Fault-injection-only scenarios that can't be driven live stay `method: code-review` with a PR
+  `file:line` citation — count them as verified-by-review, never as untested-passed.
 - Expected fields present (from the diff + the API Surface catalog).
 - Value correctness when the ticket is about math (totals, taxes, fees, counts).
 - Scope/permission: a call carrying another tenant's/bucket's scope id is rejected.
@@ -471,9 +618,8 @@ in-page navigation cross-contaminate evidence and produce false verdicts
 
 For each ticket, open a **dedicated new browser window/tab** for its live
 verification and confine that ticket's navigation to it. Never reuse one
-shared window across tickets. This mirrors the per-ticket evidence-worktree
-isolation in Phase 0 and the per-env allocation in Phase -1: one ticket →
-one env → one evidence worktree → one browser window.
+shared window across tickets. This mirrors the per-env allocation in Phase -1:
+one ticket → one env → one browser window.
 
 **Evidence:** `automated/<TC>/live.png` for every UI / FE TC (and a
 `needs-review` note when a surface could not be reached live).
@@ -591,6 +737,12 @@ Writes `confidence:` block to manifest:
   evidence), single brand when the component is shared, theoretical
   edge cases not mentioned in the ticket.
 
+**Scoring policy (enforced by the backend `qa_scoring`):** the headline score is computed
+from AC-tied TCs plus `TC-UV-1` (console) and `TC-UV-2` (network) ONLY. `TC-API-*`,
+`TC-UV-3/4/5/6` (incl. AXE accessibility) are **advisory** — report them, but do NOT
+reduce confidence or verdict when they are skipped, incomplete, or failing. The backend
+overwrites `summary.json` score/verdict with the canonical value regardless.
+
 ## Phase 8 — Gap gate
 
 Verify:
@@ -649,25 +801,11 @@ Fail → STOP, print numbered remediation list, exit non-zero.
 
 ## Phase 9 — Publish
 
-Per run kind (respect `skip-publish` flag if set):
-
-**`dev-local`** — commit + push to `test-evidence/<JIRA-KEY>`. Post Bitbucket
-PR comment: "Dev evidence captured, confidence: N/100, branch:
-test-evidence/<JIRA-KEY>". Skip Jira + Confluence.
-
-**`baseline-stable`** — commit + push silently.
-
-**`qa-feature`** — commit + push. Zip the ticket folder. Upload to Jira as
-attachment. Post Jira comment with verdict, confidence breakdown, traceability
-table, top 3 markup images. Create Confluence page under
-`<confluence_space_key>/<confluence_parent_page_title>` in DRAFT if confidence
-< `auto_publish_threshold`, else PUBLISHED.
-
-**`qa-main`** — commit + push. Append to existing Jira comment (don't
-replace). Promote Confluence page to PUBLISHED if currently DRAFT. Post to
-`<slack_channel>`: verdict + confidence + link (skip if config empty).
-
-**`ad-hoc`** — commit + push. Print summary to stdout. Notify runner only.
+Evidence is already at `~/evidence/<JIRA-KEY>/runs/<run-id>/` — the dashboard serves
+and reviews it directly; there is nothing to push. Linear attachment (if armed) is
+handled by the backend orchestrator, not here. Do NOT run any `git` commands (no
+commit, no push, no `test-evidence/*` branch), and do NOT upload to
+Jira/Confluence/Bitbucket/Slack. `skip-publish` is a no-op (nothing publishes either way).
 
 ## Phase 9.5 — Confluence-Ready HTML Report
 
@@ -759,23 +897,25 @@ timing without touching any dropdown manually.
 
 ## Phase 10 — Cleanup
 
-1. `git worktree remove .claude/worktrees/<JIRA-KEY>`
-2. Print final summary with all links.
+1. Print final summary with all links.
 
 ## Autonomous rules
 
 - No approval between phases except Phase 1 (manifest) and Phase 8 (gap remediation).
 - `evidence/**` writes proceed without confirmation.
-- Git commits + pushes to `test-evidence/**` proceed.
-- Merge conflicts → `git pull --rebase`, retry 3x, then ask user.
+- No git is used: evidence is written only under `evidence_root`
+  (`~/evidence/<KEY>/runs/…`). Never commit, push, or create `test-evidence/*`
+  branches or worktrees.
 
 ## Headless mode (`--headless --auto-approve`)
 
 When both flags are set, the entire pipeline runs without human interaction:
 
 - Phase 1: manifest auto-approved (no pause)
-- Phase 2: Playwright runs headless (default). On failure after 3 retries,
-  mark `status: fail` and continue — never pause for input.
+- Phase 2: the Playwright **MCP** browser drives the app headlessly (§2.0–2.6).
+  On a TC failure after 3 retries, mark `status: fail` and continue — never pause
+  for input. A data-dependent TC with no seed record → `BLOCKED` (still writes
+  summary.json + index.html so the dashboard registers the run).
 - Phase 4: skip manual evidence wait. Log missing items as `incomplete`.
 - Phase 8: if gap gate fails, log remediation list but do NOT exit.
   Mark run as `needs-review` instead of blocking.
@@ -804,13 +944,12 @@ Headless invocation example:
 1. Manifest has new run entry
 2. Traceability has no empty cells for current run
 3. Confidence ≥ `min_confidence_gate`
-4. Publish targets succeeded
+4. Evidence written under `<evidence_root>/<JIRA-KEY>/runs/<run-id>/`
+   (`summary.json` + `index.html`)
 5. Final stdout ends with:
-✅ Evidence published for <JIRA-KEY> (run: <kind>)
+✅ Evidence captured for <JIRA-KEY> (run: <kind>)
 Verdict: <verdict>   Confidence: <N>/100
-Branch: test-evidence/<JIRA-KEY>
-Jira: <url>
-Confluence: <url>
+Evidence: <evidence_root>/<JIRA-KEY>/runs/<run-id>/
 
 ## Troubleshooting
 
@@ -822,7 +961,6 @@ Confluence: <url>
 | Confluence 403 | Token missing Confluence write scope. |
 | Gap gate blocks on manual TC | Share `pnpm qa-evidence capture` command with tester. |
 | Score stuck low | `qa-score show <JIRA-KEY>` — explanation shows weakest dimension. |
-| Merge conflicts repeat | Someone else pushed. Skill rebases 3×; beyond that, ask user. |
 
 ## Related skills / commands
 

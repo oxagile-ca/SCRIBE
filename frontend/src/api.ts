@@ -1,4 +1,5 @@
 import { Ticket, SSEEvent, CouncilStatus, CouncilVerdict, CouncilOverride, TicketUsage, UsageSummary } from './types'
+import type { OnboardingAnswers } from './onboardingSchema'
 
 const BASE = '/api'
 
@@ -37,6 +38,7 @@ export type ScoreTally = {
 
 export interface EvidenceHistoryItem {
   key: string
+  url?: string
   status: string
   // Backend normalises to number | null, but tolerate a tally dict in case an
   // old summary.json slips through.
@@ -117,6 +119,49 @@ export async function startTest(ticketKey: string, envUrl: string): Promise<stri
   if (!res.ok) throw new Error(`Failed to start test: ${res.status}`)
   const data = await res.json()
   return data.streamId
+}
+
+export async function startQaRun(ticketKey: string, envUrl = ''): Promise<string> {
+  const res = await fetch(`${BASE}/qa-run/${ticketKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ envUrl }),
+  })
+  if (!res.ok) {
+    // Surface the backend's reason (e.g. the 409 "already in progress" guard)
+    // so the lane can react instead of showing a bare status code.
+    let detail = `Failed to start QA run: ${res.status}`
+    try { const j = await res.json(); if (j?.detail) detail = j.detail } catch { /* non-JSON */ }
+    throw new Error(detail)
+  }
+  return (await res.json()).streamId
+}
+
+export async function attachToLinear(ticketKey: string): Promise<string> {
+  const res = await fetch(`${BASE}/attach/${ticketKey}`, { method: 'POST' })
+  if (!res.ok) throw new Error(`Failed to start attach: ${res.status}`)
+  return (await res.json()).streamId
+}
+
+export interface AutomationState {
+  writeAllowed: boolean
+  autoMode: { enabled: boolean; armed: boolean }
+}
+
+export async function getAutomation(): Promise<AutomationState> {
+  const res = await fetch(`${BASE}/automation`)
+  if (!res.ok) throw new Error(`getAutomation failed: ${res.status}`)
+  return res.json()
+}
+
+export async function setAutomation(patch: { enabled?: boolean; armed?: boolean }): Promise<AutomationState> {
+  const res = await fetch(`${BASE}/automation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) throw new Error(`setAutomation failed: ${res.status}`)
+  return res.json()
 }
 
 export type EnvInUseError = {
@@ -382,4 +427,33 @@ export function subscribeSSE(
     cancelled = true
     source?.close()
   }
+}
+
+export interface ConfigResponse {
+  ok: boolean
+  answers: OnboardingAnswers
+  secretsSet: Record<string, boolean>
+}
+
+export async function getConfig(): Promise<ConfigResponse> {
+  const res = await fetch(`${BASE}/config`)
+  if (!res.ok) throw new Error(`getConfig failed: ${res.status}`)
+  return res.json()
+}
+
+export async function updateConfig(answers: OnboardingAnswers): Promise<{ ok: boolean; errors?: string[] }> {
+  const res = await fetch(`${BASE}/config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(answers),
+  })
+  return res.json().catch(() => ({ ok: false, errors: [`status ${res.status}`] }))
+}
+
+export async function uploadPostman(file: File): Promise<{ ok: boolean; endpointCount?: number; error?: string; path?: string }> {
+  const form = new FormData()
+  form.append('file', file)
+  // NOTE: do NOT set Content-Type — the browser sets the multipart boundary.
+  const res = await fetch(`${BASE}/config/upload-postman`, { method: 'POST', body: form })
+  return res.json().catch(() => ({ ok: false, error: `status ${res.status}` }))
 }

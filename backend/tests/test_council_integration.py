@@ -68,6 +68,77 @@ async def test_check_evidence_starts_council_on_pass(tmp_path, monkeypatch):
         server.pipeline_states.pop("pipe-A", None)
 
 
+@pytest.mark.asyncio
+async def test_check_evidence_passes_run_name_to_council(tmp_path, monkeypatch):
+    """Regression: the Check Evidence path must hand the council the ACTUAL run
+    name. It previously read result.get('latestRun') (never top-level on
+    check_new_evidence, which returns 'run'), so run_name was '' and the
+    qa-evidence reviewer was pointed at ~/evidence/<KEY>/runs//summary.json —
+    a nonexistent path — and falsely BLOCKed with 'evidence structure missing'.
+    """
+    _seed_evidence(tmp_path, monkeypatch)  # seeds run dir "2026-06-07_15-32-11"
+
+    import server
+    captured = {}
+
+    async def _fake_gather(_key):
+        return []
+
+    def _fake_start(*, ticket_key, run_name, pipeline_id, pr_refs):
+        captured["run_name"] = run_name
+        return "stream-xyz"
+
+    monkeypatch.setattr(server, "_gather_pr_refs", _fake_gather)
+    monkeypatch.setattr(server.council, "start", _fake_start)
+
+    server.pipeline_states["pipe-runname"] = {"ticketKey": "PROJ-COUNCIL", "stage": "inspector"}
+    try:
+        client = TestClient(server.app)
+        resp = client.post("/api/check-evidence/PROJ-COUNCIL", json={"baseline_runs": []})
+        assert resp.status_code == 200
+        assert resp.json().get("found") is True
+        assert captured.get("run_name") == "2026-06-07_15-32-11"
+    finally:
+        server.pipeline_states.pop("pipe-runname", None)
+
+
+@pytest.mark.asyncio
+async def test_check_evidence_does_not_start_council_on_incomplete_run(tmp_path, monkeypatch):
+    """A run with artifacts but NO summary.json (stalled/killed before scoring) must
+    be surfaced (found:True) yet must NOT fire the council. Otherwise the qa-evidence
+    reviewer reads an empty run and BLOCKs 'summary.json absent' every time a run
+    doesn't finish — the recurring spurious BLOCK this guards against."""
+    import agents
+    import server
+
+    # Seed a PARTIAL run: a shell index.html but no summary.json and empty evidence dirs.
+    ev_root = tmp_path / "evidence" / "PROJ-PARTIAL" / "runs" / "2026-06-07_15-32-11"
+    ev_root.mkdir(parents=True, exist_ok=True)
+    (ev_root / "index.html").write_text("<html>shell</html>")
+    monkeypatch.setattr(agents, "EVIDENCE_DIR", str(tmp_path / "evidence"))
+    monkeypatch.setattr(agents, "generate_html_report", lambda *a, **k: (True, "ok", ""))
+
+    async def _fake_gather(_key):
+        return []
+    monkeypatch.setattr(server, "_gather_pr_refs", _fake_gather)
+    started = []
+    monkeypatch.setattr(server.council, "start", lambda **k: started.append(k) or "should-not-happen")
+
+    server.pipeline_states["pipe-partial"] = {"ticketKey": "PROJ-PARTIAL", "stage": "inspector"}
+    try:
+        client = TestClient(server.app)
+        resp = client.post("/api/check-evidence/PROJ-PARTIAL", json={"baseline_runs": []})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body.get("found") is True            # surfaced in the lane card
+        assert body.get("complete") is False         # but flagged incomplete
+        assert body.get("awaitingCouncil") is not True
+        assert "councilStreamId" not in body
+        assert started == []                          # council never fired
+    finally:
+        server.pipeline_states.pop("pipe-partial", None)
+
+
 def test_override_blocks_then_succeeds():
     from server import app, pipeline_states, pipeline_store
     pipeline_states["pipe-B"] = {"ticketKey": "PROJ-OVR", "stage": "inspector", "councilStatus": "block", "councilPayload": {"verdict": "BLOCK"}}
@@ -81,6 +152,10 @@ def test_override_blocks_then_succeeds():
         state = pipeline_store.get("pipe-B")
         assert state["councilStatus"] == "overridden"
         assert state["councilOverride"]["reason"] == "flake, see slack"
+        # Regression: the in-memory read-through copy that /api/pipeline-states
+        # (the board's hydration source) serves must ALSO reflect the override,
+        # else the lane reverts from green to 'block' on a page refresh.
+        assert pipeline_states["pipe-B"]["councilStatus"] == "overridden"
     finally:
         pipeline_states.pop("pipe-B", None)
 

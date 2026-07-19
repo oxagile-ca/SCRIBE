@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Ticket, UsageSummary } from '../types'
-import { fetchVersion, getUsageSummary } from '../api'
+import { Ticket } from '../types'
+import { fetchVersion } from '../api'
 
 interface Props {
   project: string
@@ -15,6 +15,11 @@ interface Props {
   lastRefresh: string
   onRefresh: () => void
   isRefreshing: boolean
+  autoMode: { enabled: boolean; armed: boolean }
+  writeAllowed: boolean
+  onToggleAutoMode: (enabled: boolean) => void
+  onToggleArm: (armed: boolean) => void
+  onOpenSettings: () => void
 }
 
 function useBackendVersion() {
@@ -50,16 +55,9 @@ export default function TopBar({
   project, projects, onProjectChange, tickets,
   theme, onToggleTheme, onHuddle, on3x3, onCleanupEnv, lastRefresh,
   onRefresh, isRefreshing,
+  autoMode, writeAllowed, onToggleAutoMode, onToggleArm, onOpenSettings,
 }: Props) {
   const { version, restartedSinceMount } = useBackendVersion()
-  const [spend, setSpend] = useState<UsageSummary | null>(null)
-  useEffect(() => {
-    let alive = true
-    const load = () => getUsageSummary().then(s => { if (alive) setSpend(s) }).catch(() => {})
-    load()
-    const handle = setInterval(load, 30000)
-    return () => { alive = false; clearInterval(handle) }
-  }, [])
   const readyTickets = tickets.filter(t => t.statusCategory === 'ready_for_qa')
   const withEvidence = readyTickets.filter(t =>
     t.evidence.status === 'tested' || t.evidence.status === 'published'
@@ -92,12 +90,6 @@ export default function TopBar({
         </div>
       </div>
       <div className="top-bar__actions">
-        {spend && (
-          <span className="top-bar__spend" title="AI spend — today / all-time"
-                style={{ fontSize: 12, color: 'var(--text-dim)', fontVariantNumeric: 'tabular-nums' }}>
-            ${spend.today.cost_usd.toFixed(2)} today · ${spend.allTime.cost_usd.toFixed(2)} all-time
-          </span>
-        )}
         <span
           style={{
             fontSize: 10,
@@ -125,11 +117,32 @@ export default function TopBar({
         <button className="btn btn--ghost btn--small" onClick={onCleanupEnv} title="Reset stale snapshots back to k8s-stable / projd-stable">
           Clean Env
         </button>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                 title="Continuously QA Ready-for-QA tickets in the background">
+            <input type="checkbox" checked={autoMode.enabled}
+                   onChange={e => onToggleAutoMode(e.target.checked)} />
+            Auto Mode
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4,
+                          cursor: writeAllowed ? 'pointer' : 'not-allowed',
+                          color: autoMode.armed ? 'var(--warning, #f5a524)' : 'var(--text-dim)' }}
+                 title={writeAllowed ? 'When ON, auto mode attaches evidence to the live Linear board'
+                                     : 'Write permission is off for this instance'}>
+            <input type="checkbox" checked={autoMode.armed} disabled={!writeAllowed}
+                   onChange={e => {
+                     if (e.target.checked && !window.confirm('Arm auto-publish? Auto mode will attach evidence to the LIVE Linear board.')) return
+                     onToggleArm(e.target.checked)
+                   }} />
+            Auto-publish
+          </label>
+        </span>
         <button className="btn btn--accent" onClick={onHuddle}>Daily Huddle</button>
         <button className="btn btn--warning" onClick={on3x3}>Weekly 3x3</button>
         <button className="btn btn--ghost btn--small" onClick={onToggleTheme}>
           {theme === 'dark' ? '☽ Dark' : '☀ Light'}
         </button>
+        <button className="btn btn--ghost btn--small" onClick={onOpenSettings} title="Settings — Config Center">⚙</button>
       </div>
     </div>
   )

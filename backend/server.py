@@ -1,13 +1,14 @@
 import asyncio
 import json
 import os
+import re
 import subprocess
 import uuid
 import time
 
 from typing import Any, Dict, List
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -23,12 +24,14 @@ import bitbucket_client as bb
 from chat import chat_stream
 from streams import StreamRegistry, replay_events_from_disk, END_MARKER
 from pipeline_store import PipelineStore
-from onboarding import validate_answers, run_onboarding
+from onboarding import validate_answers, run_onboarding, write_config_and_secrets, save_postman_collection
 from instance_config import (
     load_instance_config, load_secrets_env, default_config_dir,
-    default_skills_root, default_instances_root,
+    default_skills_root, default_instances_root, read_secrets_file,
 )
 import linear_client
+import config_io
+import ticket_difficulty
 from status_map import resolve_status_mapping, categorize_status
 
 # Load onboarding-generated secrets (.secrets.env) into the environment at startup so
@@ -90,6 +93,11 @@ pipeline_states = pipeline_store.all_states()
 import council
 council.configure(streams, pipeline_store)
 
+import qa_orchestrator
+import auto_mode
+from qa_run_lock import qa_single_flight
+auto_mode.configure(pipeline_store, streams)
+
 import auto_provision
 auto_provision.pipeline_store = pipeline_store
 auto_provision.streams_mod = streams
@@ -108,6 +116,11 @@ async def _start_auto_provision_loop():
         return
     asyncio.create_task(auto_provision.run_loop())
     asyncio.create_task(_parent_env_keepalive_loop())
+
+
+@app.on_event("startup")
+async def _start_auto_mode_loop():
+    asyncio.create_task(auto_mode.run_loop())
 
 
 async def _parent_env_keepalive_loop():
@@ -249,6 +262,51 @@ async def api_onboarding(answers: Dict[str, Any]):
     return {"ok": True, **result}
 
 
+@app.get("/api/config")
+async def api_config_get():
+    """Current config in the onboarding-form shape, secrets blanked (#1)."""
+    cfg_path = os.path.join(default_config_dir(), "instance.config.json")
+    cfg = load_instance_config(cfg_path)
+    if not cfg:
+        return JSONResponse(status_code=404, content={"ok": False, "error": "not onboarded"})
+    secrets = read_secrets_file()
+    return {
+        "ok": True,
+        "answers": config_io.config_to_answers(cfg),
+        "secretsSet": config_io.secrets_set_map(cfg, secrets),
+    }
+
+
+@app.put("/api/config")
+async def api_config_put(answers: Dict[str, Any]):
+    """Edit config (#2/#5/#11): merge (blank secret = keep), write, hot-reload secrets."""
+    errors = validate_answers(answers)
+    if errors:
+        return JSONResponse(status_code=400, content={"ok": False, "errors": errors})
+    cfg_path = os.path.join(default_config_dir(), "instance.config.json")
+    existing = load_instance_config(cfg_path) or {}
+    existing_secrets = read_secrets_file()
+    new_config, new_secrets = config_io.merge_and_build(answers, existing, existing_secrets)
+    paths = write_config_and_secrets(new_config, new_secrets, default_config_dir())
+    load_secrets_env(paths["secrets"])  # hot-reload edited tokens — no restart
+    return {"ok": True}
+
+
+@app.post("/api/config/upload-postman")
+async def api_upload_postman(file: UploadFile = File(...)):
+    """Store an uploaded Postman collection, set its path, re-parse for a count (#3)."""
+    cfg = load_instance_config(os.path.join(default_config_dir(), "instance.config.json"))
+    if not cfg:
+        return JSONResponse(status_code=404, content={"ok": False, "error": "not onboarded"})
+    content = await file.read()
+    try:
+        cfg, count = save_postman_collection(content, cfg, default_config_dir())
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"ok": False, "error": str(e)})
+    write_config_and_secrets(cfg, read_secrets_file(), default_config_dir())
+    return {"ok": True, "endpointCount": count, "path": cfg["api"]["postmanCollectionPath"]}
+
+
 @app.get("/api/environments")
 async def api_environments():
     return ENVIRONMENTS
@@ -298,6 +356,26 @@ async def api_release_env(req: ReleaseEnvRequest):
     return {"ok": True}
 
 
+def _ticket_url(issue: dict, itype: str, key: str) -> str:
+    """Resolve a ticket's tracker URL from the onboarded issueTracker config — app-
+    agnostic, never hardcoded to any one tracker/host.
+
+    Prefers the user-provided `ticketUrlTemplate` (a full URL with a `{key}`
+    placeholder) so the link is EXACTLY what the user configured. When no template
+    is set, fall back to building it from `baseUrl` by tracker convention
+    (Linear <baseUrl>/issue/<KEY>, Jira <baseUrl>/browse/<KEY>). Returns "" when
+    nothing is configured so the frontend renders the key without a bogus link."""
+    tmpl = (issue.get("ticketUrlTemplate") or "").strip()
+    if tmpl:
+        return tmpl.replace("{key}", key) if "{key}" in tmpl else f"{tmpl.rstrip('/')}/{key}"
+    base = (issue.get("baseUrl") or "").rstrip("/")
+    if not base:
+        return ""
+    if itype == "linear":
+        return f"{base}/issue/{key}"
+    return f"{base}/browse/{key}"
+
+
 @app.get("/api/tickets")
 async def api_tickets(project: str = Query(default=DEFAULT_PROJECT)):
     """Fetch tickets from the configured issue tracker. Dispatches by the onboarded
@@ -319,6 +397,10 @@ async def api_tickets(project: str = Query(default=DEFAULT_PROJECT)):
     for t in tickets:
         t["statusCategory"] = categorize_status(t.get("status", ""), mapping)
         t["evidence"] = check_evidence(t["key"])
+        t["url"] = _ticket_url(issue, itype, t["key"])
+        label, dscore = ticket_difficulty.compute_difficulty(t.get("description", ""))
+        t["difficulty"] = label
+        t["difficultyScore"] = dscore
     return tickets
 
 
@@ -388,6 +470,9 @@ async def api_evidence_history():
     """
     if not os.path.isdir(EVIDENCE_DIR):
         return []
+    _cfg = load_instance_config() or {}
+    _issue = _cfg.get("issueTracker") or {}
+    _itype = _issue.get("type")
     results = []
     for entry in sorted(os.listdir(EVIDENCE_DIR)):
         ticket_dir = os.path.join(EVIDENCE_DIR, entry)
@@ -408,6 +493,7 @@ async def api_evidence_history():
                         latest_mtime = mt
         results.append({
             "key": entry,
+            "url": _ticket_url(_issue, _itype, entry),
             "status": ev["status"],
             "score": ev["score"],
             "time": ev["time"],
@@ -538,6 +624,13 @@ async def api_check_evidence(key: str, req: CheckEvidenceRequest):
     if not result.get("found"):
         return result
 
+    # Only fire the council on a COMPLETE run (summary.json present). A partial run
+    # — one that stalled or was killed before scoring itself — is surfaced in the
+    # lane card but must NOT spawn reviewers, or the qa-evidence reviewer reads an
+    # empty run and BLOCKs with "summary.json absent" every time a run doesn't finish.
+    if not result.get("complete"):
+        return result
+
     # Find the pipeline for this ticket (latest running/most recently updated)
     pipeline_id = None
     best_updated = -1.0
@@ -558,7 +651,7 @@ async def api_check_evidence(key: str, req: CheckEvidenceRequest):
     except Exception:
         pr_refs = []
 
-    run_name = result.get("latestRun") or ""
+    run_name = result.get("run") or ""
     council_stream_id = council.start(
         ticket_key=key,
         run_name=run_name,
@@ -574,7 +667,25 @@ async def _gather_pr_refs(ticket_key: str) -> List[dict]:
 
     Returns a list of {repo, pr_id, title} dicts. Empty on any failure so
     the council can still run (code-reviewer will PASS when there are no PRs).
+
+    On a GitHub instance, resolve PRs from Linear attachments (the reliable
+    ticket→PR link); the Jira dev-info path below is the fallback. Without this the
+    live code reviewer got zero PRs and rubber-stamped.
     """
+    import asyncio as _asyncio
+    from instance_config import load_instance_config
+    cfg = load_instance_config() or {}
+    if ((cfg.get("vcs") or {}).get("type") or "").lower() == "github":
+        try:
+            import qa_reconcile
+            refs = await _asyncio.to_thread(qa_reconcile.fetch_ticket_pr_refs, ticket_key)
+            gh = [{"repo": r["repo"], "pr_id": str(r["id"]), "title": ""}
+                  for r in (refs or []) if r.get("repo") and r.get("id")]
+            if gh:
+                return gh
+        except Exception:
+            pass  # fall through to the Jira/dev-info path
+
     import httpx
     from config import JIRA_BASE_URL
     from jira_client import _headers, _get_dev_info
@@ -615,6 +726,12 @@ async def api_council_override(pipeline_id: str, req: CouncilOverrideRequest):
         payload = await council.override(pipeline_id, req.reason, user=os.environ.get("USER", "unknown"))
     except ValueError as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
+    # council.override writes straight to pipeline_store, bypassing
+    # _update_pipeline_state — so re-snapshot the in-memory read-through copy here.
+    # Without this, /api/pipeline-states (the board's hydration source) keeps
+    # serving the stale 'block' and the override is lost on a page refresh.
+    pipeline_states.clear()
+    pipeline_states.update(pipeline_store.all_states())
     return {"ok": True, "override": payload}
 
 
@@ -797,6 +914,15 @@ class PipelineRequest(BaseModel):
     envUrl: str = ""
 
 
+class QaRunRequest(BaseModel):
+    envUrl: str = ""
+
+
+class AutomationRequest(BaseModel):
+    enabled: bool | None = None
+    armed: bool | None = None
+
+
 @app.post("/api/build")
 async def api_build(req: BuildRequest):
     stream_id = str(uuid.uuid4())
@@ -819,6 +945,64 @@ async def api_test(req: TestRequest):
     streams.create(stream_id)
     asyncio.create_task(_run_stream(stream_id, run_test(req.ticketKey, req.envUrl)))
     return {"streamId": stream_id}
+
+
+@app.post("/api/qa-run/{key}")
+async def api_qa_run(key: str, req: QaRunRequest):
+    """Close the copy-paste gap (#9): run qa-evidence server-side, then report+pdf+gated attach.
+
+    QA runs are serialized to ONE at a time: two concurrent headless runs (each a
+    Claude + Playwright MCP + Chromium) starve the box enough to drop the live SSE
+    stream. A second request is rejected with 409 until the active run finishes.
+    """
+    if not re.match(r"^[A-Z][A-Z0-9]*-\d+$", key):
+        raise HTTPException(status_code=400, detail="invalid ticket key")
+    if not qa_single_flight.try_acquire(key):
+        raise HTTPException(
+            status_code=409,
+            detail=(f"A QA run is already in progress ({qa_single_flight.active()}). "
+                    f"QA runs go one at a time — wait for it to finish, then retry."),
+        )
+    stream_id = str(uuid.uuid4())
+    streams.create(stream_id)
+    state = auto_mode.get_state()
+
+    async def _guarded_run():
+        try:
+            async for ev in qa_orchestrator.run_and_finalize(
+                key, req.envUrl, armed=state["armed"], manual=False):
+                yield ev
+        finally:
+            qa_single_flight.release(key)
+
+    asyncio.create_task(_run_stream(stream_id, _guarded_run()))
+    return {"streamId": stream_id}
+
+
+@app.post("/api/attach/{key}")
+async def api_attach(key: str):
+    """Manual 'Attach to Linear' for the latest run — write-flag only, no arm needed."""
+    if not re.match(r"^[A-Z][A-Z0-9]*-\d+$", key):
+        raise HTTPException(status_code=400, detail="invalid ticket key")
+    stream_id = str(uuid.uuid4())
+    streams.create(stream_id)
+    asyncio.create_task(_run_stream(stream_id, auto_mode.attach_latest(key)))
+    return {"streamId": stream_id}
+
+
+@app.get("/api/automation")
+async def api_automation_get():
+    cfg = load_instance_config() or {}
+    write_allowed = bool(((cfg.get("issueTracker") or {}).get("access") or {}).get("write", False))
+    return {"writeAllowed": write_allowed, "autoMode": auto_mode.get_state()}
+
+
+@app.post("/api/automation")
+async def api_automation_set(req: AutomationRequest):
+    auto_mode.set_state(enabled=req.enabled, armed=req.armed)
+    cfg = load_instance_config() or {}
+    write_allowed = bool(((cfg.get("issueTracker") or {}).get("access") or {}).get("write", False))
+    return {"writeAllowed": write_allowed, "autoMode": auto_mode.get_state()}
 
 
 class ChatSendRequest(BaseModel):
@@ -943,7 +1127,9 @@ async def api_resume_pipeline(pipeline_id: str):
         ticket_key = state.get("ticketKey", "")
         ev = check_new_evidence(ticket_key, state.get("baselineRuns") or []) or {}
         run_name = ev.get("run", "") if isinstance(ev, dict) else ""
-        if run_name:
+        # Only resume the council on a COMPLETE run (summary.json present); a partial
+        # run must not spawn reviewers (see api_check_evidence for the rationale).
+        if run_name and ev.get("complete"):
             try:
                 pr_refs = await _gather_pr_refs(ticket_key)
             except Exception:

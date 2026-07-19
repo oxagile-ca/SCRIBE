@@ -75,3 +75,28 @@ def test_build_variables_without_team_omits_team_filter():
     v = build_variables([], after=None)
     assert "team" not in v["filter"]
     assert v["after"] is None
+
+
+def test_map_issue_includes_structural_fields():
+    node = {
+        "identifier": "INV-660", "title": "Get Folio", "description": "d",
+        "priority": 2, "priorityLabel": "High", "createdAt": "2026-06-01T00:00:00.000Z",
+        "state": {"name": "Ready for QA", "type": "started"},
+        "assignee": {"displayName": "Ada Lovelace", "name": "ada"},
+        "parent": {"identifier": "INV-654", "title": "Add Location Email field"},
+        "labels": {"nodes": [{"name": "Back-End"}, {"name": "Bug"}]},
+    }
+    t = tickets_from_response({"data": {"issues": {"nodes": [node]}}})[0]
+    assert t["createdAt"] == "2026-06-01T00:00:00.000Z"
+    assert t["parent"] == {"key": "INV-654", "title": "Add Location Email field"}
+    assert t["labels"] == ["Back-End", "Bug"]
+    assert t["priorityValue"] == 2
+
+
+def test_map_issue_defaults_structural_fields_when_absent():
+    node = {"identifier": "INV-1", "title": "t", "state": {"name": "x", "type": "started"}}
+    t = tickets_from_response({"data": {"issues": {"nodes": [node]}}})[0]
+    assert t["createdAt"] == ""
+    assert t["parent"] is None
+    assert t["labels"] == []
+    assert t["priorityValue"] is None

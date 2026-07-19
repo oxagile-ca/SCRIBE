@@ -29,7 +29,7 @@ export default function DoneToday({ items }: Props) {
           {items.map(({ ticket, score, time }) => (
             <div key={ticket.key} className="done-today__row">
               <a
-                href={`https://acme.atlassian.net/browse/${ticket.key}`}
+                href={ticket.url || undefined}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ color: 'var(--accent)', fontWeight: 700, minWidth: 90, textDecoration: 'none' }}

@@ -585,7 +585,11 @@ async def run_test(ticket_key, env_url):
     from instance_config import load_instance_config
     _cfg = load_instance_config() or {}
     skill_cmd = _cfg.get("skillCommand") or "/qa-evidence"
-    qa_cmd = f"{skill_cmd} {ticket_key} run:qa-feature env:{env_url} --headless --auto-approve"
+    # Build via the server-side runner's helper so the copy-paste command can't
+    # drift from it again — it was missing --isolated, which left runs blocked on
+    # "browser already in use". Lazy import avoids the agents<->qa_runner cycle.
+    from qa_runner import build_qa_command
+    qa_cmd = build_qa_command(ticket_key, env_url, skill_cmd)
 
     # Record what evidence exists NOW so check_new_evidence can compare
     runs_path = os.path.join(EVIDENCE_DIR, ticket_key, "runs")
@@ -659,7 +663,16 @@ def check_new_evidence(ticket_key, baseline_runs=None):
         and os.path.exists(index_path)
         and os.path.getmtime(summary_path_check) > os.path.getmtime(index_path)
     )
-    if _run_has_content(latest_path) and (not os.path.exists(index_path) or summary_newer):
+    # Also regenerate when the skill left a thin (image-less) report next to
+    # screenshots — the agent writes summary.json THEN its own index.html, so
+    # summary_newer is usually False and the image-rich report never won.
+    needs_regen = (
+        not os.path.exists(index_path)
+        or summary_newer
+        or _report_missing_screenshots(latest_path)
+        or _report_status_stale(latest_path)
+    )
+    if _run_has_content(latest_path) and needs_regen:
         generate_html_report(ticket_key, latest_run)
 
     has_html = os.path.exists(os.path.join(latest_path, "index.html"))
@@ -675,12 +688,18 @@ def check_new_evidence(ticket_key, baseline_runs=None):
             summary = _json.load(f)
         _raw_conf = summary.get("confidence")
         _score = summary.get("score")
+        if isinstance(_score, dict):
+            _pct = _score.get("pct")
+            _score = round(_pct) if isinstance(_pct, (int, float)) else None
         if _score is None and isinstance(_raw_conf, dict):
             _score = _raw_conf.get("headline")
         elif _score is None and isinstance(_raw_conf, (int, float)):
             _score = _raw_conf
         return {
             "found": True,
+            # summary.json present → the run finished and scored itself. Only a
+            # complete run should fire the adversarial council (see api_check_evidence).
+            "complete": True,
             "run": latest_run,
             "score": _score,
             "time": summary.get("time", "") or summary.get("date", ""),
@@ -688,10 +707,16 @@ def check_new_evidence(ticket_key, baseline_runs=None):
             "evidence": check_evidence(ticket_key),
         }
 
-    # No summary.json — check if run has actual content (screenshots, logs, etc.)
+    # No summary.json — the run has some artifacts (a shell index.html, a partial
+    # log) but never scored itself: it stalled or was killed before collecting
+    # evidence. Surface it (found:True) so the lane card gets a clickable target,
+    # but mark it INCOMPLETE so the council does NOT fire on empty evidence (which
+    # otherwise produces a spurious "summary.json absent" BLOCK every time a run
+    # doesn't finish).
     if _run_has_content(latest_path):
         return {
             "found": True,
+            "complete": False,
             "run": latest_run,
             "score": None,
             "time": "",
@@ -1153,14 +1178,139 @@ async def watch_evidence(ticket_key):
         await asyncio.sleep(10)
 
 
+def _run_confidence(run_dir):
+    """Headline confidence (or score) for a completed run, else None.
+
+    None means the run has no summary.json — i.e. it has not completed.
+    """
+    import json as _json
+    summary_path = os.path.join(run_dir, "summary.json")
+    if not os.path.exists(summary_path):
+        return None
+    try:
+        with open(summary_path, encoding="utf-8") as f:
+            summary = _json.load(f)
+    except Exception:
+        return None
+    conf = summary.get("confidence")
+    if isinstance(conf, dict) and isinstance(conf.get("headline"), (int, float)):
+        return conf["headline"]
+    if isinstance(conf, (int, float)):
+        return conf
+    score = summary.get("score")
+    if isinstance(score, dict) and isinstance(score.get("pct"), (int, float)):
+        return score["pct"]
+    if isinstance(score, (int, float)):
+        return score
+    return None
+
+
+def _select_display_run(runs_path):
+    """Pick the run the dashboard should display.
+
+    Prefer the highest-confidence COMPLETED run (one with a summary.json),
+    tie-breaking on the newest run id. Fall back to the newest run when none have
+    completed yet (in-progress/partial). Returns a run name or None.
+
+    Replaces a bare ``sorted(reverse=True)[0]`` that always showed the
+    lexicographically-latest run — so a redundant/lower-quality re-run (e.g. a
+    PASS-WITH-ISSUES retry numbered -002) would shadow the cleaner finished -001.
+    """
+    if not os.path.isdir(runs_path):
+        return None
+    run_names = sorted(
+        [n for n in os.listdir(runs_path) if os.path.isdir(os.path.join(runs_path, n))],
+        reverse=True,
+    )
+    if not run_names:
+        return None
+    completed = [n for n in run_names
+                 if os.path.exists(os.path.join(runs_path, n, "summary.json"))]
+    if not completed:
+        return run_names[0]
+    # run_names is newest-first; max() over (confidence, name) tie-breaks to the
+    # newest run id when confidences are equal.
+    def _rank(n):
+        c = _run_confidence(os.path.join(runs_path, n))
+        return (c if isinstance(c, (int, float)) else -1, n)
+    return max(completed, key=_rank)
+
+
+def _report_missing_screenshots(run_dir):
+    """True when a run has screenshots on disk but its index.html embeds none.
+
+    The qa-evidence skill sometimes writes a thin (link-only) index.html that the
+    backend's image-embedding generator never overwrote. A regenerated report
+    embeds base64 PNGs and is large, so a small report sitting next to PNGs is the
+    thin one to regenerate. The size check avoids reading the whole file on polls.
+    """
+    index_path = os.path.join(run_dir, "index.html")
+    if not os.path.exists(index_path):
+        return False  # 'report missing' is handled by a separate branch
+    try:
+        if os.path.getsize(index_path) > 60_000:
+            return False  # already image-rich
+    except OSError:
+        return False
+    automated = os.path.join(run_dir, "automated")
+    if not os.path.isdir(automated):
+        return False
+    for _root, _dirs, files in os.walk(automated):
+        if any(f.lower().endswith((".png", ".jpg", ".jpeg")) for f in files):
+            return True
+    return False
+
+
+def _report_status_stale(run_dir):
+    """True when index.html still shows UNKNOWN TC badges while summary.json already
+    carries real verdicts (pass/fail/blocked/...).
+
+    The qa-evidence agent writes summary.json AND its own index.html, sometimes
+    emitting the report before its per-TC verdicts are final — leaving an all-UNKNOWN
+    report. Because the agent writes that report LAST, `summary_newer` is False, and
+    because the report can still be large/image-rich, `_report_missing_screenshots` is
+    False too — so the stale report would never be replaced. This catches that case so
+    the authoritative summary.json render (which has the real statuses) wins.
+    """
+    index_path = os.path.join(run_dir, "index.html")
+    summary_path = os.path.join(run_dir, "summary.json")
+    if not (os.path.exists(index_path) and os.path.exists(summary_path)):
+        return False
+    import json as _json
+    try:
+        with open(summary_path, encoding="utf-8") as f:
+            summary = _json.load(f)
+    except Exception:
+        return False
+    tcs = summary.get("test_results") or summary.get("test_cases") or []
+    real = {str((tc.get("status") or "")).lower() for tc in tcs}
+    has_real_verdicts = bool(real & {
+        "pass", "fail", "blocked", "incomplete", "skipped", "not-executed",
+    })
+    if not has_real_verdicts:
+        return False  # summary has nothing better to render — leave the report alone
+    try:
+        with open(index_path, encoding="utf-8", errors="replace") as f:
+            html = f.read()
+    except Exception:
+        return False
+    # The TC status badge renders the upper-cased status as ">STATUS<". An UNKNOWN
+    # badge present while summary has real verdicts means the report is stale.
+    return ">UNKNOWN<" in html
+
+
 def _report_url_for(ticket_key, run_name, run_dir=None):
     """Build the dashboard URL for the View Report button.
 
-    Only returns a URL when `index.html` (the Phase 7 portal) exists. The
-    earlier fallback to summary.json / headless.log made the button open
-    raw JSON or a log file under a label that promises a rendered report,
-    which confused reviewers. If the portal is missing, return "" so the
-    button hides entirely — that's a signal to regenerate the run.
+    Only returns a URL when `index.html` (the Phase 7 portal) exists. The earlier
+    fallback to summary.json / headless.log made the button open raw JSON or a log
+    file under a label that promises a rendered report, which confused reviewers.
+    If the portal is missing, return "" so the button hides entirely — a signal to
+    regenerate the run.
+
+    Appends ``?v=<index mtime>`` so a regenerated report is fetched fresh rather
+    than served from the browser/StaticFiles cache (the URL is otherwise stable
+    across regenerations, which made screenshots appear only after a hard refresh).
     """
     if not run_name:
         return ""
@@ -1168,8 +1318,12 @@ def _report_url_for(ticket_key, run_name, run_dir=None):
     if run_dir is None:
         # Caller has no on-disk handle; trust the caller checked.
         return f"{base}/index.html"
-    if os.path.exists(os.path.join(run_dir, "index.html")):
-        return f"{base}/index.html"
+    index_path = os.path.join(run_dir, "index.html")
+    if os.path.exists(index_path):
+        try:
+            return f"{base}/index.html?v={int(os.path.getmtime(index_path))}"
+        except OSError:
+            return f"{base}/index.html"
     return ""
 
 
@@ -1190,8 +1344,16 @@ def check_evidence(ticket_key):
     if not runs:
         return {"status": "manifest", "score": None, "time": "", "reportPath": "", "reportUrl": "", "needsReport": False}
 
-    latest_run_name = runs[0]
+    latest_run_name = _select_display_run(runs_path) or runs[0]
     latest_run = os.path.join(runs_path, latest_run_name)
+    # Heal a thin/image-less report for the run we're about to display, so the
+    # dashboard always serves the screenshot-embedded version (one-time per run —
+    # a regenerated report is large, so _report_missing_screenshots goes False).
+    if _report_missing_screenshots(latest_run):
+        try:
+            generate_html_report(ticket_key, latest_run_name)
+        except Exception:
+            pass
     report_path = os.path.join(latest_run, "index.html")
     # A 0-byte index.html counts as missing — some generators leave an empty
     # placeholder in the run dir while writing the real portal to the ticket root.
@@ -1328,6 +1490,19 @@ def generate_html_report(ticket_key, run_name=None):
             break
 
     ticket_summary = summary.get("ticket_summary", "") or summary.get("summary", "")
+    # Tracker deep-link from the onboarded issueTracker config — app-agnostic.
+    # Prefer the user-provided ticketUrlTemplate ({key} placeholder); else build
+    # from baseUrl by convention (Linear /issue/<KEY>, Jira /browse/<KEY>).
+    from instance_config import load_instance_config
+    _rissue = (load_instance_config() or {}).get("issueTracker") or {}
+    _rtmpl = (_rissue.get("ticketUrlTemplate") or "").strip()
+    if _rtmpl:
+        ticket_url = _rtmpl.replace("{key}", ticket_key) if "{key}" in _rtmpl else f"{_rtmpl.rstrip('/')}/{ticket_key}"
+    else:
+        _rbase = (_rissue.get("baseUrl") or "").rstrip("/")
+        ticket_url = ("" if not _rbase else
+                      f"{_rbase}/issue/{ticket_key}" if _rissue.get("type") == "linear"
+                      else f"{_rbase}/browse/{ticket_key}")
     verdict_raw = summary.get("verdict", "") or summary.get("verdict_reason", "")
     # verdict may be a long sentence — extract the first word for the badge
     verdict_word = verdict_raw.split()[0] if verdict_raw else ""
@@ -1348,6 +1523,12 @@ def generate_html_report(ticket_key, run_name=None):
         explanation = (summary.get("confidence_explanation") or
                        summary.get("score_breakdown", {}).get("explanation", "") or
                        manifest_conf.get("explanation", ""))
+
+    # Task 4: prefer canonical pct from Task 3 scoring block (summary["score"]["pct"]).
+    # Also handles the case where raw_score was incorrectly set to the dict itself.
+    _score_block = summary.get("score")
+    if isinstance(_score_block, dict) and _score_block.get("pct") is not None:
+        score = _score_block["pct"]
 
     env_val = summary.get("env", "") or summary.get("env_passed", "")
     if isinstance(env_val, dict):
@@ -1567,7 +1748,7 @@ def generate_html_report(ticket_key, run_name=None):
 </div>'''
 
     # --- TC summary table ---
-    tc_rows_html = ""
+    tc_row_by_id = {}
     for tc_id in tc_ids:
         tc_data = tc_detail_map.get(tc_id, {})
         result = tc_data.get("status") or tc_results_legacy.get(tc_id, "unknown")
@@ -1581,7 +1762,7 @@ def generate_html_report(ticket_key, run_name=None):
             for a in ac_tags
         )
         acs_plain = ", ".join(ac_tags)
-        tc_rows_html += (
+        tc_row_by_id[tc_id] = (
             f'<tr onclick="document.getElementById(\'{tc_id}\').scrollIntoView({{behavior:\'smooth\'}})" '
             f'style="cursor:pointer">'
             f'<td><span style="color:#818cf8;font-weight:700">{_esc(tc_id)}</span></td>'
@@ -1592,7 +1773,7 @@ def generate_html_report(ticket_key, run_name=None):
         )
 
     # --- TC detail cards ---
-    tc_detail_html = ""
+    tc_detail_by_id = {}
     for tc_id in tc_ids:
         tc_data = tc_detail_map.get(tc_id, {})
         result = tc_data.get("status") or tc_results_legacy.get(tc_id, "unknown")
@@ -1790,6 +1971,54 @@ def generate_html_report(ticket_key, run_name=None):
   </table>
 </div>'''
 
+        # ---- API / JSON evidence (api-*.json, console-errors.json, network-requests.json, …) ----
+        # These artifacts are captured on disk and listed in tc evidence, but were never
+        # surfaced in the report — so the API-flow proof was invisible. steps-log.json and
+        # field-assertions.json are already rendered as rich tables above, so skip them.
+        _json_already_rendered = {"steps-log.json", "field-assertions.json"}
+        _json_candidates = {}  # basename -> full path
+        for _ep in evidence_paths:
+            if str(_ep).lower().endswith(".json"):
+                _bn = os.path.basename(_ep)
+                _full = os.path.join(run_dir, _ep)
+                if _bn not in _json_already_rendered and os.path.exists(_full):
+                    _json_candidates[_bn] = _full
+        if os.path.isdir(tc_path):
+            for _fn in sorted(os.listdir(tc_path)):
+                if _fn.lower().endswith(".json") and _fn not in _json_already_rendered:
+                    _full = os.path.join(tc_path, _fn)
+                    if os.path.isfile(_full):
+                        _json_candidates.setdefault(_fn, _full)
+        json_evidence_html = ""
+        if _json_candidates:
+            _blocks = ""
+            for _fn in sorted(_json_candidates):
+                try:
+                    with open(_json_candidates[_fn], encoding="utf-8", errors="replace") as _jf:
+                        _raw = _jf.read()
+                    try:
+                        _pretty = _json.dumps(_json.loads(_raw), indent=2)
+                    except Exception:
+                        _pretty = _raw
+                    _trunc = len(_pretty) > 6000
+                    _body = _esc(_pretty[:6000]) + ("\n… (truncated)" if _trunc else "")
+                except Exception:
+                    _body = "(could not read artifact)"
+                _blocks += (
+                    f'<details style="margin-bottom:8px">'
+                    f'<summary style="color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;'
+                    f'letter-spacing:0.05em;cursor:pointer;user-select:none">{_esc(_fn)}</summary>'
+                    f'<pre style="background:#0f172a;padding:10px;border-radius:6px;font-size:10px;'
+                    f'white-space:pre-wrap;max-height:340px;overflow-y:auto;color:#94a3b8;margin-top:8px">{_body}</pre>'
+                    f'</details>'
+                )
+            json_evidence_html = (
+                '<div style="margin-bottom:14px">'
+                '<div style="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;'
+                'letter-spacing:0.05em;margin-bottom:8px">API / JSON Evidence</div>'
+                f'{_blocks}</div>'
+            )
+
         # ---- Assertion hints checklist (fallback when no steps-log) ----
         hints_html = ""
         m_tc = manifest_tc_map.get(tc_id, {})
@@ -1893,7 +2122,7 @@ def generate_html_report(ticket_key, run_name=None):
         skip_html = (f'<div style="color:#f59e0b;font-size:12px;padding:8px 12px;background:rgba(245,158,11,0.1);'
                      f'border-radius:6px;margin-bottom:8px">Skipped: {_esc(skip_reason)}</div>') if skip_reason else ""
 
-        tc_detail_html += f'''
+        tc_detail_by_id[tc_id] = f'''
 <div id="{tc_id}" style="background:#1e293b;border-radius:10px;padding:20px;margin-bottom:20px;border:1px solid #334155;scroll-margin-top:80px">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
     <div>
@@ -1912,12 +2141,40 @@ def generate_html_report(ticket_key, run_name=None):
   {steps_log_table_html}
   {field_assert_html}
   {console_log_html}
+  {json_evidence_html}
   {notes_html}
   {skip_html}
   {shots_html}
   {markups_html}
 </div>
 '''
+
+    # --- Split TCs into scored vs advisory; reassemble two-group HTML ---
+    import qa_scoring as _qa_scoring
+    _tcs_for_split = [{"id": tc_id} for tc_id in tc_ids]
+    _scored_tcs, _advisory_tcs = _qa_scoring.split_test_cases(_tcs_for_split)
+    _scored_ids = [t["id"] for t in _scored_tcs]
+    _advisory_ids = [t["id"] for t in _advisory_tcs]
+
+    # Summary table rows: scored first, then advisory with separator
+    tc_rows_html = "".join(tc_row_by_id.get(tc_id, "") for tc_id in _scored_ids)
+    if _advisory_ids:
+        tc_rows_html += (
+            '<tr><td colspan="4" style="background:#0f172a;color:#64748b;font-size:10px;'
+            'font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding:8px 12px">'
+            'Advisory — not scored</td></tr>'
+        )
+        tc_rows_html += "".join(tc_row_by_id.get(tc_id, "") for tc_id in _advisory_ids)
+
+    # Detail cards: scored section first, then advisory section under separate heading
+    tc_detail_html = "".join(tc_detail_by_id.get(tc_id, "") for tc_id in _scored_ids)
+    if _advisory_ids:
+        _advisory_detail_html = "".join(tc_detail_by_id.get(tc_id, "") for tc_id in _advisory_ids)
+        tc_detail_html += (
+            '<h3 style="color:#94a3b8;margin:32px 0 16px;font-size:15px">'
+            'Advisory <span style="font-size:11px;color:#475569;font-weight:400">— not scored</span></h3>'
+            + _advisory_detail_html
+        )
 
     # --- Flat automated screenshots (not in subdirs) ---
     flat_shots_html = ""
@@ -2125,7 +2382,7 @@ def generate_html_report(ticket_key, run_name=None):
 
 <!-- Sticky nav -->
 <div class="sticky-nav">
-  <a href="https://acme.atlassian.net/browse/{_esc(ticket_key)}" target="_blank"
+  <a href="{_esc(ticket_url)}" target="_blank"
      style="font-weight:800;font-size:15px;color:#818cf8">{_esc(ticket_key)}</a>
   {f'<span style="color:#cbd5e1;font-size:13px">{_esc(ticket_summary)}</span>' if ticket_summary else ""}
   <span style="flex:1"></span>

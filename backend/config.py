@@ -14,7 +14,9 @@ QA_ASSIGNEE_FIELD = "customfield_10000"
 EVIDENCE_DIR = os.path.expanduser("~/evidence")
 STREAMS_DIR = os.path.expanduser("~/qa-dashboard/streams")
 STREAMS_RETENTION_DAYS = 7
-PIPELINE_DB = os.path.expanduser("~/qa-dashboard/pipeline-state.db")
+# Env-overridable so tests can point at a throwaway DB instead of the real board
+# DB (SCRIBE_PIPELINE_DB is set in tests/conftest.py).
+PIPELINE_DB = os.environ.get("SCRIBE_PIPELINE_DB") or os.path.expanduser("~/qa-dashboard/pipeline-state.db")
 PIPELINE_RETENTION_DAYS = 30
 POLL_INTERVAL = 60
 def _envs_from_env_var() -> list[str]:
@@ -51,13 +53,26 @@ REPO_MAP = {
 JIRA_EMAIL = os.environ.get("JIRA_EMAIL", "qa.engineer@example.com")
 JIRA_TOKEN = os.environ.get("JIRA_TOKEN", "")
 
-# --- Per-task model selection (cost control) ---
-# Low-effort AI tasks (QA-Evidence reviewer, FRIDAY chat) run on a cheaper model to
-# cut per-token API cost. The high-effort Code Reviewer is intentionally NOT pinned
-# here — it keeps the CLI default model. Override either via env var, no code change.
-CHEAP_MODEL = "claude-haiku-4-5"
-QA_EVIDENCE_MODEL = os.environ.get("SCRIBE_QA_EVIDENCE_MODEL", CHEAP_MODEL)
-CHAT_MODEL = os.environ.get("SCRIBE_CHAT_MODEL", CHEAP_MODEL)
+# --- Per-task model selection ---
+# POLICY (strict, no exceptions): NEVER use Haiku for ANY service. Haiku is unreliable
+# for QA/agentic work — it hangs on the streaming API and fabricates non-browser
+# fallbacks. A council QA-Evidence reviewer on Haiku once hung for 12h on a stalled
+# read and orphaned the lane at "test working". Only two tiers are allowed:
+#   LOW_MODEL  = lower Sonnet — low-effort tasks (QA-Evidence reviewer, FRIDAY chat)
+#   HIGH_MODEL = high-value Opus — high-effort tasks (Code Reviewer)
+# Override any of these via env var, but do NOT point them at a Haiku id.
+LOW_MODEL = "claude-sonnet-4-6"
+HIGH_MODEL = "claude-opus-4-8"
+CHEAP_MODEL = LOW_MODEL  # back-compat alias — kept pointing at Sonnet, never Haiku
+QA_EVIDENCE_MODEL = os.environ.get("SCRIBE_QA_EVIDENCE_MODEL", LOW_MODEL)
+CHAT_MODEL = os.environ.get("SCRIBE_CHAT_MODEL", LOW_MODEL)
+CODE_REVIEWER_MODEL = os.environ.get("SCRIBE_CODE_REVIEWER_MODEL", HIGH_MODEL)
+# Headless QA EXECUTION (qa_runner) drives the Playwright MCP through the whole
+# multi-phase skill — Haiku can't do that reliably (it abandons the deferred MCP and
+# fabricates non-browser fallbacks), so test execution must NEVER run on Haiku. This
+# is separate from the QA-Evidence *reviewer* (QA_EVIDENCE_MODEL) above. Override the
+# execution model via SCRIBE_QA_RUNNER_MODEL, but it is force-guarded off Haiku.
+QA_RUNNER_MODEL = os.environ.get("SCRIBE_QA_RUNNER_MODEL", LOW_MODEL)
 
 # Default reference each service uses on stable. Most are k8s-stable.
 DEFAULT_REFERENCE = "k8s-stable"

@@ -15,7 +15,7 @@ config.issueTracker.statusMapping (captured during onboarding).
 DEFAULT_STATUS_MAP = {
     "jira": {"ready_for_qa": ["Ready for QA"], "in_qa": ["In QA"]},
     "linear": {
-        "ready_for_qa": ["Ready for testing", "Ready for QA", "QA Ready", "Ready for Test"],
+        "ready_for_qa": ["Ready for Testing", "Ready for QA", "QA Ready", "Ready for Test"],
         "in_qa": ["In QA", "In Testing", "Testing", "QA"],
     },
     "azure": {"ready_for_qa": ["Ready for QA"], "in_qa": ["In QA", "Testing"]},

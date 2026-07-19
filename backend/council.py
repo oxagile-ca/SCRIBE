@@ -48,12 +48,19 @@ def _claude_bin() -> str:
     return os.environ.get(CLAUDE_BIN_ENV, "claude")
 
 
-def _build_reviewer_cmd(prompt: str, model: Optional[str] = None) -> list[str]:
+def _build_reviewer_cmd(model: Optional[str] = None) -> list[str]:
     """Argv list for create_subprocess_exec — NOT a shell-quoted string. Passing an
     argv vector avoids shell quoting entirely; the old shell+shlex.quote build mangled
     the multi-line prompt on Windows (cmd.exe ignores POSIX single quotes), so claude
-    received a stray `'You` and never returned a VERDICT. A `--model` flag is added only
-    when `model` is set; the prompt is always the final element."""
+    received a stray `'You` and never returned a VERDICT.
+
+    The prompt is fed via STDIN, NOT as an argv element. On Windows a large council
+    prompt (QA summary + reconcile + PR diff) as an argv element overflows the ~32K
+    CreateProcess command-line limit, failing with [WinError 206] "The filename or
+    extension is too long" — which crashed the orchestrator into a spurious BLOCK.
+    `claude -p` reads the prompt from stdin when none is passed as an argument
+    (verified: returns a normal stream-json result). A `--model` flag is added only
+    when `model` is set."""
     cmd = [
         _claude_bin(),
         "-p",
@@ -63,7 +70,6 @@ def _build_reviewer_cmd(prompt: str, model: Optional[str] = None) -> list[str]:
     ]
     if model:
         cmd += ["--model", model]
-    cmd.append(prompt)
     return cmd
 
 
@@ -83,12 +89,30 @@ async def _run_reviewer(reviewer: Reviewer, ctx: dict) -> dict:
     verdict is "PASS" | "BLOCK" | None (no verdict line) | "ERROR".
     """
     prompt = reviewer.prompt_builder(**ctx)
-    cmd = _build_reviewer_cmd(prompt, reviewer.model)
+    cmd = _build_reviewer_cmd(reviewer.model)
     proc = await asyncio.create_subprocess_exec(
         *cmd,
+        stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
+
+    # Feed the prompt via stdin (see _build_reviewer_cmd for why: avoids the Windows
+    # 32K argv/command-line limit). Run it as a background task so a large prompt that
+    # fills the pipe buffer can't deadlock against the stdout read loop below. Swallow
+    # BrokenPipe in case the child exits (or a test stub never reads stdin).
+    async def _feed_stdin() -> None:
+        try:
+            proc.stdin.write(prompt.encode("utf-8"))
+            await proc.stdin.drain()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+        finally:
+            try:
+                proc.stdin.close()
+            except OSError:
+                pass
+    stdin_task = asyncio.create_task(_feed_stdin())
 
     transcript_chunks: list[str] = []
     start = asyncio.get_event_loop().time()
@@ -133,6 +157,13 @@ async def _run_reviewer(reviewer: Reviewer, ctx: dict) -> dict:
             except ProcessLookupError:
                 pass
         await proc.wait()
+        # The stdin feeder has usually finished; make sure it's not left dangling
+        # (e.g. if the reviewer was killed before draining the whole prompt).
+        stdin_task.cancel()
+        try:
+            await stdin_task
+        except (asyncio.CancelledError, Exception):
+            pass
 
     stdout = "\n".join(transcript_chunks)
 
@@ -261,22 +292,45 @@ def configure(streams_registry, pipeline_store_instance):
 
 def _default_reviewers() -> list:
     from council_prompts import build_qa_evidence_prompt, build_code_reviewer_prompt
-    from config import QA_EVIDENCE_MODEL
+    from config import QA_EVIDENCE_MODEL, CODE_REVIEWER_MODEL
     return [
         Reviewer(name="qa-evidence", prompt_builder=build_qa_evidence_prompt,
-                 model=QA_EVIDENCE_MODEL),
-        Reviewer(name="code-reviewer", prompt_builder=build_code_reviewer_prompt),
-        # code-reviewer: model stays None → no --model flag → CLI default
+                 model=QA_EVIDENCE_MODEL),  # low-value → lower Sonnet (never Haiku)
+        Reviewer(name="code-reviewer", prompt_builder=build_code_reviewer_prompt,
+                 model=CODE_REVIEWER_MODEL),  # high-value → Opus (policy)
     ]
 
 
 async def _fetch_diffs(pr_refs: list) -> dict:
-    """Fetch diffs from Bitbucket for each PR. Failures degrade to '(unavailable)'."""
-    from bitbucket_client import get_pr_diff
+    """Fetch each PR's diff for the code reviewer, from the CONFIGURED VCS.
+
+    The live instance is GitHub; using the Bitbucket client there returned empty diffs,
+    so the code reviewer reviewed nothing and rubber-stamped. Pick the client by
+    vcs.type; failures degrade to a visible marker (never a silent empty).
+    """
+    try:
+        from instance_config import load_instance_config
+        vcs_type = ((load_instance_config() or {}).get("vcs") or {}).get("type", "").lower()
+    except Exception:
+        vcs_type = ""
+
     diffs: dict = {}
+    if vcs_type == "github":
+        import github_client
+        for pr in pr_refs:
+            repo, pr_id = pr.get("repo", ""), pr.get("pr_id", "")
+            if not repo or not pr_id:
+                continue
+            try:
+                text = await asyncio.to_thread(github_client.fetch_pr_diff, repo, int(pr_id))
+            except Exception as e:
+                text = f"(diff fetch failed: {e})"
+            diffs[f"{repo}/{pr_id}"] = text or "(diff empty)"
+        return diffs
+
+    from bitbucket_client import get_pr_diff
     for pr in pr_refs:
-        repo = pr.get("repo", "")
-        pr_id = pr.get("pr_id", "")
+        repo, pr_id = pr.get("repo", ""), pr.get("pr_id", "")
         if not repo or not pr_id:
             continue
         try:

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Ticket } from '../types'
 import QueueRow, { isTicketQAed } from './QueueRow'
+import { groupTickets } from '../ticketGroups'
 
 type QueueFilter = 'Ready for QA' | 'In QA' | 'QAed' | 'All'
-type SortKey = 'priority' | 'stale' | 'score' | 'key' | 'summary'
+type SortKey = 'priority' | 'difficulty' | 'created' | 'stale' | 'score' | 'key' | 'summary'
 type SortDir = 'asc' | 'desc'
 
 export type EnvLockMap = Record<string, { pipelineId: string; ticketKey: string; stage: string; status: string }>
@@ -33,6 +34,8 @@ const PRI_ORDER: Record<string, number> = { Highest: 0, High: 1, Medium: 2, Low:
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'priority', label: 'Priority' },
+  { key: 'difficulty', label: 'Difficulty (Easy→Hard)' },
+  { key: 'created', label: 'Oldest first' },
   { key: 'stale', label: 'Stale days' },
   { key: 'score', label: 'QA score' },
   { key: 'key', label: 'Ticket key' },
@@ -41,7 +44,7 @@ const SORTS: { key: SortKey; label: string }[] = [
 
 // Sensible default direction per sort field (e.g. most-stale / highest-score first).
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
-  priority: 'asc', stale: 'desc', score: 'desc', key: 'asc', summary: 'asc',
+  priority: 'asc', difficulty: 'asc', created: 'asc', stale: 'desc', score: 'desc', key: 'asc', summary: 'asc',
 }
 
 export default function Queue({ tickets, activeLaneKeys, lanesAreFull, onStart, environments, envLocks, pipelineByTicket, onRetryProvision }: Props) {
@@ -49,6 +52,7 @@ export default function Queue({ tickets, activeLaneKeys, lanesAreFull, onStart, 
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('priority')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [groupBy, setGroupBy] = useState<'none' | 'epic' | 'label'>('none')
 
   const inQueue = tickets.filter(t => !activeLaneKeys.includes(t.key))
   const qaedCount = inQueue.filter(isTicketQAed).length
@@ -68,6 +72,13 @@ export default function Queue({ tickets, activeLaneKeys, lanesAreFull, onStart, 
     .sort((a, b) => {
       const dir = sortDir === 'asc' ? 1 : -1
       switch (sortKey) {
+        case 'difficulty':
+          return ((a.difficultyScore ?? 0) - (b.difficultyScore ?? 0)) * dir
+        case 'created': {
+          const ca = a.createdAt ? Date.parse(a.createdAt) : Infinity
+          const cb = b.createdAt ? Date.parse(b.createdAt) : Infinity
+          return (ca - cb) * dir
+        }
         case 'stale':
           return (a.staleDays - b.staleDays) * dir
         case 'score': {
@@ -81,7 +92,13 @@ export default function Queue({ tickets, activeLaneKeys, lanesAreFull, onStart, 
           return a.summary.localeCompare(b.summary) * dir
         case 'priority':
         default: {
-          const priDiff = (PRI_ORDER[a.priority] ?? 2) - (PRI_ORDER[b.priority] ?? 2)
+          // Prefer Linear's numeric priority when present (None/0 sorts last); else the
+          // label order. Ties fall back to most-stale first.
+          const pv = (t: Ticket) => (t.priorityValue == null || t.priorityValue === 0) ? 99 : t.priorityValue
+          const usePv = a.priorityValue != null || b.priorityValue != null
+          const priDiff = usePv
+            ? (pv(a) - pv(b))
+            : ((PRI_ORDER[a.priority] ?? 2) - (PRI_ORDER[b.priority] ?? 2))
           const base = priDiff !== 0 ? priDiff : b.staleDays - a.staleDays
           return base * dir
         }
@@ -142,6 +159,18 @@ export default function Queue({ tickets, activeLaneKeys, lanesAreFull, onStart, 
             {sortDir === 'asc' ? '↑' : '↓'}
           </button>
         </div>
+        <div className="queue__group-by">
+          <label className="queue__sort-label">Group</label>
+          <select
+            className="queue__sort-select"
+            value={groupBy}
+            onChange={e => setGroupBy(e.target.value as 'none' | 'epic' | 'label')}
+          >
+            <option value="none">None</option>
+            <option value="epic">Epic</option>
+            <option value="label">Label</option>
+          </select>
+        </div>
       </div>
 
       <div className="queue__list">
@@ -150,18 +179,29 @@ export default function Queue({ tickets, activeLaneKeys, lanesAreFull, onStart, 
             {inQueue.length === 0 ? 'No tickets in queue' : 'No tickets match the current filters'}
           </div>
         ) : (
-          queueTickets.map(t => (
-            <QueueRow
-              key={t.key}
-              ticket={t}
-              onStart={onStart}
-              disabled={lanesAreFull}
-              environments={environments}
-              envLocks={envLocks}
-              pipelineState={pipelineByTicket?.[t.key]}
-              onRetryProvision={onRetryProvision}
-            />
-          ))
+          (() => {
+            const renderRow = (t: Ticket) => (
+              <QueueRow
+                key={t.key}
+                ticket={t}
+                onStart={onStart}
+                disabled={lanesAreFull}
+                environments={environments}
+                envLocks={envLocks}
+                pipelineState={pipelineByTicket?.[t.key]}
+                onRetryProvision={onRetryProvision}
+              />
+            )
+            if (groupBy === 'none') return queueTickets.map(renderRow)
+            return groupTickets(queueTickets, groupBy).map(g => (
+              <div key={g.key} className="queue__group">
+                <div className="queue__group-header">
+                  {g.title} <span className="queue__group-count">({g.tickets.length})</span>
+                </div>
+                {g.tickets.map(renderRow)}
+              </div>
+            ))
+          })()
         )}
       </div>
     </div>

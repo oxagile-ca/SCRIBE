@@ -1,0 +1,89 @@
+{
+  "_comment": "Template for a new customer's instance.config.json. Copy to backend/instance.config.json (gitignored) and edit. Secrets are ${secret:NAME} refs resolved from .secrets.env — never put real tokens here. This example is a generic e-commerce app to show SCRIBE is NOT tied to any one product.",
+  "orgName": "Acme Retail",
+  "productName": "ShopFront",
+  "productType": "webapp",
+  "description": "Short product description used to prime the QA agent's context.",
+  "urls": ["https://staging.shopfront.example.com/"],
+  "appSlug": "shopfront",
+  "skillCommand": "/qa-evidence-shopfront",
+  "environments": {
+    "mode": "static",
+    "staticUrls": ["https://staging.shopfront.example.com/"],
+    "buildCmd": "",
+    "deployCmd": "",
+    "readinessUrlPattern": "",
+    "testAuth": {
+      "required": true,
+      "loginUrl": "https://staging.shopfront.example.com/login",
+      "username": "qa-bot@acme.example.com",
+      "password": "${secret:TEST_LOGIN_PASSWORD}",
+      "cognito": {
+        "_comment": "Only if the app authenticates via AWS Cognito. Omit for other auth providers.",
+        "region": "us-east-1",
+        "userPoolId": "us-east-1_XXXXXXXXX",
+        "clientId": "xxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "notes": ""
+    }
+  },
+  "issueTracker": {
+    "type": "linear",
+    "baseUrl": "https://linear.app/acme/",
+    "_comment_ticketUrlTemplate": "Exact ticket deep-link, {key} = ticket id. Use this to control the URL directly; if omitted, it's built from baseUrl by convention (Linear /issue/<KEY>, Jira /browse/<KEY>).",
+    "ticketUrlTemplate": "https://linear.app/acme/issue/{key}",
+    "projects": ["SHOP"],
+    "email": "qa@acme.example.com",
+    "token": "${secret:LINEAR_TOKEN}",
+    "access": {"read": true, "write": true},
+    "statusMapping": {
+      "ready_for_qa": ["Ready for Testing", "Ready for QA"],
+      "in_qa": ["In QA", "In Testing"]
+    }
+  },
+  "vcs": {
+    "type": "github",
+    "org": "https://github.com/acme/shopfront",
+    "repos": ["shopfront-web", "shopfront-api"],
+    "token": "${secret:GITHUB_TOKEN}",
+    "access": {"read": true, "write": true}
+  },
+  "publish": {
+    "jiraComment": false,
+    "prComment": true,
+    "slackWebhook": "",
+    "confluence": {"baseUrl": "", "spaceKey": "", "parentPage": "", "token": ""}
+  },
+  "knowledge": {
+    "provider": "none",
+    "link": "",
+    "token": "",
+    "access": {"read": true, "write": false}
+  },
+  "api": {
+    "baseUrl": "https://api.staging.shopfront.example.com",
+    "prefix": "/api/v1",
+    "authType": "bearer",
+    "tokenLocation": "sessionStorage oidc.user.id_token",
+    "scopeParam": "",
+    "postmanCollectionPath": "",
+    "referencePath": ""
+  },
+  "qaTargets": {
+    "_comment": "OPTIONAL, app-specific QA-targeting taxonomy. Omit entirely and qa_targets falls back to a generic ruleset (filter/config/nav/dashboard/display) with no seed entities. seedEntities: existing records whose detail surface a ticket may need to target. entityDependentTypes: ticket types that require navigating to a seed entity. classifyRules: ordered keyword->type rules, first match wins.",
+    "seedEntities": ["ORD-100001", "ORD-100002"],
+    "entityDependentTypes": ["order", "refund", "invoice"],
+    "classifyRules": [
+      {"type": "cart", "keywords": ["cart", "basket"]},
+      {"type": "checkout", "keywords": ["checkout", "check out"]},
+      {"type": "order", "keywords": ["order", "purchase"]},
+      {"type": "refund", "keywords": ["refund", "return"]},
+      {"type": "invoice", "keywords": ["invoice", "receipt"]},
+      {"type": "filter", "keywords": ["filter"]},
+      {"type": "config", "keywords": ["config", "setting"]},
+      {"type": "nav", "keywords": ["navigation", "navbar", "nav item", "breadcrumb"]},
+      {"type": "dashboard", "keywords": ["dashboard"]},
+      {"type": "display", "keywords": ["display", "render", "badge", "icon", "logo"]}
+    ]
+  }
+}

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, FormEvent } from 'react'
 import { Ticket } from '../types'
 import type { EnvLockMap, PipelineStateEntry } from './Queue'
 import { evidenceIsComplete } from '../laneStatus'
+import { fetchTestCases, addTestCase, deleteTestCase, TestCase } from '../api'
 
 const PRIORITY_COLORS: Record<string, string> = {
   Highest: 'var(--pri-highest)',
@@ -32,6 +33,35 @@ export default function QueueRow({ ticket, onStart, disabled, environments, envL
     ticket.staleDays >= 3 ? 'queue-row queue-row--stale' : 'queue-row'
 
   const acs = extractACs(ticket.description)
+  const ticketCases = extractTestCases(ticket.description)
+
+  const [added, setAdded] = useState<TestCase[]>([])
+  const [newCase, setNewCase] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  // Load the ticket's SCRIBE-local added cases the first time the card is expanded.
+  useEffect(() => {
+    if (!expanded) return
+    let alive = true
+    fetchTestCases(ticket.key).then((cs) => { if (alive) setAdded(cs) })
+    return () => { alive = false }
+  }, [expanded, ticket.key])
+
+  async function handleAddCase(e: FormEvent) {
+    e.preventDefault()
+    const text = newCase.trim()
+    if (!text) return
+    setBusy(true)
+    const created = await addTestCase(ticket.key, text)
+    setBusy(false)
+    if (created) { setAdded((prev) => [...prev, created]); setNewCase('') }
+  }
+
+  async function handleDeleteCase(id: string) {
+    if (await deleteTestCase(ticket.key, id)) {
+      setAdded((prev) => prev.filter((c) => c.id !== id))
+    }
+  }
 
   return (
     <>
@@ -260,18 +290,56 @@ export default function QueueRow({ ticket, onStart, disabled, environments, envL
           )}
         </div>
       </div>
-      {expanded && acs.length > 0 && (
+      {expanded && (
         <div style={{
-          padding: '8px 14px 8px 34px',
+          padding: '8px 14px 10px 34px',
           background: 'var(--bg)',
           borderBottom: '1px solid var(--border)',
           fontSize: 11,
           color: 'var(--text-muted)',
         }}>
-          <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 10, color: 'var(--text-dim)' }}>
-            Acceptance Criteria:
+          {acs.length > 0 && (
+            <>
+              <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 10, color: 'var(--text-dim)' }}>
+                Acceptance Criteria:
+              </div>
+              {acs.map((ac, i) => <div key={i} style={{ marginBottom: 2 }}>- {ac}</div>)}
+            </>
+          )}
+
+          <div style={{ fontWeight: 700, margin: '8px 0 4px', fontSize: 10, color: 'var(--text-dim)' }}>
+            Test cases{ticketCases.length + added.length > 0 ? ` (${ticketCases.length + added.length})` : ''}
           </div>
-          {acs.map((ac, i) => <div key={i} style={{ marginBottom: 2 }}>- {ac}</div>)}
+          {ticketCases.length === 0 && added.length === 0 && (
+            <div style={{ color: 'var(--text-dim)', marginBottom: 2 }}>None yet — add one below.</div>
+          )}
+          {ticketCases.map((tc, i) => (
+            <div key={`t${i}`} style={{ marginBottom: 2 }}>
+              {'☐'} {tc} <span style={{ color: 'var(--text-dim)', fontSize: 9 }}>from ticket</span>
+            </div>
+          ))}
+          {added.map((tc) => (
+            <div key={tc.id} style={{ marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>{'☐'} {tc.text} <span style={{ color: 'var(--accent, #5b8cff)', fontSize: 9 }}>added</span></span>
+              <button
+                type="button"
+                onClick={() => handleDeleteCase(tc.id)}
+                title="Remove this test case"
+                style={{ marginLeft: 'auto', border: 'none', background: 'none', color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1 }}
+              >
+                {'✕'}
+              </button>
+            </div>
+          ))}
+          <form onSubmit={handleAddCase} style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            <input
+              value={newCase}
+              onChange={(e) => setNewCase(e.target.value)}
+              placeholder="Add a test case — it'll be tested on the next run"
+              style={{ flex: 1, fontSize: 11, padding: '3px 6px' }}
+            />
+            <button type="submit" disabled={busy || !newCase.trim()} style={{ fontSize: 11 }}>Add</button>
+          </form>
         </div>
       )}
     </>
@@ -311,4 +379,30 @@ function extractACs(description: string): string[] {
     if (inAcSection && trimmed === '') inAcSection = false
   }
   return acs
+}
+
+/** Pull the ticket's own test cases from a `Test Cases` section of the description
+ *  (the checklist items under a "## Test Cases" heading). Empty when there's none. */
+function extractTestCases(description: string): string[] {
+  if (!description) return []
+  const out: string[] = []
+  let inSection = false
+  for (const raw of description.split('\n')) {
+    const line = raw.trim()
+    const isHeading = /^#{1,6}\s/.test(line) || /^\*{0,2}[\w ]+:?\*{0,2}$/.test(line)
+    if (/test\s*cases?/i.test(line) && isHeading) {
+      inSection = true
+      continue
+    }
+    if (!inSection) continue
+    // A different heading ends the Test Cases section.
+    if (/^#{1,6}\s/.test(line) && !/test\s*cases?/i.test(line)) {
+      inSection = false
+      continue
+    }
+    // Collect checklist / bullet items: "- [ ] x", "- [x] x", "- x", "* x".
+    const m = line.match(/^[-*]\s*(?:\[[ xX]\]\s*)?(.+)$/)
+    if (m && m[1].trim().length > 2) out.push(m[1].trim())
+  }
+  return out
 }

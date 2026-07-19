@@ -27,6 +27,20 @@ import sys
 import config
 import instance_config as ic
 import qa_auth
+import test_cases_store
+
+
+def merge_added_test_cases(ticket_text, ticket_description, added):
+    """Append SCRIBE-local, user-added test cases to the scope handed to the skill so
+    they're actually tested (they live only in SCRIBE — never in the tracker).
+
+    Returns (ticket_text, ticket_description) with an '## Added Test Cases (SCRIBE)'
+    checklist appended to each when there are any; unchanged otherwise.
+    """
+    if not added:
+        return ticket_text, ticket_description
+    block = "\n\n## Added Test Cases (SCRIBE)\n" + "\n".join(f"- [ ] {t}" for t in added)
+    return (ticket_text or "") + block, (ticket_description or "") + block
 
 
 # ── QA-targeting config (app-agnostic) ──────────────────────────────────────
@@ -434,9 +448,15 @@ def main(argv=None):
     if is_booking_dependent(ttype) and not args.no_network:
         seed_booking, seed_error = _resolve_seed_booking(_api_base(cfg))
 
-    out = gather(args.key, args.env_url, ticket_text=ticket_text,
+    # Merge user-added local test cases into the scope handed to the skill so they get
+    # tested too. Classification + seed-booking above stay on the ticket's own text.
+    added = test_cases_store.texts_for(args.key)
+    scope_text, scope_desc = merge_added_test_cases(
+        ticket_text, (ticket or {}).get("description"), added)
+
+    out = gather(args.key, args.env_url, ticket_text=scope_text,
                  ticket_summary=(ticket or {}).get("summary"),
-                 ticket_description=(ticket or {}).get("description"),
+                 ticket_description=scope_desc,
                  ticket_state=(ticket or {}).get("state"),
                  seed_booking=seed_booking, instance_cfg=cfg,
                  evidence_root=evidence_root)

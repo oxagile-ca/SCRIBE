@@ -32,6 +32,9 @@ from instance_config import (
 import linear_client
 import config_io
 import ticket_difficulty
+import onboarding_verify
+import version_info
+import test_cases_store
 from status_map import resolve_status_mapping, categorize_status
 
 # Load onboarding-generated secrets (.secrets.env) into the environment at startup so
@@ -39,24 +42,7 @@ from status_map import resolve_status_mapping, categorize_status
 load_secrets_env()
 
 
-def _resolve_version():
-    """Capture git SHA + dirty flag at startup. Process restarts bump this — that's the point."""
-    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    try:
-        sha = subprocess.check_output(
-            ["git", "-C", repo_root, "rev-parse", "--short", "HEAD"],
-            stderr=subprocess.DEVNULL, timeout=2,
-        ).decode().strip()
-        dirty = bool(subprocess.check_output(
-            ["git", "-C", repo_root, "status", "--porcelain"],
-            stderr=subprocess.DEVNULL, timeout=2,
-        ).decode().strip())
-        return f"{sha}{'+dirty' if dirty else ''}"
-    except Exception:
-        return "unknown"
-
-
-VERSION = _resolve_version()
+VERSION = version_info.resolve_version()
 STARTED_AT = time.time()
 
 app = FastAPI(title="Agent Squad API")
@@ -257,9 +243,48 @@ async def api_onboarding(answers: Dict[str, Any]):
         # Load the just-written secrets so the running process picks up tokens
         # immediately — no restart needed.
         load_secrets_env(result["paths"].get("secrets"))
+        # A newly-onboarded product starts fresh: archive the prior usage ledger so its
+        # all-time spend doesn't carry into the new product's header total.
+        try:
+            usage_ledger.reset()
+        except Exception:
+            pass  # bookkeeping only — must never fail the onboarding
     except Exception as e:  # noqa: BLE001 — surface any generation failure to the wizard
         return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
     return {"ok": True, **result}
+
+
+@app.post("/api/onboarding/verify")
+async def api_onboarding_verify(payload: Dict[str, Any]):
+    """Live-check one integration the wizard just configured, so a bad token/URL is
+    caught during onboarding instead of surfacing later as an empty board.
+
+    Body: {"target": "issueTracker"|"vcs"|"environment"|"anthropic", "answers": {...}}
+    Returns {ok, detail, hint} — never raises, never echoes the secret value.
+    """
+    target = payload.get("target") or ""
+    answers = payload.get("answers") or {}
+    return await onboarding_verify.verify(target, answers)
+
+
+@app.get("/api/test-cases/{key}")
+async def api_test_cases_list(key: str):
+    """User-added, SCRIBE-local test cases for a ticket (never written to the tracker)."""
+    return {"cases": test_cases_store.list_cases(key)}
+
+
+@app.post("/api/test-cases/{key}")
+async def api_test_cases_add(key: str, payload: Dict[str, Any]):
+    """Add a local test case. These are merged into the QA run scope so they get tested."""
+    case = test_cases_store.add_case(key, (payload or {}).get("text", ""))
+    if not case:
+        return JSONResponse(status_code=400, content={"ok": False, "error": "text is required"})
+    return {"ok": True, "case": case}
+
+
+@app.delete("/api/test-cases/{key}/{case_id}")
+async def api_test_cases_delete(key: str, case_id: str):
+    return {"ok": test_cases_store.delete_case(key, case_id)}
 
 
 @app.get("/api/config")

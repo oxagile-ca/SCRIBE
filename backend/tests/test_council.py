@@ -271,6 +271,49 @@ async def test_run_reviewer_no_verdict(monkeypatch):
     assert "forgot the verdict" in outcome["stdout"]
 
 
+@pytest.mark.asyncio
+async def test_run_reviewer_sets_large_subprocess_stream_limit(monkeypatch):
+    # Root-cause regression for the recurring council spurious BLOCK
+    # "orchestrator crashed: Separator is found, but chunk is longer than limit":
+    # claude --output-format stream-json emits ONE JSON object per line, and a large
+    # assistant/tool-result line exceeds asyncio's default 64 KiB StreamReader limit ->
+    # proc.stdout.readline() raises LimitOverrunError -> the orchestrator crashes into a
+    # BLOCK. _run_reviewer must spawn the reviewer with an explicit, generous stream limit.
+    import asyncio
+    captured = {}
+
+    class _FakeStdin:
+        def write(self, *_): pass
+        async def drain(self): pass
+        def close(self): pass
+
+    class _FakeReader:
+        async def readline(self): return b""   # immediate EOF -> read loop exits at once
+        async def read(self): return b""
+
+    class _FakeProc:
+        returncode = 0
+        stdin = _FakeStdin()
+        stdout = _FakeReader()
+        stderr = _FakeReader()
+        async def wait(self): return 0
+        def kill(self): pass
+
+    async def _fake_exec(*args, **kwargs):
+        captured.update(kwargs)
+        return _FakeProc()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", _fake_exec)
+
+    rv = Reviewer(name="qa-evidence", prompt_builder=lambda **kw: "prompt")
+    await _run_reviewer(rv, ctx={"ticket_key": "PROJ-1"})
+
+    assert "limit" in captured, "reviewer subprocess must set an explicit StreamReader limit"
+    # Comfortably above asyncio's 64 KiB default so an oversized stream-json line is read,
+    # not crashed on.
+    assert captured["limit"] >= 8 * 1024 * 1024
+
+
 def test_synthesize_carries_per_reviewer_usage():
     outcomes = [
         {"name": "qa-evidence", "verdict": "PASS", "reason": "", "error": None,

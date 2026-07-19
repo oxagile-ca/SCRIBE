@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   OnboardingAnswers,
   emptyAnswers,
@@ -7,8 +7,83 @@ import {
   EnvMode,
   KnowledgeProvider,
 } from '../../onboardingSchema'
-import { submitOnboarding } from '../../api'
+import { submitOnboarding, verifyConnection, VerifyTarget, VerifyResult } from '../../api'
 import { AccessChecks, ListTextarea, Field, linesToArr } from './fields'
+
+/** A "Test connection" button + inline ✓/✗ status for one integration. Runs a live
+ *  check against the current answers so a bad token/URL is caught during onboarding. */
+function ConnectionCheck({ target, answers, label = 'Test connection' }:
+  { target: VerifyTarget; answers: OnboardingAnswers; label?: string }) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ok' | 'fail'>('idle')
+  const [msg, setMsg] = useState('')
+  async function run() {
+    setStatus('loading'); setMsg('')
+    const r = await verifyConnection(target, answers)
+    setStatus(r.ok ? 'ok' : 'fail'); setMsg(r.ok ? r.detail : r.hint)
+  }
+  return (
+    <div className="ob-check">
+      <button type="button" className="ob-check-btn" disabled={status === 'loading'} onClick={run}>
+        {status === 'loading' ? 'Testing…' : label}
+      </button>
+      {status === 'ok' && <span className="ob-check-ok">✓ {msg}</span>}
+      {status === 'fail' && <span className="ob-check-fail">✗ {msg}</span>}
+    </div>
+  )
+}
+
+const PREFLIGHT: { target: VerifyTarget; label: string }[] = [
+  { target: 'environment', label: 'Test environment' },
+  { target: 'issueTracker', label: 'Issue tracker' },
+  { target: 'vcs', label: 'Version control' },
+  { target: 'anthropic', label: 'Anthropic key' },
+]
+
+/** Runs all connection checks when the Review step opens and lists ✓/✗ per integration.
+ *  Warn-but-allow: failures are shown loudly but never block Generate. */
+function PreflightSummary({ answers }: { answers: OnboardingAnswers }) {
+  const [results, setResults] = useState<Record<string, VerifyResult | 'loading'>>({})
+  const runAll = useCallback(() => {
+    setResults(Object.fromEntries(PREFLIGHT.map((p) => [p.target, 'loading'])))
+    PREFLIGHT.forEach(async (p) => {
+      const r = await verifyConnection(p.target, answers)
+      setResults((prev) => ({ ...prev, [p.target]: r }))
+    })
+  }, [answers])
+  useEffect(() => { runAll() }, [])  // eslint-disable-line react-hooks/exhaustive-deps
+  const anyFail = PREFLIGHT.some((p) => {
+    const r = results[p.target]
+    return r && r !== 'loading' && !r.ok
+  })
+  return (
+    <div className="ob-preflight">
+      <div className="ob-preflight-head">
+        <b>Connection pre-flight</b>
+        <button type="button" className="ob-check-btn" onClick={runAll}>Re-check</button>
+      </div>
+      <ul>
+        {PREFLIGHT.map((p) => {
+          const r = results[p.target]
+          return (
+            <li key={p.target}>
+              <span className="ob-preflight-label">{p.label}:</span>{' '}
+              {r === undefined && <span className="ob-check-muted">—</span>}
+              {r === 'loading' && <span className="ob-check-muted">testing…</span>}
+              {r && r !== 'loading' && (r.ok
+                ? <span className="ob-check-ok">✓ {r.detail}</span>
+                : <span className="ob-check-fail">✗ {r.hint}</span>)}
+            </li>
+          )
+        })}
+      </ul>
+      {anyFail && (
+        <p className="ob-check-warn">
+          Some connections are failing. You can fix them above and Re-check, or generate anyway.
+        </p>
+      )}
+    </div>
+  )
+}
 
 const STEPS = [
   'Company & product',
@@ -178,6 +253,9 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
                 </Field>
               </>
             )}
+            {env.staticUrls[0] && (
+              <ConnectionCheck target="environment" answers={answers} label="Test environment URL" />
+            )}
           </>
         )
       case 2:
@@ -230,6 +308,7 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
                 onChange={(arr) => set('issueTracker', { statusMapping: { ...it.statusMapping, in_qa: arr } })}
               />
             </Field>
+            <ConnectionCheck target="issueTracker" answers={answers} />
           </>
         )
       case 3:
@@ -252,6 +331,7 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
               <input type="password" value={vcs.token} onChange={(e) => set('vcs', { token: e.target.value })} />
             </Field>
             <AccessChecks value={vcs.access} onChange={(access) => set('vcs', { access })} />
+            <ConnectionCheck target="vcs" answers={answers} />
           </>
         )
       case 4:
@@ -333,9 +413,12 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
         )
       case 7:
         return (
-          <Field label="Anthropic API key (the runner uses this; stored encrypted)">
-            <input type="password" value={answers.anthropicKey} onChange={(e) => setAnswers((a) => ({ ...a, anthropicKey: e.target.value }))} placeholder="sk-ant-..." />
-          </Field>
+          <>
+            <Field label="Anthropic API key (the runner uses this; stored encrypted)">
+              <input type="password" value={answers.anthropicKey} onChange={(e) => setAnswers((a) => ({ ...a, anthropicKey: e.target.value }))} placeholder="sk-ant-..." />
+            </Field>
+            <ConnectionCheck target="anthropic" answers={answers} label="Test key" />
+          </>
         )
       case 8:
         return (
@@ -350,6 +433,7 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
               <li><b>Risk-area patterns:</b> {qa.riskAreas.length}</li>
               <li><b>Anthropic key:</b> {answers.anthropicKey ? 'set' : 'not set'}</li>
             </ul>
+            <PreflightSummary answers={answers} />
             {errors.length > 0 && (
               <div className="ob-errors">
                 <b>Please fix:</b>

@@ -82,3 +82,8 @@ backend/*_REPORT.md
 backend/QA_EVIDENCE_*.md
 backend/FINAL_QA_SUMMARY.md
 backend/HANDOFF_*.md
+
+# QA evidence + test output (regenerated; never commit — see docs plan 2026-06-29)
+evidence/
+frontend/test-results/
+backend/index.html

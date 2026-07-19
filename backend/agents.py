@@ -1328,6 +1328,19 @@ def _report_url_for(ticket_key, run_name, run_dir=None):
 
 
 def check_evidence(ticket_key):
+    # Never let one ticket's unreadable evidence (e.g. a corrupt/oddly-encoded
+    # summary.json written by an autonomous QA agent) propagate an exception —
+    # api_tickets iterates every ticket, so an unguarded raise 500s the whole
+    # board. Degrade to "no evidence" and log instead.
+    try:
+        return _check_evidence_impl(ticket_key)
+    except Exception as exc:
+        import sys
+        print(f"[check_evidence] {ticket_key}: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+        return {"status": "none", "score": None, "time": "", "reportPath": "", "reportUrl": "", "needsReport": False}
+
+
+def _check_evidence_impl(ticket_key):
     evidence_path = os.path.join(EVIDENCE_DIR, ticket_key)
     if not os.path.isdir(evidence_path):
         return {"status": "none", "score": None, "time": "", "reportPath": "", "reportUrl": "", "needsReport": False}
@@ -1364,8 +1377,15 @@ def check_evidence(ticket_key):
     import json as _json
     summary_path = os.path.join(latest_run, "summary.json")
     if os.path.exists(summary_path):
-        with open(summary_path) as f:
-            summary = _json.load(f)
+        # Evidence JSON is authored by autonomous QA agents; on Windows they can
+        # emit CP1252 punctuation (e.g. 0x97 em-dash) instead of UTF-8. Read the
+        # bytes and fall back to CP1252 so a stray byte can't raise here.
+        with open(summary_path, "rb") as f:
+            _raw = f.read()
+        try:
+            summary = _json.loads(_raw.decode("utf-8"))
+        except UnicodeDecodeError:
+            summary = _json.loads(_raw.decode("cp1252"))
         score = summary.get("score")
         # Some runs write `score` as a tally dict (e.g. {pass, fail, blocked, total, pct, verdict}).
         # Coerce to a single number so the API contract (number | null) holds for the UI.

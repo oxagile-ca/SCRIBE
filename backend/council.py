@@ -34,6 +34,13 @@ CLAUDE_BIN_ENV = "CLAUDE_BIN"
 DEFAULT_IDLE_TIMEOUT_S = 120
 DEFAULT_TOTAL_TIMEOUT_S = 300
 
+# asyncio's StreamReader defaults to a 64 KiB line limit. `claude --output-format
+# stream-json` emits ONE JSON object per line, and a large assistant/tool-result event
+# is a single line that can blow past 64 KiB — which makes proc.stdout.readline() raise
+# LimitOverrunError ("Separator is found, but chunk is longer than limit") and crashed the
+# orchestrator into a spurious BLOCK. Give the reader generous headroom (64 MiB).
+_STREAM_READER_LIMIT = 64 * 1024 * 1024
+
 
 @dataclass
 class Reviewer:
@@ -95,6 +102,10 @@ async def _run_reviewer(reviewer: Reviewer, ctx: dict) -> dict:
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        # Raise the StreamReader line limit so the readline() loop below can consume a
+        # >64 KiB stream-json line instead of crashing with LimitOverrunError. See
+        # _STREAM_READER_LIMIT for the full rationale.
+        limit=_STREAM_READER_LIMIT,
     )
 
     # Feed the prompt via stdin (see _build_reviewer_cmd for why: avoids the Windows

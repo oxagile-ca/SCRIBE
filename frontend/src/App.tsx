@@ -61,6 +61,8 @@ export default function App() {
   // Already-deployed apps (static/local/deployed modes) skip build & deploy — only
   // 'script' mode needs them. Drives which stages the lane shows.
   const [needsBuildDeploy, setNeedsBuildDeploy] = useState(true)
+  // Lane created by a queue Re-test, waiting for state to settle before its QA run.
+  const [pendingReTestLaneId, setPendingReTestLaneId] = useState<string | null>(null)
   // Ref mirror so the start callbacks read the current value (not a stale closure).
   const needsBuildDeployRef = useRef(true)
   useEffect(() => { needsBuildDeployRef.current = needsBuildDeploy }, [needsBuildDeploy])
@@ -558,6 +560,45 @@ export default function App() {
       showToast(`QA failed to start: ${err}`)
     }
   }, [lanes])
+
+  /**
+   * Re-test a ticket that has already been QA'd, straight from the queue.
+   *
+   * A re-test only needs the QA stage, so this skips the full provision → build →
+   * deploy pipeline that "Start" runs and goes directly to inspector. It still
+   * creates a lane first: firing a background run with no card would leave the user
+   * with no progress, no logs, and no blocker banner.
+   */
+  const handleReTest = useCallback((ticket: Ticket, env = '') => {
+    if (lanes.length >= 3) return
+    const laneId = `lane-${Date.now()}`
+    const agents = makeAgentStatuses()
+    agents.inspector.state = 'active'
+    setLanes(prev => [...prev, {
+      id: laneId,
+      ticket,
+      agents,
+      currentAgent: 'inspector' as AgentName,
+      streamId: null,
+      pipelineId: null,
+      env,
+      logs: [],
+      startedAt: new Date().toISOString(),
+    }])
+    laneCurrentAgent.current[laneId] = 'inspector'
+    // handleRunQa reads `lanes` from its closure, so it cannot see a lane added in
+    // this same tick. Hand off via state and let the effect below fire once the
+    // lane has actually landed.
+    setPendingReTestLaneId(laneId)
+  }, [lanes])
+
+  useEffect(() => {
+    if (!pendingReTestLaneId) return
+    if (!lanes.some(l => l.id === pendingReTestLaneId)) return
+    const laneId = pendingReTestLaneId
+    setPendingReTestLaneId(null)
+    handleRunQa(laneId)
+  }, [pendingReTestLaneId, lanes, handleRunQa])
 
   const handleAttachLinear = useCallback(async (laneId: string) => {
     const lane = lanes.find(l => l.id === laneId)
@@ -1196,6 +1237,8 @@ export default function App() {
         activeLaneKeys={activeLaneKeys}
         lanesAreFull={lanes.length >= 3}
         onStart={handleStart}
+        onReTest={handleReTest}
+        needsBuildDeploy={needsBuildDeploy}
         environments={environments}
         envLocks={envLocks}
         pipelineByTicket={pipelineByTicket}

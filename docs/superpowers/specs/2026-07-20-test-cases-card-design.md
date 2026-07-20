@@ -158,6 +158,43 @@ work. Boot backend + frontend, then on a real ticket:
 4. Run QA and confirm an added case actually reaches the run scope via
    `qa_targets`.
 
+## Addendum — "Re-test" on QAed queue rows (2026-07-20)
+
+Decided in the same session, implemented in the same file (`QueueRow.tsx`), so it
+is recorded here rather than in a separate spec.
+
+**Problem.** A ticket that has already been QA'd is indistinguishable in the queue
+from one that never has: `NOR-11` (0/100) and `NOR-12` (82/100) both offer the same
+plain **Start**, which runs the *full* pipeline behind the env picker — provision,
+build, deploy, test — when re-testing usually only needs the QA stage. The lane card
+already relabels itself to "Retry QA" (`LaneCard.tsx:231`); the queue never got the
+same treatment.
+
+**Decisions (locked)**
+
+1. A row where `isTicketQAed(ticket)` is true labels its button **"Re-test"** instead
+   of "Start". Non-QAed rows are untouched.
+2. **Env resolution splits on `needsBuildDeploy`** (the existing `App.tsx:63` flag):
+   - **already-deployed app** (`needsBuildDeploy === false`) → one click, no picker.
+     The request sends `envUrl: ""` and the backend resolves it via
+     `qa_orchestrator.resolve_env_url` → `environments.staticUrls[0]`.
+   - **build/deploy app** (`needsBuildDeploy === true`) → opens the **existing** env
+     picker, then runs QA-only against the chosen env.
+   Rejected: always-skip-the-picker (an app with no `staticUrls` would resolve to `""`
+   and silently test nothing — the exact silent-wrong failure this codebase keeps
+   fixing), and always-show-the-picker (pointless click when there is one answer).
+3. **Re-test creates a lane, then runs QA.** Firing a background run with no lane card
+   would leave the user with no progress, no logs, and no blocker banner. Re-test
+   therefore does what Start does to establish the lane, then immediately triggers the
+   QA run instead of waiting for a second click on "Run QA".
+4. The single-run lock is respected: the backend returns **409** when another QA run is
+   active (`server.py:1009`). Re-test surfaces that message as a toast and leaves the
+   lane in place rather than failing silently.
+
+**Pure logic (tested):** `queueActionLabel(isQAed)` and `retestNeedsEnvPicker(needsBuildDeploy)`
+live in `src/testCases.ts`'s sibling module `src/queueActions.ts` so the branch in
+decision 2 is unit-tested rather than buried in JSX.
+
 ## Out of scope
 
 - Last-run executed results in the modal (decision 2).

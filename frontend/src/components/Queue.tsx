@@ -24,6 +24,10 @@ interface Props {
   activeLaneKeys: string[]
   lanesAreFull: boolean
   onStart: (ticket: Ticket, env: string) => void
+  /** Re-test an already-QAed ticket: QA stage only, no build/deploy. */
+  onReTest: (ticket: Ticket, env: string) => void
+  /** False for already-deployed apps — a re-test then needs no env picker. */
+  needsBuildDeploy: boolean
   environments: string[]
   envLocks: EnvLockMap
   pipelineByTicket?: Record<string, PipelineStateEntry>
@@ -47,7 +51,7 @@ const DEFAULT_DIR: Record<SortKey, SortDir> = {
   priority: 'asc', difficulty: 'asc', created: 'asc', stale: 'desc', score: 'desc', key: 'asc', summary: 'asc',
 }
 
-export default function Queue({ tickets, activeLaneKeys, lanesAreFull, onStart, environments, envLocks, pipelineByTicket, onRetryProvision }: Props) {
+export default function Queue({ tickets, activeLaneKeys, lanesAreFull, onStart, onReTest, needsBuildDeploy, environments, envLocks, pipelineByTicket, onRetryProvision }: Props) {
   const [filter, setFilter] = useState<QueueFilter>('All')
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('priority')
@@ -185,6 +189,8 @@ export default function Queue({ tickets, activeLaneKeys, lanesAreFull, onStart, 
                 key={t.key}
                 ticket={t}
                 onStart={onStart}
+                onReTest={onReTest}
+                needsBuildDeploy={needsBuildDeploy}
                 disabled={lanesAreFull}
                 environments={environments}
                 envLocks={envLocks}

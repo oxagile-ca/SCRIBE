@@ -88,7 +88,7 @@
   font: inherit;
 }
 .ob-foot button:disabled { opacity: 0.4; cursor: default; }
-.ob-primary { background: var(--accent, #5b8cff) !important; border-color: var(--accent, #5b8cff) !important; color: #fff !important; }
+.ob-primary { background: var(--accent) !important; border-color: var(--accent) !important; color: #2d3142 !important; font-weight: 600; }
 
 .ob-done { padding: 28px 24px; text-align: center; }
 .ob-done h2 { margin-top: 0; }

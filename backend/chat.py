@@ -47,7 +47,11 @@ def _session_exists(session_id: str) -> bool:
     return os.path.exists(os.path.join(SESSION_DIR, f"{session_id}.jsonl"))
 
 
-def _build_cmd(message: str, session_id: Optional[str]) -> str:
+def _build_cmd(session_id: Optional[str]) -> list[str]:
+    # argv list for create_subprocess_exec — the message is fed via STDIN, never as an
+    # arg. The old shell + shlex.quote build ran through cmd.exe on Windows, which ignores
+    # POSIX single quotes and mangled the message, so FRIDAY received a garbled prompt and
+    # replied "looks like your message was cut off".
     parts = [
         CLAUDE_BIN,
         "-p",
@@ -59,8 +63,7 @@ def _build_cmd(message: str, session_id: Optional[str]) -> str:
         parts += ["--model", CHAT_MODEL]
     if session_id:
         parts += ["--resume", session_id]
-    parts.append(message)
-    return " ".join(shlex.quote(p) for p in parts)
+    return parts
 
 
 def _extract_text(content):
@@ -78,13 +81,28 @@ async def chat_stream(message: str, session_id: Optional[str] = None) -> AsyncIt
     # "No conversation found" — happens after manual cleanup or backend restarts.
     if session_id and not _session_exists(session_id):
         session_id = None
-    cmd = _build_cmd(message, session_id)
-    proc = await asyncio.create_subprocess_shell(
-        cmd,
+    cmd = _build_cmd(session_id)
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=CHAT_CWD,
+        limit=64 * 1024 * 1024,  # a large stream-json line would overrun the 64 KiB default
     )
+
+    async def _feed_stdin() -> None:
+        try:
+            proc.stdin.write(message.encode("utf-8"))
+            await proc.stdin.drain()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+        finally:
+            try:
+                proc.stdin.close()
+            except OSError:
+                pass
+    stdin_task = asyncio.create_task(_feed_stdin())
 
     sent_session = False
     start = asyncio.get_event_loop().time()
@@ -195,3 +213,4 @@ async def chat_stream(message: str, session_id: Optional[str] = None) -> AsyncIt
                 proc.kill()
             except ProcessLookupError:
                 pass
+        stdin_task.cancel()

@@ -1,45 +1,49 @@
+/* VERDIKT design tokens — slate ground + coral accent.
+ * Brand palette: #2D3142 slate · #4F5D75 slate-blue · #BFC0C0 silver · #FFFFFF · #EF8354 coral.
+ * PASS/BLOCK are functional verdict hues, kept deliberately off the brand accent. */
 :root, [data-theme="dark"] {
-  /* Surfaces — layered slate; each level a step up in lightness */
-  --bg: #0f1623;
-  --bg-elevated: #161f30;
-  --bg-card: #1b2638;
-  --bg-input: #0f1623;
-  --bg-hover: rgba(99, 132, 197, 0.07);
+  /* Surfaces — slate ramp anchored on #2D3142 */
+  --bg: #20232e;
+  --bg-elevated: #262a37;
+  --bg-card: #2d3142;
+  --bg-input: #1b1e28;
+  --bg-hover: rgba(239, 131, 84, 0.08);
 
   /* Text */
-  --text: #e6ecf4;
-  --text-muted: #9aa9c2;
-  --text-dim: #6b7a94;
+  --text: #f5f6f8;
+  --text-muted: #bfc0c0;
+  --text-dim: #8b92a3;
 
   /* Borders */
-  --border: #2a3650;
-  --border-strong: #3a4a6e;
+  --border: #3a4056;
+  --border-strong: #4f5d75;
 
-  /* Brand — cool indigo primary, with sky accent */
-  --accent: #6c8cff;
-  --accent-strong: #5775ee;
-  --accent-soft: rgba(108, 140, 255, 0.14);
-  --accent-glow: rgba(108, 140, 255, 0.28);
+  /* Brand — coral */
+  --accent: #ef8354;
+  --accent-strong: #e06a3c;
+  --accent-soft: rgba(239, 131, 84, 0.14);
+  --accent-glow: rgba(239, 131, 84, 0.30);
+  --grad-accent: linear-gradient(135deg, #f79e75 0%, #ef8354 48%, #d96a3c 100%);
 
-  /* Semantic */
-  --success: #4ade80;
-  --success-soft: rgba(74, 222, 128, 0.14);
-  --warning: #fbbf24;
-  --warning-soft: rgba(251, 191, 36, 0.14);
-  --danger: #f87171;
-  --danger-soft: rgba(248, 113, 113, 0.14);
-  --purple: #a78bfa;
+  /* Semantic / verdict — functional, not the accent */
+  --success: #46b98a;
+  --success-soft: rgba(70, 185, 138, 0.15);
+  --warning: #e3b341;
+  --warning-soft: rgba(227, 179, 65, 0.15);
+  --danger: #e14b5b;
+  --danger-soft: rgba(225, 75, 91, 0.15);
+  --purple: #7c86ad;
 
-  /* Priority — same hues as semantic for consistency */
-  --pri-highest: #f87171;
-  --pri-high: #fbbf24;
-  --pri-medium: #facc15;
-  --pri-low: #4ade80;
+  /* Priority — red → coral → amber → green ramp */
+  --pri-highest: #e14b5b;
+  --pri-high: #ef8354;
+  --pri-medium: #e3b341;
+  --pri-low: #46b98a;
 
   /* Elevation */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 2px rgba(8, 10, 16, 0.30);
+  --shadow-md: 0 6px 20px rgba(8, 10, 16, 0.42);
+  --shadow-lg: 0 18px 44px rgba(8, 10, 16, 0.55);
 
   /* Radius */
   --radius-sm: 6px;
@@ -49,42 +53,48 @@
 
   /* Motion */
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* Type */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Helvetica Neue', Helvetica, Arial, var(--font-sans);
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
 }
 [data-theme="light"] {
-  --bg: #f5f7fb;
+  --bg: #f4f5f7;
   --bg-elevated: #ffffff;
   --bg-card: #ffffff;
   --bg-input: #ffffff;
-  --bg-hover: rgba(46, 79, 168, 0.05);
+  --bg-hover: rgba(239, 131, 84, 0.07);
 
-  --text: #1c2536;
-  --text-muted: #4a5872;
-  --text-dim: #6b7a94;
+  --text: #2d3142;
+  --text-muted: #4f5d75;
+  --text-dim: #838b9c;
 
-  --border: #e3e8f0;
-  --border-strong: #cbd4e1;
+  --border: #e2e5ec;
+  --border-strong: #c7ccd6;
 
-  --accent: #3a5bd9;
-  --accent-strong: #2d4ac0;
-  --accent-soft: rgba(58, 91, 217, 0.10);
-  --accent-glow: rgba(58, 91, 217, 0.20);
+  --accent: #d9662f;
+  --accent-strong: #bf5525;
+  --accent-soft: rgba(239, 131, 84, 0.12);
+  --accent-glow: rgba(239, 131, 84, 0.22);
+  --grad-accent: linear-gradient(135deg, #f79e75 0%, #ef8354 48%, #d96a3c 100%);
 
-  --success: #15803d;
-  --success-soft: rgba(21, 128, 61, 0.10);
-  --warning: #b45309;
-  --warning-soft: rgba(180, 83, 9, 0.10);
-  --danger: #b91c1c;
-  --danger-soft: rgba(185, 28, 28, 0.10);
-  --purple: #6d28d9;
+  --success: #1f9d6b;
+  --success-soft: rgba(31, 157, 107, 0.12);
+  --warning: #b77a1e;
+  --warning-soft: rgba(183, 122, 30, 0.12);
+  --danger: #cf3b4e;
+  --danger-soft: rgba(207, 59, 78, 0.12);
+  --purple: #5e6b9e;
 
-  --pri-highest: #b91c1c;
-  --pri-high: #b45309;
-  --pri-medium: #92400e;
-  --pri-low: #15803d;
+  --pri-highest: #cf3b4e;
+  --pri-high: #d9662f;
+  --pri-medium: #b77a1e;
+  --pri-low: #1f9d6b;
 
-  --shadow-sm: 0 1px 2px rgba(20, 30, 50, 0.06);
-  --shadow-md: 0 4px 16px rgba(20, 30, 50, 0.08);
-  --shadow-lg: 0 16px 40px rgba(20, 30, 50, 0.12);
+  --shadow-sm: 0 1px 2px rgba(45, 49, 66, 0.06);
+  --shadow-md: 0 4px 16px rgba(45, 49, 66, 0.09);
+  --shadow-lg: 0 16px 40px rgba(45, 49, 66, 0.13);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -94,7 +104,7 @@
   border-radius: var(--radius-sm);
 }
 html, body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg);
   color: var(--text);
   line-height: 1.5;
@@ -104,14 +114,14 @@ html, body {
 }
 body {
   background:
-    radial-gradient(1200px 600px at 20% -20%, var(--accent-soft), transparent 60%),
-    radial-gradient(900px 500px at 110% 0%, rgba(167, 139, 250, 0.08), transparent 60%),
+    radial-gradient(1200px 600px at 18% -20%, var(--accent-soft), transparent 60%),
+    radial-gradient(900px 500px at 112% 0%, rgba(79, 93, 117, 0.18), transparent 60%),
     var(--bg);
   min-height: 100vh;
 }
 [data-theme="light"] body {
   background:
-    radial-gradient(900px 500px at 20% -20%, var(--accent-soft), transparent 60%),
+    radial-gradient(900px 500px at 18% -20%, var(--accent-soft), transparent 65%),
     var(--bg);
 }
 

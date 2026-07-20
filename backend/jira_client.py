@@ -229,23 +229,45 @@ async def _get_done_this_week(project):
     )
 
 
-async def get_huddle_data(project, notes=""):
-    tickets = await get_tickets(project)
-    done_today = await _get_done_today(project)
+async def _report_context(project):
+    """Tracker-agnostic inputs for huddle/3x3 so they work for ANY configured tracker,
+    not just Jira. Returns (tickets, status_mapping, is_jira): tickets from the configured
+    provider (Linear direct, else the Jira client), plus the status mapping so verdict
+    lanes classify correctly regardless of the tracker's raw status names."""
+    from instance_config import load_instance_config
+    from status_map import resolve_status_mapping
+    cfg = load_instance_config() or {}
+    itype = ((cfg.get("issueTracker") or {}).get("type") or "jira").lower()
+    mapping = resolve_status_mapping(cfg, itype)
+    if itype == "linear":
+        try:
+            import os
+            import linear_client
+            projects = (cfg.get("issueTracker") or {}).get("projects") or []
+            tickets = await linear_client.get_tickets(os.environ.get("LINEAR_TOKEN", ""), projects)
+        except Exception:
+            tickets = []
+    else:
+        tickets = await get_tickets(project)
+    return tickets, mapping, itype == "jira"
 
-    groups = {"inQA": [], "readyQA": [], "inProgress": [], "blocked": [], "stale": []}
+
+async def get_huddle_data(project, notes=""):
+    from status_map import categorize_status
+    tickets, mapping, is_jira = await _report_context(project)
+    done_today = await _get_done_today(project) if is_jira else []
+
+    groups = {"inQA": [], "readyQA": [], "blocked": [], "stale": []}
     for t in tickets:
-        status = t["status"]
-        if t["flagged"]:
+        if t.get("flagged"):
             groups["blocked"].append(t)
-        if t["staleDays"] >= STALE_DAYS:
+        if t.get("staleDays", 0) >= STALE_DAYS:
             groups["stale"].append(t)
-        if status in ("In QA", "QA"):
+        cat = categorize_status(t.get("status", ""), mapping)
+        if cat == "in_qa":
             groups["inQA"].append(t)
-        elif status == "Ready for QA":
+        elif cat == "ready_for_qa":
             groups["readyQA"].append(t)
-        elif status in ("In Progress", "In Review"):
-            groups["inProgress"].append(t)
 
     date_str = datetime.now().strftime("%b %d, %Y")
     text = f"{project} Daily Huddle — {date_str}\n\n"
@@ -274,13 +296,14 @@ async def get_huddle_data(project, notes=""):
 
 
 async def get_3x3_data(project, notes=""):
-    tickets = await get_tickets(project)
-    released = await _get_done_this_week(project)
+    from status_map import categorize_status
+    tickets, mapping, is_jira = await _report_context(project)
+    released = await _get_done_this_week(project) if is_jira else []
     date_str = datetime.now().strftime("%b %d, %Y")
 
-    in_progress = [t for t in tickets if t["status"] in ("In QA", "QA", "Ready for QA")]
-    ready_prod = [t for t in tickets if t["status"] == "Ready for Prod"]
-    blocked = [t for t in tickets if t["flagged"]]
+    in_progress = [t for t in tickets if categorize_status(t.get("status", ""), mapping) in ("in_qa", "ready_for_qa")]
+    ready_prod = [t for t in tickets if t.get("status") == "Ready for Prod"]
+    blocked = [t for t in tickets if t.get("flagged")]
 
     def bullets(items):
         return "\n".join(f"• {i['key']} {i['summary'][:50]}" for i in items)

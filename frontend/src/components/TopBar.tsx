@@ -69,7 +69,14 @@ export default function TopBar({
   return (
     <div className="top-bar">
       <div className="top-bar__title">
-        <span>Agent Squad</span>
+        <span className="top-bar__brand" title="VERDIKT">
+          <span className="brand-seal" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M4 12.5l5 5L20 6.5" stroke="#2d3142" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <span className="brand-word">VERDI<span className="brand-k">K</span>T</span>
+        </span>
         <select
           className="select"
           value={project}

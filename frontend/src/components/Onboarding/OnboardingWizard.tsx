@@ -198,7 +198,7 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
         return (
           <>
             <p className="ob-hint">
-              Does QA Pilot need to build &amp; deploy your app before testing? Most teams
+              Does VERDIKT need to build &amp; deploy your app before testing? Most teams
               test an already-running environment — only "Build &amp; deploy via scripts" adds
               build/deploy stages; the others skip straight to analyze-PR → test → report.
             </p>
@@ -466,7 +466,7 @@ export default function OnboardingWizard({ onComplete }: { onComplete: () => voi
     <div className="ob-overlay">
       <div className="ob-card">
         <div className="ob-head">
-          <h2>Set up QA Pilot</h2>
+          <h2>Set up VERDIKT</h2>
           <div className="ob-progress">Step {step + 1} of {STEPS.length} — {STEPS[step]}</div>
           <div className="ob-bar"><div style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} /></div>
         </div>

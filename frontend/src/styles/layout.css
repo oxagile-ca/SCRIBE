@@ -21,15 +21,31 @@
   gap: 12px;
   letter-spacing: -0.01em;
 }
-.top-bar__title > span:first-child {
-  background: linear-gradient(135deg, var(--accent), var(--purple));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+/* VERDIKT brand lockup: coral seal + wordmark */
+.top-bar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
+.brand-seal {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--grad-accent);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+.brand-seal svg { width: 17px; height: 17px; }
+.brand-word {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+.brand-k { font-style: italic; color: var(--accent); }
 .top-bar__actions {
   display: flex;
   gap: 8px;
@@ -504,7 +520,7 @@
 }
 .queue-row__start {
   background: var(--accent);
-  color: #fff;
+  color: #2d3142;
   border: none;
   padding: 6px 14px;
   border-radius: var(--radius-sm);
@@ -673,8 +689,9 @@
 .btn--accent,
 .btn--primary {
   background: var(--accent);
-  color: #fff;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.12) inset, 0 4px 12px var(--accent-glow);
+  color: #2d3142;
+  font-weight: 600;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.18) inset, 0 4px 12px var(--accent-glow);
 }
 .btn--accent:hover,
 .btn--primary:hover {

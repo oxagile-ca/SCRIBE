@@ -287,6 +287,20 @@ async def api_test_cases_delete(key: str, case_id: str):
     return {"ok": test_cases_store.delete_case(key, case_id)}
 
 
+@app.patch("/api/test-cases/{key}/{case_id}")
+async def api_test_cases_update(key: str, case_id: str, payload: Dict[str, Any]):
+    """Edit a local test case's text. Blank text -> 400; unknown id -> 404."""
+    text = (payload or {}).get("text", "")
+    # The blank check lives here, not in the store: update_case returns None for
+    # both blank text and an unknown id, and those deserve different statuses.
+    if not (text or "").strip():
+        return JSONResponse(status_code=400, content={"ok": False, "error": "text is required"})
+    case = test_cases_store.update_case(key, case_id, text)
+    if not case:
+        return JSONResponse(status_code=404, content={"ok": False, "error": "no such test case"})
+    return {"ok": True, "case": case}
+
+
 @app.get("/api/config")
 async def api_config_get():
     """Current config in the onboarding-form shape, secrets blanked (#1)."""

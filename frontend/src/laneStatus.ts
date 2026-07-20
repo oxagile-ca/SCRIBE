@@ -89,7 +89,9 @@ const BLOCKER_RULES: { kind: BlockerKind; label: string; hint: string; test: Reg
   // that is working perfectly well.
   {
     kind: 'cli',
-    label: 'Claude CLI blocked',
+    // The card renders this as "⛔ Blocked: {label}", so the label must not
+    // repeat the word — "Blocked: Claude CLI blocked" reads like a stutter.
+    label: 'Claude CLI',
     hint: 'The claude CLI could not start with your connectors. Check that no ANTHROPIC_API_KEY is set for the run, then retry.',
     test: /connectors are disabled|anthropic_api_key|takes precedence|claude exited|needs authentication/,
   },

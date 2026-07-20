@@ -84,6 +84,29 @@ def delete_case(key: str, case_id: str, path: Optional[str] = None) -> bool:
     return True
 
 
+def update_case(key: str, case_id: str, text: str,
+                path: Optional[str] = None) -> Optional[dict]:
+    """Edit a case's text in place.
+
+    Returns the updated case, or None when the text is blank or the id is not
+    found (nothing is written in either case). The case's id, ts, and position
+    in the list are preserved: the list is oldest-first and qa_targets builds
+    the run scope in that order, so an edit must not reorder it.
+    """
+    text = (text or "").strip()
+    if not text:
+        return None
+    path = path or STORE_PATH
+    with _LOCK:
+        data = _load(path)
+        for case in data.get(key, []):
+            if case.get("id") == case_id:
+                case["text"] = text
+                _save(path, data)
+                return dict(case)
+    return None
+
+
 def texts_for(key: str, path: Optional[str] = None) -> list:
     """Just the case strings for a ticket — used to merge into the QA run scope."""
     return [c.get("text", "") for c in list_cases(key, path) if c.get("text")]

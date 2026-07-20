@@ -49,3 +49,44 @@ def test_missing_file_and_garbage_are_safe(tmp_path):
     bad = tmp_path / "bad.json"
     bad.write_text("{ not json", encoding="utf-8")
     assert tcs.list_cases("X", path=str(bad)) == []
+
+
+def test_update_changes_text_and_preserves_id_ts_and_position(tmp_path):
+    p = _p(tmp_path)
+    a = tcs.add_case("NOR-8", "one", path=p)
+    b = tcs.add_case("NOR-8", "two", path=p)
+    tcs.add_case("NOR-8", "three", path=p)
+
+    updated = tcs.update_case("NOR-8", b["id"], "  two edited  ", path=p)
+
+    assert updated["text"] == "two edited"      # trimmed
+    assert updated["id"] == b["id"]             # id preserved
+    assert updated["ts"] == b["ts"]             # created-at preserved, not bumped
+    # position preserved: qa_targets builds the run scope in list order, so an
+    # edit must not reorder the list
+    assert [c["text"] for c in tcs.list_cases("NOR-8", path=p)] == [
+        "one", "two edited", "three"
+    ]
+    assert a["id"] != b["id"]
+
+
+def test_update_blank_text_is_rejected(tmp_path):
+    p = _p(tmp_path)
+    c = tcs.add_case("NOR-8", "keep me", path=p)
+    assert tcs.update_case("NOR-8", c["id"], "   ", path=p) is None
+    assert tcs.texts_for("NOR-8", path=p) == ["keep me"]  # unchanged on disk
+
+
+def test_update_unknown_id_returns_none(tmp_path):
+    p = _p(tmp_path)
+    tcs.add_case("NOR-8", "keep me", path=p)
+    assert tcs.update_case("NOR-8", "nope", "x", path=p) is None
+    assert tcs.update_case("MISSING-1", "nope", "x", path=p) is None
+    assert tcs.texts_for("NOR-8", path=p) == ["keep me"]
+
+
+def test_update_result_is_readable_from_disk(tmp_path):
+    p = _p(tmp_path)
+    c = tcs.add_case("NOR-8", "before", path=p)
+    tcs.update_case("NOR-8", c["id"], "after", path=p)
+    assert tcs.texts_for("NOR-8", path=p) == ["after"]

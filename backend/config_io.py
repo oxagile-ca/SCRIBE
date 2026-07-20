@@ -125,6 +125,12 @@ def merge_and_build(answers: dict, existing_config: dict, existing_secrets: dict
         new_config["appSlug"] = existing_config["appSlug"]
     if existing_config.get("skillCommand"):
         new_config["skillCommand"] = existing_config["skillCommand"]
+    # Carry the skill build stamp forward. build_instance_config never emits skillMeta, so
+    # without this every edit would wipe it and falsely flag the skill stale. Kept as-is so
+    # staleness is driven purely by whether the skill inputs changed (GET recomputes and
+    # compares); an explicit Rebuild re-stamps it.
+    if existing_config.get("skillMeta"):
+        new_config["skillMeta"] = existing_config["skillMeta"]
     # New non-blank secrets override; existing values carried forward.
     final_secrets = {**existing_secrets, **new_secrets}
     # Blank secret field -> restore the ${secret:KEY} ref if a value exists.

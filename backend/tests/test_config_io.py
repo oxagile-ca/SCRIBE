@@ -196,3 +196,31 @@ def test_skill_signature_ignores_qatargets_edit():
     base = config_io.config_skill_signature(cfg)
     cfg2 = json.loads(json.dumps(cfg)); cfg2["qaTargets"] = {"seedEntities": ["different"]}
     assert config_io.config_skill_signature(cfg2) == base            # qaTargets is a runtime input, no rebuild
+
+
+def _stamped_config():
+    cfg, _ = onboarding.build_instance_config(_answers_with_qa())
+    cfg["skillMeta"] = {"builtAt": "2026-07-20T00:00:00+00:00", "inputsHash": config_io.config_skill_signature(cfg)}
+    return cfg
+
+
+def test_merge_carries_skill_meta_so_nonskill_edit_stays_fresh():
+    """Regression: a PUT that edits a non-skill field (tracker email) must NOT drop
+    skillMeta — otherwise the skill falsely reads stale after every edit."""
+    cfg = _stamped_config()
+    answers = config_io.config_to_answers(cfg)
+    answers["issueTracker"]["email"] = "changed@example.com"
+    merged, _ = config_io.merge_and_build(answers, cfg, {"LINEAR_TOKEN": "lt", "GITHUB_TOKEN": "gh"})
+    assert merged.get("skillMeta")                                            # carried forward
+    assert merged["skillMeta"]["inputsHash"] == config_io.config_skill_signature(merged)  # not stale
+
+
+def test_merge_keeps_stamp_so_productqa_edit_reads_stale():
+    """A PUT that edits Product QA knowledge keeps the OLD stamp, so GET reports stale
+    until an explicit rebuild."""
+    cfg = _stamped_config()
+    answers = config_io.config_to_answers(cfg)
+    answers["productQA"]["riskAreas"] = [*answers["productQA"]["riskAreas"], "POSTAL_UNICODE_LOSS"]
+    merged, _ = config_io.merge_and_build(answers, cfg, {"LINEAR_TOKEN": "lt", "GITHUB_TOKEN": "gh"})
+    assert merged.get("skillMeta")                                            # stamp preserved (old hash)
+    assert merged["skillMeta"]["inputsHash"] != config_io.config_skill_signature(merged)  # correctly stale

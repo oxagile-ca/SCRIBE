@@ -8,7 +8,7 @@ import {
   KnowledgeProvider,
 } from '../../onboardingSchema'
 import { submitOnboarding, verifyConnection, VerifyTarget, VerifyResult } from '../../api'
-import { AccessChecks, ListTextarea, Field, linesToArr } from './fields'
+import { AccessChecks, ListTextarea, KeyPagesTextarea, Field } from './fields'
 
 /** A "Test connection" button + inline ✓/✗ status for one integration. Runs a live
  *  check against the current answers so a bad token/URL is caught during onboarding. */
@@ -106,32 +106,6 @@ const STATUS_DEFAULTS: Record<IssueType, { ready_for_qa: string[]; in_qa: string
   linear: { ready_for_qa: ['Ready for Testing', 'Ready for QA', 'QA Ready', 'Ready for Test'], in_qa: ['In QA', 'In Testing', 'Testing', 'QA'] },
   azure: { ready_for_qa: ['Ready for QA'], in_qa: ['In QA', 'Testing'] },
   github: { ready_for_qa: [], in_qa: [] },
-}
-
-// Key pages: "Name | /route" per line. Same raw-text-in-local-state approach.
-function KeyPagesTextarea({
-  value,
-  onChange,
-}: {
-  value: { name: string; route: string }[]
-  onChange: (v: { name: string; route: string }[]) => void
-}) {
-  const [text, setText] = useState(() => value.map((p) => `${p.name} | ${p.route}`).join('\n'))
-  return (
-    <textarea
-      rows={3}
-      value={text}
-      onChange={(e) => {
-        setText(e.target.value)
-        onChange(
-          linesToArr(e.target.value).map((line) => {
-            const [name, route] = line.split('|')
-            return { name: (name || '').trim(), route: (route || '').trim() }
-          })
-        )
-      }}
-    />
-  )
 }
 
 export default function OnboardingWizard({ onComplete }: { onComplete: () => void }) {

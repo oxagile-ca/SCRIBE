@@ -20,6 +20,7 @@ interface Props {
   onToggleAutoMode: (enabled: boolean) => void
   onToggleArm: (armed: boolean) => void
   onOpenSettings: () => void
+  onOpenProfile: () => void
 }
 
 function useBackendVersion() {
@@ -55,7 +56,7 @@ export default function TopBar({
   project, projects, onProjectChange, tickets,
   theme, onToggleTheme, onHuddle, on3x3, onCleanupEnv, lastRefresh,
   onRefresh, isRefreshing,
-  autoMode, writeAllowed, onToggleAutoMode, onToggleArm, onOpenSettings,
+  autoMode, writeAllowed, onToggleAutoMode, onToggleArm, onOpenSettings, onOpenProfile,
 }: Props) {
   const { version, restartedSinceMount } = useBackendVersion()
   const readyTickets = tickets.filter(t => t.statusCategory === 'ready_for_qa')
@@ -149,6 +150,7 @@ export default function TopBar({
         <button className="btn btn--ghost btn--small" onClick={onToggleTheme}>
           {theme === 'dark' ? '☽ Dark' : '☀ Light'}
         </button>
+        <button className="btn btn--ghost btn--small" onClick={onOpenProfile} title="Application Profile — everything VERDIKT knows about this app">🗂 Profile</button>
         <button className="btn btn--ghost btn--small" onClick={onOpenSettings} title="Settings — Config Center">⚙</button>
       </div>
     </div>

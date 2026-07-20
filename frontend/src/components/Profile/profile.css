@@ -1,0 +1,88 @@
+/* Application Profile — full-page view of everything VERDIKT knows about the app. */
+
+.profile-page {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow-y: auto;
+  background: var(--bg);
+  color: var(--text);
+  padding: 24px clamp(16px, 5vw, 64px) 64px;
+}
+
+.profile-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.profile-page__header h2 { margin: 0 0 4px; font-family: var(--font-display, inherit); }
+
+.profile-dim { color: var(--text-dim); font-size: 13px; }
+
+.profile-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+.profile-banner--warn { background: var(--warning-soft, #3a2e12); border-color: var(--warning, #f5a524); }
+.profile-banner--ok { background: var(--success-soft, #14301f); border-color: var(--success, #2ecc71); }
+.profile-banner__actions { display: flex; align-items: center; gap: 10px; }
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.profile-card {
+  background: var(--bg-card, var(--bg-elevated));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm, none);
+}
+.profile-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.profile-card__head h3 { margin: 0; font-size: 15px; }
+.profile-card__subtitle { color: var(--text-dim); font-size: 12px; margin: 6px 0 0; }
+.profile-card__body { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.profile-card__actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+
+.profile-row { display: grid; grid-template-columns: 130px 1fr; gap: 10px; font-size: 13px; align-items: baseline; }
+.profile-row__label { color: var(--text-muted, var(--text-dim)); }
+.profile-row__value { color: var(--text); word-break: break-word; }
+
+.profile-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.profile-chip {
+  background: var(--bg-hover, var(--bg-input));
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 12px;
+}
+
+.profile-inline-check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.profile-json-err { color: var(--danger, #e5484d); font-size: 12px; }
+
+/* Reuse the onboarding field layout inside edit mode. */
+.profile-card .ob-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.profile-card .ob-field > span { color: var(--text-dim); }
+.profile-card input,
+.profile-card textarea,
+.profile-card select {
+  width: 100%;
+  background: var(--bg-input, var(--bg));
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 6px 8px;
+  font: inherit;
+}

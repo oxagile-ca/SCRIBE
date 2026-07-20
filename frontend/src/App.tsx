@@ -18,6 +18,7 @@ import CleanupEnvModal from './components/CleanupEnvModal'
 import Toast from './components/Toast'
 import ChatPanel from './components/ChatPanel'
 import Settings from './components/Settings'
+import ApplicationProfile from './components/Profile/ApplicationProfile'
 import FeatureBreakdown from './components/FeatureBreakdown'
 
 const POLL_INTERVAL = 60_000
@@ -52,6 +53,7 @@ export default function App() {
   const [show3x3, setShow3x3] = useState(false)
   const [showCleanup, setShowCleanup] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const [lastRefresh, setLastRefresh] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [environments, setEnvironments] = useState<string[]>([])
@@ -1169,6 +1171,7 @@ export default function App() {
         onToggleAutoMode={handleToggleAutoMode}
         onToggleArm={handleToggleArm}
         onOpenSettings={() => setShowSettings(true)}
+        onOpenProfile={() => setShowProfile(true)}
       />
       <ActiveLanes
         lanes={lanes}
@@ -1203,6 +1206,7 @@ export default function App() {
         generateReport(key).then(() => loadEvidenceHistory()).catch(() => {})
       }} />
       {showSettings && <Settings onClose={() => setShowSettings(false)} />}
+      {showProfile && <ApplicationProfile onClose={() => setShowProfile(false)} />}
       {showHuddle && <HuddleModal project={project} onClose={() => setShowHuddle(false)} />}
       {show3x3 && <ThreeByThreeModal project={project} onClose={() => setShow3x3(false)} />}
       {showCleanup && (

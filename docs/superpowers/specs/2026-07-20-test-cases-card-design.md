@@ -110,8 +110,9 @@ already handled there).
   Criteria only. Add a `Test cases (N)` button and one `showCases` boolean. Net
   effect: the file (currently 408 lines, the largest card file) gets shorter.
 - **`LaneCard.tsx`** — add the same button + boolean, passing
-  `runActive = agents.some(a => a.state === 'active')` (i.e. a stage is currently
-  working). The Queue row passes `runActive={false}`: queued tickets have no lane.
+  `runActive = Object.values(agents).some(a => a?.state === 'active')` (`agents` is
+  a `Record<AgentName, AgentStatus>`, not an array). The Queue row passes
+  `runActive={false}`: queued tickets have no lane.
 
 ### Known cost, accepted
 The `(N)` badge needs the added-case count per ticket, so each queue row keeps

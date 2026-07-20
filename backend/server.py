@@ -24,7 +24,7 @@ import bitbucket_client as bb
 from chat import chat_stream
 from streams import StreamRegistry, replay_events_from_disk, END_MARKER
 from pipeline_store import PipelineStore
-from onboarding import validate_answers, run_onboarding, write_config_and_secrets, save_postman_collection
+from onboarding import validate_answers, run_onboarding, rebuild_skill, write_config_and_secrets, save_postman_collection
 from instance_config import (
     load_instance_config, load_secrets_env, default_config_dir,
     default_skills_root, default_instances_root, read_secrets_file,
@@ -295,10 +295,15 @@ async def api_config_get():
     if not cfg:
         return JSONResponse(status_code=404, content={"ok": False, "error": "not onboarded"})
     secrets = read_secrets_file()
+    skill_meta = cfg.get("skillMeta") or {}
     return {
         "ok": True,
         "answers": config_io.config_to_answers(cfg),
         "secretsSet": config_io.secrets_set_map(cfg, secrets),
+        # Skill staleness: true when the current skill inputs differ from the ones stamped
+        # at the last rebuild (or when never stamped) — the Profile prompts a rebuild.
+        "skillStale": skill_meta.get("inputsHash") != config_io.config_skill_signature(cfg),
+        "skillBuiltAt": skill_meta.get("builtAt"),
     }
 
 
@@ -330,6 +335,25 @@ async def api_upload_postman(file: UploadFile = File(...)):
         return JSONResponse(status_code=400, content={"ok": False, "error": str(e)})
     write_config_and_secrets(cfg, read_secrets_file(), default_config_dir())
     return {"ok": True, "endpointCount": count, "path": cfg["api"]["postmanCollectionPath"]}
+
+
+@app.post("/api/skill/rebuild")
+async def api_skill_rebuild():
+    """Regenerate the QA skill bundle from the current config (Application Profile's
+    explicit 'Rebuild skill'). Applies edited Product QA knowledge to real QA runs.
+    Never touches secrets. Returns {ok, builtAt, patternRules}."""
+    cfg_dir = default_config_dir()
+    if not load_instance_config(os.path.join(cfg_dir, "instance.config.json")):
+        return JSONResponse(status_code=404, content={"ok": False, "error": "not onboarded"})
+    try:
+        result = rebuild_skill(
+            config_dir=cfg_dir,
+            skills_root=default_skills_root(),
+            repo_instances_root=default_instances_root(),
+        )
+    except Exception as e:  # noqa: BLE001 — surface any generation failure to the page
+        return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
+    return {"ok": True, **result}
 
 
 @app.get("/api/environments")

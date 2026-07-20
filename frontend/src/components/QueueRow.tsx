@@ -4,6 +4,7 @@ import type { EnvLockMap, PipelineStateEntry } from './Queue'
 import { evidenceIsComplete } from '../laneStatus'
 import { queueActionLabel, retestNeedsEnvPicker } from '../queueActions'
 import { redactCredentials } from '../redact'
+import { extractTicketTestCases } from '../testCases'
 import { fetchTestCases, addTestCase, deleteTestCase, TestCase } from '../api'
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -44,7 +45,7 @@ export default function QueueRow({ ticket, onStart, onReTest, needsBuildDeploy, 
   const skipEnvPicker = isQAed && !retestNeedsEnvPicker(needsBuildDeploy)
 
   const acs = extractACs(ticket.description)
-  const ticketCases = extractTestCases(ticket.description)
+  const ticketCases = extractTicketTestCases(ticket.description)
 
   const [added, setAdded] = useState<TestCase[]>([])
   const [newCase, setNewCase] = useState('')
@@ -395,30 +396,4 @@ function extractACs(description: string): string[] {
     if (inAcSection && trimmed === '') inAcSection = false
   }
   return acs
-}
-
-/** Pull the ticket's own test cases from a `Test Cases` section of the description
- *  (the checklist items under a "## Test Cases" heading). Empty when there's none. */
-function extractTestCases(description: string): string[] {
-  if (!description) return []
-  const out: string[] = []
-  let inSection = false
-  for (const raw of description.split('\n')) {
-    const line = raw.trim()
-    const isHeading = /^#{1,6}\s/.test(line) || /^\*{0,2}[\w ]+:?\*{0,2}$/.test(line)
-    if (/test\s*cases?/i.test(line) && isHeading) {
-      inSection = true
-      continue
-    }
-    if (!inSection) continue
-    // A different heading ends the Test Cases section.
-    if (/^#{1,6}\s/.test(line) && !/test\s*cases?/i.test(line)) {
-      inSection = false
-      continue
-    }
-    // Collect checklist / bullet items: "- [ ] x", "- [x] x", "- x", "* x".
-    const m = line.match(/^[-*]\s*(?:\[[ xX]\]\s*)?(.+)$/)
-    if (m && m[1].trim().length > 2) out.push(m[1].trim())
-  }
-  return out
 }

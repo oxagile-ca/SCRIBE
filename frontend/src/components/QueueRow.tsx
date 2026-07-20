@@ -3,6 +3,7 @@ import { Ticket } from '../types'
 import type { EnvLockMap, PipelineStateEntry } from './Queue'
 import { evidenceIsComplete } from '../laneStatus'
 import { queueActionLabel, retestNeedsEnvPicker } from '../queueActions'
+import { redactCredentials } from '../redact'
 import { fetchTestCases, addTestCase, deleteTestCase, TestCase } from '../api'
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -316,7 +317,9 @@ export default function QueueRow({ ticket, onStart, onReTest, needsBuildDeploy, 
               <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 10, color: 'var(--text-dim)' }}>
                 Acceptance Criteria:
               </div>
-              {acs.map((ac, i) => <div key={i} style={{ marginBottom: 2 }}>- {ac}</div>)}
+              {acs.map((ac, i) => (
+                <div key={i} style={{ marginBottom: 2 }}>- {redactCredentials(ac)}</div>
+              ))}
             </>
           )}
 
@@ -328,7 +331,7 @@ export default function QueueRow({ ticket, onStart, onReTest, needsBuildDeploy, 
           )}
           {ticketCases.map((tc, i) => (
             <div key={`t${i}`} style={{ marginBottom: 2 }}>
-              {'☐'} {tc} <span style={{ color: 'var(--text-dim)', fontSize: 9 }}>from ticket</span>
+              {'☐'} {redactCredentials(tc)} <span style={{ color: 'var(--text-dim)', fontSize: 9 }}>from ticket</span>
             </div>
           ))}
           {added.map((tc) => (

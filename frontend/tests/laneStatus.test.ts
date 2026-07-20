@@ -4,6 +4,7 @@ import {
   shouldPassivelyCheckEvidence,
   waitingLaneKey,
   classifyBlocker,
+  shouldShowBlocker,
   streamLostUpdate,
   evidenceIsComplete,
 } from '../src/laneStatus'
@@ -132,6 +133,17 @@ eq(classifyBlocker('something exploded').kind, 'generic',
   // and the app-login rule must still win for genuine app-login failures
   eq(classifyBlocker('Sign in failed: invalid password').kind, 'login',
     'a real app sign-in failure is still a login blocker')
+}
+
+// --- shouldShowBlocker (dismissing the banner must not hide a NEW failure) ---
+{
+  eq(shouldShowBlocker('boom', null), true, 'never dismissed -> banner shows')
+  eq(shouldShowBlocker('boom', 'boom'), false, 'dismissed that exact message -> hidden')
+  // the important one: dismissing one blocker must not suppress the next, different
+  // one, or the card silently stops telling the user why the run is stuck
+  eq(shouldShowBlocker('a different failure', 'boom'), true,
+    'a new failure message re-shows the banner after a dismissal')
+  eq(shouldShowBlocker('', null), true, 'blocker with no message still shows')
 }
 
 // every blocker must carry a user-facing label + actionable hint

@@ -120,6 +120,18 @@ const BLOCKER_RULES: { kind: BlockerKind; label: string; hint: string; test: Reg
 ]
 
 /**
+ * Should the blocker banner render, given what the user has already dismissed?
+ *
+ * Dismissal is scoped to the exact message that was dismissed, NOT to the lane:
+ * a run that fails again for a DIFFERENT reason must speak up, otherwise the card
+ * silently stops explaining why it is stuck. Re-showing on a changed message is
+ * the whole point of comparing text rather than storing a boolean.
+ */
+export function shouldShowBlocker(message: string, dismissedMessage: string | null): boolean {
+  return dismissedMessage === null || message !== dismissedMessage
+}
+
+/**
  * Classify a failure message into an actionable blocker so the lane card can
  * tell the user WHY a run can't continue — login, missing data, runner, etc. —
  * instead of a generic "Failed". Only call this for a failed/blocked state.

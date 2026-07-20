@@ -8,7 +8,7 @@ appSlug/skillCommand so an edit never renames the generated skill.
 import copy
 
 from onboarding import (
-    build_instance_config, _ref,
+    build_instance_config, _ref, skill_signature,
     ISSUE_SECRET_KEY, VCS_SECRET_KEY, KNOWLEDGE_SECRET_KEY,
 )
 from status_map import DEFAULT_STATUS_MAP
@@ -49,6 +49,26 @@ def _put(d: dict, path: tuple, value) -> None:
     cur[path[-1]] = value
 
 
+def _hydrate_product_qa(pqa) -> dict:
+    """Full productQA shape with defaults for any missing field, so the edit form always
+    has every key present (and an un-onboarded / lean config yields all-empty values)."""
+    pqa = pqa or {}
+    return {
+        "criticalFlows": pqa.get("criticalFlows") or [],
+        "saveSemantics": pqa.get("saveSemantics") or "",
+        "publishSemantics": pqa.get("publishSemantics") or "",
+        "keyPages": pqa.get("keyPages") or [],
+        "riskAreas": pqa.get("riskAreas") or [],
+        "alwaysCheck": pqa.get("alwaysCheck") or [],
+    }
+
+
+def config_skill_signature(config: dict) -> str:
+    """Signature of the skill inputs for this config (see onboarding.skill_signature).
+    GET /api/config compares it to config.skillMeta.inputsHash to report skillStale."""
+    return skill_signature(config_to_answers(config or {}))
+
+
 def config_to_answers(config: dict) -> dict:
     """Reshape on-disk config into the OnboardingAnswers form shape, secrets blanked."""
     cfg = copy.deepcopy(config or {})
@@ -66,12 +86,13 @@ def config_to_answers(config: dict) -> dict:
         "publish": cfg.get("publish") or {},
         "knowledge": cfg.get("knowledge") or {},
         "api": cfg.get("api") or {},
-        "productQA": {
-            "criticalFlows": [], "saveSemantics": "", "publishSemantics": "",
-            "keyPages": [], "riskAreas": [], "alwaysCheck": [],
-        },
+        "productQA": _hydrate_product_qa(cfg.get("productQA")),
         "anthropicKey": "",
     }
+    # qaTargets is persisted-but-optional and carries no secrets; round-trip it so an
+    # edit through the Application Profile (or Settings) never silently drops it.
+    if cfg.get("qaTargets"):
+        answers["qaTargets"] = cfg["qaTargets"]
     it = answers["issueTracker"]
     if not it.get("statusMapping"):
         # Default to the provider's own status names (status_map is the source of
@@ -104,6 +125,12 @@ def merge_and_build(answers: dict, existing_config: dict, existing_secrets: dict
         new_config["appSlug"] = existing_config["appSlug"]
     if existing_config.get("skillCommand"):
         new_config["skillCommand"] = existing_config["skillCommand"]
+    # Carry the skill build stamp forward. build_instance_config never emits skillMeta, so
+    # without this every edit would wipe it and falsely flag the skill stale. Kept as-is so
+    # staleness is driven purely by whether the skill inputs changed (GET recomputes and
+    # compares); an explicit Rebuild re-stamps it.
+    if existing_config.get("skillMeta"):
+        new_config["skillMeta"] = existing_config["skillMeta"]
     # New non-blank secrets override; existing values carried forward.
     final_secrets = {**existing_secrets, **new_secrets}
     # Blank secret field -> restore the ${secret:KEY} ref if a value exists.

@@ -5,11 +5,18 @@ Secrets are split out of the non-secret instance config and referenced from it a
 ``${secret:KEY}`` so the adapter registry can resolve them from the secret store.
 """
 import copy
+import hashlib
 import json
 import os
 import re
+from datetime import datetime, timezone
 
 import yaml
+
+
+def _now_iso() -> str:
+    """UTC timestamp for skillMeta.builtAt (stamped whenever the skill is generated)."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 # Which secret key holds the token for each provider, so the adapter registry
 # (see multi-provider-adapters design) can resolve ${secret:KEY}.
@@ -137,6 +144,15 @@ def build_instance_config(answers: dict) -> tuple[dict, dict]:
         "knowledge": knowledge,
         "api": copy.deepcopy(answers.get("api", {})),
     }
+    # Product QA knowledge (critical flows, save/publish semantics, key pages, risk
+    # areas, always-check). Persisted so it's viewable/editable on the Application
+    # Profile after onboarding — and so the skill can be rebuilt from it later. Kept
+    # lean: only written when it carries real content. No secrets live here.
+    pqa = answers.get("productQA") or {}
+    if any(pqa.get(k) for k in
+           ("criticalFlows", "saveSemantics", "publishSemantics", "keyPages", "riskAreas", "alwaysCheck")):
+        config["productQA"] = copy.deepcopy(pqa)
+
     # QA-targeting taxonomy (seed entities + classify rules) is app-specific and
     # optional; include it only when onboarding provides it so a minimal config
     # stays lean and qa_targets falls back to its generic ruleset otherwise.
@@ -448,6 +464,24 @@ def build_patterns(answers: dict) -> dict:
     return {"rules": rules, "baseline_always_on": list(qa.get("alwaysCheck") or [])}
 
 
+def skill_signature(answers: dict) -> str:
+    """A content hash of exactly what a skill rebuild would produce from these answers:
+    the generated Product Context block, the API Surface block, and the seeded patterns.
+
+    Used to detect skill staleness — the Application Profile flags "rebuild needed" when
+    the current config's signature differs from the one stamped at the last rebuild. It
+    deliberately covers only skill inputs (productQA, company, environments, knowledge,
+    api); qaTargets is excluded because it feeds the runtime QA classifier live and needs
+    no rebuild to take effect.
+    """
+    blob = "\x1e".join([
+        _product_context_block(answers),
+        _api_surface_block(answers),
+        yaml.safe_dump(build_patterns(answers), sort_keys=True),
+    ])
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
 def write_config_and_secrets(config: dict, secrets: dict, config_dir: str) -> dict:
     """Write instance.config.json + .secrets.env to config_dir; return their paths.
     Shared by write_outputs (full onboarding) and the Config Center edit path."""
@@ -569,6 +603,13 @@ def run_onboarding(
     skill_text = render_skill(answers, _read_base_skill(base_skill_path))
     patterns = build_patterns(answers)
 
+    # Stamp the skill signature so a freshly onboarded app starts "up to date" — the
+    # Application Profile only flags "rebuild needed" once a later edit diverges from this.
+    # Computed via the config (the exact path GET /api/config recomputes) so the fresh
+    # stamp always matches and never reads as falsely stale.
+    import config_io  # local import: config_io imports onboarding (avoid circular import)
+    config["skillMeta"] = {"builtAt": _now_iso(), "inputsHash": config_io.config_skill_signature(config)}
+
     install_dir = os.path.join(skills_root, f"qa-evidence-{slug}")
     repo_dir = os.path.join(repo_instances_root, slug)
 
@@ -591,3 +632,50 @@ def run_onboarding(
         "skillRepoDir": repo_dir,
     }
     return {"paths": {**paths, "skillRepo": repo_paths["skill"]}, "summary": summary}
+
+
+def rebuild_skill(
+    *,
+    config_dir: str,
+    skills_root: str = DEFAULT_SKILLS_ROOT,
+    repo_instances_root: str = DEFAULT_INSTANCES_ROOT,
+    base_skill_path: str = DEFAULT_BASE_SKILL,
+) -> dict:
+    """Regenerate ONLY the skill artifacts (SKILL.md + patterns.yml, plus the live-API
+    helper when an API base URL is set) from the currently persisted config, and re-stamp
+    config.skillMeta. Never touches .secrets.env or rewrites tracker/VCS config, so a
+    rebuild can't blank a token. Powers the Application Profile's explicit "Rebuild skill".
+    """
+    import config_io  # local import: config_io imports onboarding (avoid circular import)
+
+    cfg_path = os.path.join(config_dir, "instance.config.json")
+    with open(cfg_path, encoding="utf-8") as fh:
+        config = json.load(fh)
+
+    answers = config_io.config_to_answers(config)  # hydrates productQA; secrets blanked
+    slug = config.get("appSlug") or app_slug(config.get("productName"))
+    skill_text = render_skill(answers, _read_base_skill(base_skill_path))
+    patterns = build_patterns(answers)
+
+    install_dir = os.path.join(skills_root, f"qa-evidence-{slug}")
+    repo_dir = os.path.join(repo_instances_root, slug)
+    write_skill_bundle(skill_text, patterns, install_dir)
+    write_skill_bundle(skill_text, patterns, repo_dir)
+
+    api_base = (config.get("api") or {}).get("baseUrl")
+    if api_base:
+        with open(os.path.join(install_dir, "scribe-live-api.js"), "w", encoding="utf-8") as fh:
+            fh.write(_live_api_helper_js(api_base))
+
+    # Re-stamp only the config (secrets untouched). skill_signature(answers) matches what
+    # GET /api/config recomputes from config_to_answers, so skillStale clears afterward.
+    config["skillMeta"] = {"builtAt": _now_iso(), "inputsHash": skill_signature(answers)}
+    with open(cfg_path, "w", encoding="utf-8") as fh:
+        json.dump(config, fh, indent=2)
+
+    return {
+        "builtAt": config["skillMeta"]["builtAt"],
+        "patternRules": len(patterns["rules"]),
+        "skillInstallDir": install_dir,
+        "skillRepoDir": repo_dir,
+    }

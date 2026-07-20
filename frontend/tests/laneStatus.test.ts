@@ -4,6 +4,7 @@ import {
   shouldPassivelyCheckEvidence,
   waitingLaneKey,
   classifyBlocker,
+  shouldShowBlocker,
   streamLostUpdate,
   evidenceIsComplete,
 } from '../src/laneStatus'
@@ -115,6 +116,35 @@ eq(classifyBlocker('Connection lost').kind, 'connection',
   'classifies a dropped stream as a connection blocker')
 eq(classifyBlocker('something exploded').kind, 'generic',
   'falls back to a generic blocker for unrecognised messages')
+
+// A claude-CLI auth/config failure is NOT an app login problem. The real message
+// contains "auth" and "login", so this rule must win over the login rule or the
+// card tells the user to sign in to an app that is working fine.
+{
+  const real = 'claude exited 1: ⚠ claude.ai connectors are disabled because ' +
+    'ANTHROPIC_API_KEY or another auth source is set and takes precedence over ' +
+    'your claude.ai login · Unset it to load your organization’s connectors'
+  eq(classifyBlocker(real).kind, 'cli',
+    'connector-precedence failure is a CLI blocker, not a login blocker')
+  eq(classifyBlocker('claude exited 1').kind, 'cli',
+    'a non-zero claude exit is a CLI blocker')
+  eq(classifyBlocker('MCP server linear: needs authentication').kind, 'cli',
+    'an unauthenticated MCP connector is a CLI blocker, not an app login')
+  // and the app-login rule must still win for genuine app-login failures
+  eq(classifyBlocker('Sign in failed: invalid password').kind, 'login',
+    'a real app sign-in failure is still a login blocker')
+}
+
+// --- shouldShowBlocker (dismissing the banner must not hide a NEW failure) ---
+{
+  eq(shouldShowBlocker('boom', null), true, 'never dismissed -> banner shows')
+  eq(shouldShowBlocker('boom', 'boom'), false, 'dismissed that exact message -> hidden')
+  // the important one: dismissing one blocker must not suppress the next, different
+  // one, or the card silently stops telling the user why the run is stuck
+  eq(shouldShowBlocker('a different failure', 'boom'), true,
+    'a new failure message re-shows the banner after a dismissal')
+  eq(shouldShowBlocker('', null), true, 'blocker with no message still shows')
+}
 
 // every blocker must carry a user-facing label + actionable hint
 for (const msg of ['log in', 'no branch', 'chrome', 'connection lost', 'boom']) {

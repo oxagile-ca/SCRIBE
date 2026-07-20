@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent } from 'react'
 import { Ticket } from '../types'
 import type { EnvLockMap, PipelineStateEntry } from './Queue'
 import { evidenceIsComplete } from '../laneStatus'
+import { queueActionLabel, retestNeedsEnvPicker } from '../queueActions'
 import { fetchTestCases, addTestCase, deleteTestCase, TestCase } from '../api'
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -15,6 +16,10 @@ const PRIORITY_COLORS: Record<string, string> = {
 interface Props {
   ticket: Ticket
   onStart: (ticket: Ticket, env: string) => void
+  /** Re-test an already-QAed ticket: QA stage only, no build/deploy. */
+  onReTest: (ticket: Ticket, env: string) => void
+  /** False for already-deployed apps — a re-test then needs no env picker. */
+  needsBuildDeploy: boolean
   disabled: boolean
   environments: string[]
   envLocks: EnvLockMap
@@ -22,7 +27,7 @@ interface Props {
   onRetryProvision?: (ticketKey: string) => void
 }
 
-export default function QueueRow({ ticket, onStart, disabled, environments, envLocks, pipelineState, onRetryProvision }: Props) {
+export default function QueueRow({ ticket, onStart, onReTest, needsBuildDeploy, disabled, environments, envLocks, pipelineState, onRetryProvision }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [showEnvPicker, setShowEnvPicker] = useState(false)
   const [customEnv, setCustomEnv] = useState('')
@@ -31,6 +36,11 @@ export default function QueueRow({ ticket, onStart, disabled, environments, envL
   const isQAed = isTicketQAed(ticket)
   const rowClass = isBlocked ? 'queue-row queue-row--blocked' :
     ticket.staleDays >= 3 ? 'queue-row queue-row--stale' : 'queue-row'
+
+  // A QAed ticket is re-tested (QA stage only), not started from scratch. Already-
+  // deployed apps resolve their env server-side, so that path needs no picker.
+  const fireAction = (env: string) => (isQAed ? onReTest : onStart)(ticket, env)
+  const skipEnvPicker = isQAed && !retestNeedsEnvPicker(needsBuildDeploy)
 
   const acs = extractACs(ticket.description)
   const ticketCases = extractTestCases(ticket.description)
@@ -166,9 +176,12 @@ export default function QueueRow({ ticket, onStart, disabled, environments, envL
           <button
             className="queue-row__start"
             disabled={disabled || isBlocked}
-            onClick={() => setShowEnvPicker(!showEnvPicker)}
+            title={isQAed
+              ? 'Re-run QA on this already-tested ticket (test stage only)'
+              : 'Run the full pipeline for this ticket'}
+            onClick={() => (skipEnvPicker ? fireAction('') : setShowEnvPicker(!showEnvPicker))}
           >
-            Start
+            {queueActionLabel(isQAed)}
           </button>
           {showEnvPicker && (
             <div style={{
@@ -201,7 +214,7 @@ export default function QueueRow({ ticket, onStart, disabled, environments, envL
                     onClick={() => {
                       if (held) return
                       setShowEnvPicker(false)
-                      onStart(ticket, env)
+                      fireAction(env)
                     }}
                     style={{
                       display: 'flex',
@@ -249,7 +262,7 @@ export default function QueueRow({ ticket, onStart, disabled, environments, envL
                     onKeyDown={e => {
                       if (e.key === 'Enter' && customEnv.trim()) {
                         setShowEnvPicker(false)
-                        onStart(ticket, customEnv.trim())
+                        fireAction(customEnv.trim())
                         setCustomEnv('')
                       }
                     }}
@@ -269,7 +282,7 @@ export default function QueueRow({ ticket, onStart, disabled, environments, envL
                     disabled={!customEnv.trim()}
                     onClick={() => {
                       setShowEnvPicker(false)
-                      onStart(ticket, customEnv.trim())
+                      fireAction(customEnv.trim())
                       setCustomEnv('')
                     }}
                     style={{

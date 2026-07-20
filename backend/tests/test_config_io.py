@@ -122,3 +122,105 @@ def test_config_to_answers_blanks_publish_slack_ref():
 
 def json_str(d):
     return json.dumps(d)
+
+
+# --- Application Profile: productQA / qaTargets round-trip + skill staleness ---
+
+_PQA = {
+    "criticalFlows": ["checkout", "refund with manager cap"],
+    "saveSemantics": "Save persists a draft order.",
+    "publishSemantics": "Publish commits the order.",
+    "keyPages": [{"name": "Orders", "route": "/orders"}],
+    "riskAreas": ["refund float rounding", "postal unicode loss"],
+    "alwaysCheck": ["audit trail written"],
+}
+_QT = {"seedEntities": ["order", "product"], "classifyRules": [{"match": "refund", "type": "refund"}]}
+
+
+def _answers_with_qa() -> dict:
+    return {
+        "company": {"orgName": "Northstar", "productName": "Northstar Commerce",
+                    "productType": "webapp", "description": "e-commerce console", "urls": ["https://x"]},
+        "environments": {"mode": "deployed",
+                         "testAuth": {"required": True, "loginUrl": "u", "username": "m",
+                                      "password": "pw", "notes": ""}},
+        "issueTracker": {"type": "linear", "baseUrl": "b", "projects": ["NOR"], "email": "e",
+                         "token": "lt", "access": {"read": True, "write": True}},
+        "vcs": {"type": "github", "org": "o", "repos": ["r"], "token": "gh",
+                "access": {"read": True, "write": True}},
+        "publish": {}, "knowledge": {"provider": "none"},
+        "api": {"baseUrl": "https://api"},
+        "productQA": _PQA, "qaTargets": _QT,
+    }
+
+
+def test_product_qa_and_qatargets_round_trip():
+    cfg, _ = onboarding.build_instance_config(_answers_with_qa())
+    assert cfg["productQA"]["riskAreas"] == _PQA["riskAreas"]     # persisted (was dropped before)
+    assert cfg["qaTargets"] == _QT
+    a = config_io.config_to_answers(cfg)
+    assert a["productQA"]["criticalFlows"] == _PQA["criticalFlows"]   # hydrated back
+    assert a["productQA"]["keyPages"] == [{"name": "Orders", "route": "/orders"}]
+    assert a["qaTargets"] == _QT                                      # no longer silently dropped
+
+
+def test_lean_config_yields_empty_productqa_shape():
+    cfg, _ = onboarding.build_instance_config({"company": {"productName": "X"},
+                                               "issueTracker": {"type": "jira"}, "vcs": {"type": "github"}})
+    assert "productQA" not in cfg                                     # lean: not written when empty
+    a = config_io.config_to_answers(cfg)
+    assert a["productQA"] == {"criticalFlows": [], "saveSemantics": "", "publishSemantics": "",
+                              "keyPages": [], "riskAreas": [], "alwaysCheck": []}
+    assert "qaTargets" not in a
+
+
+def test_merge_preserves_productqa_and_qatargets():
+    cfg, _ = onboarding.build_instance_config(_answers_with_qa())
+    answers = config_io.config_to_answers(cfg)               # simulate loading into the editor
+    merged, _secrets = config_io.merge_and_build(answers, cfg, {"LINEAR_TOKEN": "lt", "GITHUB_TOKEN": "gh"})
+    assert merged["productQA"]["riskAreas"] == _PQA["riskAreas"]
+    assert merged["qaTargets"] == _QT
+
+
+def test_skill_signature_changes_on_riskarea_edit_not_on_email():
+    cfg, _ = onboarding.build_instance_config(_answers_with_qa())
+    base = config_io.config_skill_signature(cfg)
+    cfg_email = json.loads(json.dumps(cfg)); cfg_email["issueTracker"]["email"] = "other@x"
+    assert config_io.config_skill_signature(cfg_email) == base       # tracker email is not a skill input
+    cfg_risk = json.loads(json.dumps(cfg)); cfg_risk["productQA"]["riskAreas"] = ["totally different risk"]
+    assert config_io.config_skill_signature(cfg_risk) != base        # productQA edit => stale
+
+
+def test_skill_signature_ignores_qatargets_edit():
+    cfg, _ = onboarding.build_instance_config(_answers_with_qa())
+    base = config_io.config_skill_signature(cfg)
+    cfg2 = json.loads(json.dumps(cfg)); cfg2["qaTargets"] = {"seedEntities": ["different"]}
+    assert config_io.config_skill_signature(cfg2) == base            # qaTargets is a runtime input, no rebuild
+
+
+def _stamped_config():
+    cfg, _ = onboarding.build_instance_config(_answers_with_qa())
+    cfg["skillMeta"] = {"builtAt": "2026-07-20T00:00:00+00:00", "inputsHash": config_io.config_skill_signature(cfg)}
+    return cfg
+
+
+def test_merge_carries_skill_meta_so_nonskill_edit_stays_fresh():
+    """Regression: a PUT that edits a non-skill field (tracker email) must NOT drop
+    skillMeta — otherwise the skill falsely reads stale after every edit."""
+    cfg = _stamped_config()
+    answers = config_io.config_to_answers(cfg)
+    answers["issueTracker"]["email"] = "changed@example.com"
+    merged, _ = config_io.merge_and_build(answers, cfg, {"LINEAR_TOKEN": "lt", "GITHUB_TOKEN": "gh"})
+    assert merged.get("skillMeta")                                            # carried forward
+    assert merged["skillMeta"]["inputsHash"] == config_io.config_skill_signature(merged)  # not stale
+
+
+def test_merge_keeps_stamp_so_productqa_edit_reads_stale():
+    """A PUT that edits Product QA knowledge keeps the OLD stamp, so GET reports stale
+    until an explicit rebuild."""
+    cfg = _stamped_config()
+    answers = config_io.config_to_answers(cfg)
+    answers["productQA"]["riskAreas"] = [*answers["productQA"]["riskAreas"], "POSTAL_UNICODE_LOSS"]
+    merged, _ = config_io.merge_and_build(answers, cfg, {"LINEAR_TOKEN": "lt", "GITHUB_TOKEN": "gh"})
+    assert merged.get("skillMeta")                                            # stamp preserved (old hash)
+    assert merged["skillMeta"]["inputsHash"] != config_io.config_skill_signature(merged)  # correctly stale

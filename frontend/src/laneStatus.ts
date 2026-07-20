@@ -72,7 +72,7 @@ export function evidenceIsComplete(ev?: EvidenceStatus | null): boolean {
   return ev.score != null
 }
 
-export type BlockerKind = 'login' | 'data' | 'runner' | 'connection' | 'generic'
+export type BlockerKind = 'login' | 'cli' | 'data' | 'runner' | 'connection' | 'generic'
 
 export interface Blocker {
   kind: BlockerKind
@@ -83,6 +83,18 @@ export interface Blocker {
 }
 
 const BLOCKER_RULES: { kind: BlockerKind; label: string; hint: string; test: RegExp }[] = [
+  // MUST stay ahead of the login rule. A claude-CLI auth/config failure quotes the
+  // words "auth" and "login" ("...takes precedence over your claude.ai login"), so
+  // the login rule would otherwise claim it and tell the user to sign in to an app
+  // that is working perfectly well.
+  {
+    kind: 'cli',
+    // The card renders this as "⛔ Blocked: {label}", so the label must not
+    // repeat the word — "Blocked: Claude CLI blocked" reads like a stutter.
+    label: 'Claude CLI',
+    hint: 'The claude CLI could not start with your connectors. Check that no ANTHROPIC_API_KEY is set for the run, then retry.',
+    test: /connectors are disabled|anthropic_api_key|takes precedence|claude exited|needs authentication/,
+  },
   {
     kind: 'login',
     label: 'Login required',
@@ -108,6 +120,18 @@ const BLOCKER_RULES: { kind: BlockerKind; label: string; hint: string; test: Reg
     test: /no repo|no branch|dev[\s-]?info|missing data|missing dev|fee_schedule|\bno pr\b|missing (?:snapshot|info)/,
   },
 ]
+
+/**
+ * Should the blocker banner render, given what the user has already dismissed?
+ *
+ * Dismissal is scoped to the exact message that was dismissed, NOT to the lane:
+ * a run that fails again for a DIFFERENT reason must speak up, otherwise the card
+ * silently stops explaining why it is stuck. Re-showing on a changed message is
+ * the whole point of comparing text rather than storing a boolean.
+ */
+export function shouldShowBlocker(message: string, dismissedMessage: string | null): boolean {
+  return dismissedMessage === null || message !== dismissedMessage
+}
 
 /**
  * Classify a failure message into an actionable blocker so the lane card can

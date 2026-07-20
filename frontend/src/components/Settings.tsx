@@ -1,20 +1,9 @@
 import { useEffect, useState } from 'react'
 import Modal from './Modal'
 import { Field, AccessChecks, ListTextarea } from './Onboarding/fields'
+import SecretInput from './SecretInput'
 import type { OnboardingAnswers } from '../onboardingSchema'
 import { getConfig, updateConfig, uploadPostman } from '../api'
-
-// Masked secret input: blank submit keeps the existing secret; typing replaces it.
-function SecretInput({ isSet, value, onChange }: { isSet: boolean; value: string; onChange: (v: string) => void }) {
-  return (
-    <input
-      type="password"
-      value={value}
-      placeholder={isSet ? '•••• set — leave blank to keep' : 'not set'}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  )
-}
 
 export default function Settings({ onClose }: { onClose: () => void }) {
   const [a, setA] = useState<OnboardingAnswers | null>(null)

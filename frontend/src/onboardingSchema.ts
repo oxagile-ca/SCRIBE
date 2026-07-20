@@ -70,7 +70,18 @@ export interface OnboardingAnswers {
     baseUrl: string
     postmanCollectionPath: string
   }
+  // Advanced QA-targeting taxonomy (seed entities + classify rules). Not captured by the
+  // wizard — editable on the Application Profile. Optional; qa_targets falls back to a
+  // generic ruleset when absent. Takes effect on the next QA run (no skill rebuild needed).
+  qaTargets?: QaTargets
   anthropicKey: string
+}
+
+export interface QaTargets {
+  seedEntities?: string[]
+  entityDependentTypes?: Record<string, string[]>
+  classifyRules?: unknown[]
+  [k: string]: unknown
 }
 
 export function emptyAnswers(): OnboardingAnswers {

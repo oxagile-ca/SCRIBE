@@ -487,6 +487,10 @@ export interface ConfigResponse {
   ok: boolean
   answers: OnboardingAnswers
   secretsSet: Record<string, boolean>
+  // Whether the generated QA skill is out of date vs the current knowledge, and when it
+  // was last built. Drives the Application Profile's "Rebuild skill" prompt.
+  skillStale?: boolean
+  skillBuiltAt?: string | null
 }
 
 export async function getConfig(): Promise<ConfigResponse> {
@@ -509,5 +513,10 @@ export async function uploadPostman(file: File): Promise<{ ok: boolean; endpoint
   form.append('file', file)
   // NOTE: do NOT set Content-Type — the browser sets the multipart boundary.
   const res = await fetch(`${BASE}/config/upload-postman`, { method: 'POST', body: form })
+  return res.json().catch(() => ({ ok: false, error: `status ${res.status}` }))
+}
+
+export async function rebuildSkill(): Promise<{ ok: boolean; builtAt?: string; patternRules?: number; error?: string }> {
+  const res = await fetch(`${BASE}/skill/rebuild`, { method: 'POST' })
   return res.json().catch(() => ({ ok: false, error: `status ${res.status}` }))
 }

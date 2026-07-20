@@ -4,7 +4,7 @@ import AgentDetail from './AgentDetail'
 import { CouncilPanel } from './CouncilPanel'
 import { getTicketUsage } from '../api'
 import { UsageBreakdown } from './UsageBreakdown'
-import { classifyBlocker } from '../laneStatus'
+import { classifyBlocker, shouldShowBlocker } from '../laneStatus'
 
 // Plain-English word + colour for each agent state, used by the always-visible
 // status line so the user can always tell what a lane is doing.
@@ -48,6 +48,8 @@ interface Props {
 
 export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeploy, onRunCommand, onGenerateReport, onResume, onOverrideCouncil, onStartFromQuartermaster, onRunQa, onAttachLinear, writeAllowed = false, needsBuildDeploy = true }: Props) {
   const [expandedAgent, setExpandedAgent] = useState<AgentName | null>(null)
+  // The exact blocker message the user dismissed — a different failure re-shows.
+  const [dismissedBlocker, setDismissedBlocker] = useState<string | null>(null)
   const [cmdInput, setCmdInput] = useState('')
   const [usage, setUsage] = useState<TicketUsage | null>(null)
   const { ticket, agents, currentAgent } = lane
@@ -186,20 +188,38 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
         )}
       </div>
       {/* Blocker banner — tells the user WHY the run can't continue and what to do. */}
-      {blocker && (
+      {blocker && shouldShowBlocker(failedAgent?.message || '', dismissedBlocker) && (
         <div role="alert" style={{
           marginTop: 8, padding: '8px 10px', borderRadius: 6, fontSize: 11,
           background: 'rgba(252,129,129,0.12)', border: '1px solid var(--danger, #fc8181)',
+          // The lane card is flex:1, so on a single-lane board it spans the whole app
+          // and the banner stretched with it. Cap it to a readable measure instead.
+          maxWidth: 560,
+          display: 'flex', alignItems: 'flex-start', gap: 8,
         }}>
-          <div style={{ fontWeight: 700, color: 'var(--danger, #fc8181)' }}>
-            ⛔ Blocked: {blocker.label}
-          </div>
-          {failedAgent?.message && (
-            <div style={{ color: 'var(--text-muted)', marginTop: 2, wordBreak: 'break-word' }}>
-              {failedAgent.message}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, color: 'var(--danger, #fc8181)' }}>
+              ⛔ Blocked: {blocker.label}
             </div>
-          )}
-          <div style={{ color: 'var(--text)', marginTop: 3 }}>→ {blocker.hint}</div>
+            {failedAgent?.message && (
+              <div style={{ color: 'var(--text-muted)', marginTop: 2, wordBreak: 'break-word' }}>
+                {failedAgent.message}
+              </div>
+            )}
+            <div style={{ color: 'var(--text)', marginTop: 3 }}>→ {blocker.hint}</div>
+          </div>
+          <button
+            type="button"
+            aria-label="Dismiss this blocker"
+            title="Dismiss — it reappears if the run fails for a different reason"
+            onClick={() => setDismissedBlocker(failedAgent?.message || '')}
+            style={{
+              border: 'none', background: 'none', color: 'var(--text-dim)',
+              cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 0,
+            }}
+          >
+            {'✕'}
+          </button>
         </div>
       )}
       {(currentAgent === 'shipper' && agents.shipper.state !== 'done') && (

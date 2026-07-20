@@ -48,3 +48,31 @@ export function ListTextarea({
     />
   )
 }
+
+/** "Name | /route" per line -> [{name, route}]. Shared by the onboarding wizard and the
+ *  Application Profile so both edit key pages the same way. */
+export function KeyPagesTextarea({
+  value, onChange, rows = 3,
+}: {
+  value: { name: string; route: string }[]
+  onChange: (v: { name: string; route: string }[]) => void
+  rows?: number
+}) {
+  const [text, setText] = useState(() => value.map((p) => `${p.name} | ${p.route}`).join('\n'))
+  return (
+    <textarea
+      rows={rows}
+      placeholder="Orders | /orders"
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value)
+        onChange(
+          linesToArr(e.target.value).map((line) => {
+            const [name, route] = line.split('|')
+            return { name: (name || '').trim(), route: (route || '').trim() }
+          })
+        )
+      }}
+    />
+  )
+}

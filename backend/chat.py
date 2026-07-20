@@ -7,6 +7,7 @@ import shlex
 from typing import AsyncIterator, Optional
 
 import usage_ledger
+from claude_env import claude_env
 from config import CHAT_MODEL
 
 
@@ -88,6 +89,7 @@ async def chat_stream(message: str, session_id: Optional[str] = None) -> AsyncIt
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=CHAT_CWD,
+        env=claude_env(),  # without this the inherited ANTHROPIC_API_KEY kills claude.ai connectors
         limit=64 * 1024 * 1024,  # a large stream-json line would overrun the 64 KiB default
     )
 

@@ -9,6 +9,7 @@ import json
 import os
 
 from agents import EVIDENCE_DIR  # ~/evidence
+from claude_env import claude_env
 import config
 
 
@@ -147,6 +148,7 @@ async def run(ticket_key, env_url, *, model=None, idle_timeout_s=300, total_time
     try:
         proc = await asyncio.create_subprocess_exec(
             *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            env=claude_env(),  # without this the inherited ANTHROPIC_API_KEY kills claude.ai connectors
         )
     except Exception as e:
         if logf:

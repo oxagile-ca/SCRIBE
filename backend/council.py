@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 import usage_ledger
+from claude_env import claude_env
 
 
 COUNCIL_AUDIT_PATH = os.path.expanduser("~/qa-dashboard/council-audit.jsonl")
@@ -102,6 +103,7 @@ async def _run_reviewer(reviewer: Reviewer, ctx: dict) -> dict:
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        env=claude_env(),  # without this the inherited ANTHROPIC_API_KEY kills claude.ai connectors
         # Raise the StreamReader line limit so the readline() loop below can consume a
         # >64 KiB stream-json line instead of crashing with LimitOverrunError. See
         # _STREAM_READER_LIMIT for the full rationale.

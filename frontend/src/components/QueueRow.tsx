@@ -1,11 +1,12 @@
-import { useState, useEffect, FormEvent } from 'react'
+import { useState, useEffect } from 'react'
 import { Ticket } from '../types'
 import type { EnvLockMap, PipelineStateEntry } from './Queue'
 import { evidenceIsComplete } from '../laneStatus'
 import { queueActionLabel, retestNeedsEnvPicker } from '../queueActions'
 import { redactCredentials } from '../redact'
-import { extractTicketTestCases } from '../testCases'
-import { fetchTestCases, addTestCase, deleteTestCase, TestCase } from '../api'
+import { extractTicketTestCases, caseCount } from '../testCases'
+import TestCasesModal from './TestCases/TestCasesModal'
+import { fetchTestCases } from '../api'
 
 const PRIORITY_COLORS: Record<string, string> = {
   Highest: 'var(--pri-highest)',
@@ -47,33 +48,16 @@ export default function QueueRow({ ticket, onStart, onReTest, needsBuildDeploy, 
   const acs = extractACs(ticket.description)
   const ticketCases = extractTicketTestCases(ticket.description)
 
-  const [added, setAdded] = useState<TestCase[]>([])
-  const [newCase, setNewCase] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [showCases, setShowCases] = useState(false)
+  const [addedCount, setAddedCount] = useState(0)
 
-  // Load the ticket's SCRIBE-local added cases the first time the card is expanded.
+  // The badge needs the added-case count without opening the modal. Same per-row
+  // fetch the inline block already did — see the spec's "Known cost".
   useEffect(() => {
-    if (!expanded) return
     let alive = true
-    fetchTestCases(ticket.key).then((cs) => { if (alive) setAdded(cs) })
+    fetchTestCases(ticket.key).then((cs) => { if (alive) setAddedCount(cs.length) })
     return () => { alive = false }
-  }, [expanded, ticket.key])
-
-  async function handleAddCase(e: FormEvent) {
-    e.preventDefault()
-    const text = newCase.trim()
-    if (!text) return
-    setBusy(true)
-    const created = await addTestCase(ticket.key, text)
-    setBusy(false)
-    if (created) { setAdded((prev) => [...prev, created]); setNewCase('') }
-  }
-
-  async function handleDeleteCase(id: string) {
-    if (await deleteTestCase(ticket.key, id)) {
-      setAdded((prev) => prev.filter((c) => c.id !== id))
-    }
-  }
+  }, [ticket.key])
 
   return (
     <>
@@ -174,6 +158,13 @@ export default function QueueRow({ ticket, onStart, onReTest, needsBuildDeploy, 
             Env ready
           </span>
         ) : null}
+        <button
+          className="btn btn--ghost btn--small"
+          title="View the ticket's test cases and add your own"
+          onClick={(e) => { e.stopPropagation(); setShowCases(true) }}
+        >
+          Test cases ({caseCount(ticketCases.length, addedCount)})
+        </button>
         <div style={{ position: 'relative' }}>
           <button
             className="queue-row__start"
@@ -323,41 +314,14 @@ export default function QueueRow({ ticket, onStart, onReTest, needsBuildDeploy, 
               ))}
             </>
           )}
-
-          <div style={{ fontWeight: 700, margin: '8px 0 4px', fontSize: 10, color: 'var(--text-dim)' }}>
-            Test cases{ticketCases.length + added.length > 0 ? ` (${ticketCases.length + added.length})` : ''}
-          </div>
-          {ticketCases.length === 0 && added.length === 0 && (
-            <div style={{ color: 'var(--text-dim)', marginBottom: 2 }}>None yet — add one below.</div>
-          )}
-          {ticketCases.map((tc, i) => (
-            <div key={`t${i}`} style={{ marginBottom: 2 }}>
-              {'☐'} {redactCredentials(tc)} <span style={{ color: 'var(--text-dim)', fontSize: 9 }}>from ticket</span>
-            </div>
-          ))}
-          {added.map((tc) => (
-            <div key={tc.id} style={{ marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>{'☐'} {tc.text} <span style={{ color: 'var(--accent, #5b8cff)', fontSize: 9 }}>added</span></span>
-              <button
-                type="button"
-                onClick={() => handleDeleteCase(tc.id)}
-                title="Remove this test case"
-                style={{ marginLeft: 'auto', border: 'none', background: 'none', color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1 }}
-              >
-                {'✕'}
-              </button>
-            </div>
-          ))}
-          <form onSubmit={handleAddCase} style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-            <input
-              value={newCase}
-              onChange={(e) => setNewCase(e.target.value)}
-              placeholder="Add a test case — it'll be tested on the next run"
-              style={{ flex: 1, fontSize: 11, padding: '3px 6px' }}
-            />
-            <button type="submit" disabled={busy || !newCase.trim()} style={{ fontSize: 11 }}>Add</button>
-          </form>
         </div>
+      )}
+      {showCases && (
+        <TestCasesModal
+          ticket={ticket}
+          onClose={() => setShowCases(false)}
+          onCountChange={(n) => setAddedCount(Math.max(0, n - ticketCases.length))}
+        />
       )}
     </>
   )

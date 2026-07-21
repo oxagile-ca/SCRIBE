@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { Lane, AgentName, AgentState, TicketUsage } from '../types'
 import AgentDetail from './AgentDetail'
 import { CouncilPanel } from './CouncilPanel'
-import { getTicketUsage } from '../api'
+import { getTicketUsage, fetchTestCases } from '../api'
 import { UsageBreakdown } from './UsageBreakdown'
 import { classifyBlocker, shouldShowBlocker } from '../laneStatus'
+import { extractTicketTestCases, caseCount } from '../testCases'
+import TestCasesModal from './TestCases/TestCasesModal'
 
 // Plain-English word + colour for each agent state, used by the always-visible
 // status line so the user can always tell what a lane is doing.
@@ -50,13 +52,24 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
   const [expandedAgent, setExpandedAgent] = useState<AgentName | null>(null)
   // The exact blocker message the user dismissed — a different failure re-shows.
   const [dismissedBlocker, setDismissedBlocker] = useState<string | null>(null)
+  const [showCases, setShowCases] = useState(false)
+  const [addedCount, setAddedCount] = useState(0)
   const [cmdInput, setCmdInput] = useState('')
   const [usage, setUsage] = useState<TicketUsage | null>(null)
   const { ticket, agents, currentAgent } = lane
+  // agents is a Record<AgentName, AgentStatus>, not an array.
+  const runActive = Object.values(agents).some((a) => a?.state === 'active')
+  const ticketCases = extractTicketTestCases(ticket.description)
 
   useEffect(() => {
     let alive = true
     getTicketUsage(ticket.key).then(u => { if (alive) setUsage(u) }).catch(() => {})
+    return () => { alive = false }
+  }, [ticket.key])
+
+  useEffect(() => {
+    let alive = true
+    fetchTestCases(ticket.key).then((cs) => { if (alive) setAddedCount(cs.length) })
     return () => { alive = false }
   }, [ticket.key])
 
@@ -112,6 +125,13 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
           )}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            className="btn btn--ghost btn--small"
+            title="View the ticket's test cases and add your own"
+            onClick={() => setShowCases(true)}
+          >
+            Test cases ({caseCount(ticketCases.length, addedCount)})
+          </button>
           {reportUrl && (
             <a
               className="btn btn--primary btn--small"
@@ -349,6 +369,14 @@ export default function LaneCard({ lane, onCancel, onCheckEvidence, onCheckDeplo
               : undefined
           }
           qaCommand={lane.qaCommand}
+        />
+      )}
+      {showCases && (
+        <TestCasesModal
+          ticket={ticket}
+          runActive={runActive}
+          onClose={() => setShowCases(false)}
+          onCountChange={(n) => setAddedCount(Math.max(0, n - ticketCases.length))}
         />
       )}
     </div>

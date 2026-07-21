@@ -122,6 +122,28 @@ export async function deleteTestCase(key: string, id: string): Promise<boolean> 
   } catch { return false }
 }
 
+export interface UpdateTestCaseResult { ok: boolean; case?: TestCase; error?: string }
+
+/** Edit an added case's text. Unlike its neighbours above this returns the error
+ *  message, so the modal can show it inline instead of failing silently. */
+export async function updateTestCase(key: string, id: string, text: string): Promise<UpdateTestCaseResult> {
+  try {
+    const res = await fetch(
+      `${BASE}/test-cases/${encodeURIComponent(key)}/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      },
+    )
+    const data = await res.json().catch(() => null)
+    if (data && data.ok && data.case) return { ok: true, case: data.case }
+    return { ok: false, error: (data && data.error) || `status ${res.status}` }
+  } catch {
+    return { ok: false, error: 'could not reach the server' }
+  }
+}
+
 export type VerifyTarget = 'issueTracker' | 'vcs' | 'environment' | 'anthropic'
 export interface VerifyResult { ok: boolean; detail: string; hint: string }
 

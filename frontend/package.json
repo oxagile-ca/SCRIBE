@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "esbuild tests/laneStatus.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/scribe-tests.mjs && node node_modules/.cache/scribe-tests.mjs && esbuild tests/queueActions.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/scribe-tests-queue.mjs && node node_modules/.cache/scribe-tests-queue.mjs"
+    "test": "esbuild tests/laneStatus.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/t-laneStatus.mjs && node node_modules/.cache/t-laneStatus.mjs && esbuild tests/queueActions.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/t-queueActions.mjs && node node_modules/.cache/t-queueActions.mjs && esbuild tests/redact.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/t-redact.mjs && node node_modules/.cache/t-redact.mjs && esbuild tests/testCases.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/t-testCases.mjs && node node_modules/.cache/t-testCases.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

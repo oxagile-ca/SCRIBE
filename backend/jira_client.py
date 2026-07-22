@@ -13,8 +13,13 @@ from config import (
 
 
 def _auth():
-    email = JIRA_EMAIL
-    token = JIRA_TOKEN
+    # Read live from the environment first, falling back to the module constants.
+    # server.py imports config/jira_client (freezing JIRA_TOKEN from the env) BEFORE
+    # load_secrets_env() populates it, so the frozen constant is empty on a fresh
+    # install — the onboarded token only exists in os.environ by request time. The
+    # Linear path already reads its token live per request; this matches that.
+    email = os.environ.get("JIRA_EMAIL") or JIRA_EMAIL
+    token = os.environ.get("JIRA_TOKEN") or JIRA_TOKEN
     if not token:
         mcp_path = os.path.expanduser("~/.claude/mcp.json")
         if os.path.exists(mcp_path):

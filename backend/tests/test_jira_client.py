@@ -129,3 +129,50 @@ async def test_non_200_returns_empty():
         cm.return_value = _mock_client(_mock_response(401, {}))
         result = await _get_dev_info("1")
     assert result == []
+
+
+# --- token load-order regression (Jira board empty on fresh installs) --------
+# Bug: server.py imports config/jira_client (freezing JIRA_TOKEN from the env)
+# BEFORE load_secrets_env() populates the env, so the onboarded token never
+# reached _auth() and Jira was queried anonymously -> 200 with zero issues ->
+# blank board. Linear was immune because it reads its token live per request.
+# The fix: _auth() reads JIRA_TOKEN/JIRA_EMAIL live from os.environ, falling back
+# to the frozen module constant, then ~/.claude/mcp.json.
+import os
+import jira_client
+
+
+def test_auth_reads_live_env_token_when_module_constant_is_empty(monkeypatch):
+    # Simulate the frozen-at-import empty constant...
+    monkeypatch.setattr(jira_client, "JIRA_TOKEN", "")
+    monkeypatch.setattr(jira_client, "JIRA_EMAIL", "cfg@example.com")
+    # ...while load_secrets_env() has since populated the real token live.
+    monkeypatch.setenv("JIRA_TOKEN", "live-secret-token")
+    monkeypatch.delenv("JIRA_EMAIL", raising=False)
+    # No mcp.json fallback in play.
+    monkeypatch.setattr(os.path, "exists", lambda p: False)
+
+    email, token = jira_client._auth()
+    assert token == "live-secret-token"          # the live env token, not ""
+    assert email == "cfg@example.com"             # falls back to the config constant
+
+
+def test_auth_prefers_env_email_when_present(monkeypatch):
+    monkeypatch.setattr(jira_client, "JIRA_TOKEN", "")
+    monkeypatch.setattr(jira_client, "JIRA_EMAIL", "cfg@example.com")
+    monkeypatch.setenv("JIRA_TOKEN", "t")
+    monkeypatch.setenv("JIRA_EMAIL", "env@example.com")
+    monkeypatch.setattr(os.path, "exists", lambda p: False)
+    email, token = jira_client._auth()
+    assert (email, token) == ("env@example.com", "t")
+
+
+def test_auth_falls_back_to_frozen_constant_without_env(monkeypatch):
+    # Backward compat: no env token, module constant set -> use the constant.
+    monkeypatch.setattr(jira_client, "JIRA_TOKEN", "frozen-token")
+    monkeypatch.setattr(jira_client, "JIRA_EMAIL", "cfg@example.com")
+    monkeypatch.delenv("JIRA_TOKEN", raising=False)
+    monkeypatch.delenv("JIRA_EMAIL", raising=False)
+    monkeypatch.setattr(os.path, "exists", lambda p: False)
+    email, token = jira_client._auth()
+    assert (email, token) == ("cfg@example.com", "frozen-token")

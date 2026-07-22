@@ -244,18 +244,18 @@ export default function QueueRow({ ticket, onStart, onReTest, needsBuildDeploy, 
               })}
               <div style={{ borderTop: '1px solid var(--border)', marginTop: 6, paddingTop: 6 }}>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', padding: '0 8px 4px', fontWeight: 700 }}>
-                  Or use already-deployed env:
+                  Or test an already-deployed URL (no build/deploy):
                 </div>
                 <div style={{ display: 'flex', gap: 4, padding: '0 4px' }}>
                   <input
                     type="text"
                     value={customEnv}
-                    placeholder="e.g. proj-shared"
+                    placeholder="e.g. https://qa.example.com"
                     onChange={e => setCustomEnv(e.target.value)}
                     onKeyDown={e => {
                       if (e.key === 'Enter' && customEnv.trim()) {
                         setShowEnvPicker(false)
-                        fireAction(customEnv.trim())
+                        onReTest(ticket, customEnv.trim())
                         setCustomEnv('')
                       }
                     }}

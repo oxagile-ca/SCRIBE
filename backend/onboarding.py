@@ -95,6 +95,10 @@ def build_instance_config(answers: dict) -> tuple[dict, dict]:
     company = answers.get("company", {})
     env = copy.deepcopy(answers.get("environments", {}))
     issue = copy.deepcopy(answers.get("issueTracker", {}))
+    if issue.get("baseUrl"):
+        # Store the site root, not a pasted ticket link or a trailing slash.
+        from instance_config import normalize_base_url
+        issue["baseUrl"] = normalize_base_url(issue["baseUrl"])
     vcs = copy.deepcopy(answers.get("vcs", {}))
     publish = copy.deepcopy(answers.get("publish", {}))
     knowledge = copy.deepcopy(answers.get("knowledge", {}))

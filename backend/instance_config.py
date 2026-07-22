@@ -8,7 +8,24 @@ Resolution order for the config path:
 """
 import json
 import os
+import re
 from pathlib import Path
+
+
+def normalize_base_url(url: str) -> str:
+    """Reduce a tracker base URL to its site root, dropping a pasted /browse/<KEY>
+    ticket path and any trailing slash.
+
+    Onboarding users routinely paste a full ticket link (or leave a trailing
+    slash) into the base-URL field. The code builds ``{base}/rest/api/3/search/jql``
+    from it, so ``.../browse/KEY/rest/...`` 302s to login and ``...net//rest/...``
+    (double slash) each yield an empty board with NO error. A leading context path
+    (Jira Server/DC under e.g. ``/jira``) is preserved — only the ``/browse/<KEY>``
+    ticket suffix is a link, never a valid API base.
+    """
+    url = (url or "").strip().rstrip("/")
+    url = re.sub(r"/browse/[^/]+$", "", url)
+    return url.rstrip("/")
 
 
 def default_config_path() -> str:

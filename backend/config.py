@@ -133,7 +133,7 @@ AUTO_PROVISION_PARENT_KEEPALIVE_INTERVAL_SEC = 24 * 60 * 60
 # reconfigure the dashboard to the deployed product instead of these built-in defaults.
 # Silently falls back to the defaults above when absent.
 try:
-    from instance_config import load_instance_config as _load_instance_config
+    from instance_config import load_instance_config as _load_instance_config, normalize_base_url
     _instance = _load_instance_config()
 except Exception:
     _instance = None
@@ -144,7 +144,10 @@ if _instance:
         PROJECTS = _it["projects"]
         DEFAULT_PROJECT = PROJECTS[0]
     if _it.get("baseUrl"):
-        JIRA_BASE_URL = _it["baseUrl"]
+        # Normalize a pasted ticket URL / trailing slash so the running app never
+        # builds a broken request URL from a malformed stored value (fixes existing
+        # installs without re-onboarding).
+        JIRA_BASE_URL = normalize_base_url(_it["baseUrl"])
     if _it.get("email"):
         JIRA_EMAIL = _it["email"]
     _env_cfg = _instance.get("environments") or {}

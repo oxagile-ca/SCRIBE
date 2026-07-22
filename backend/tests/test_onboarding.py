@@ -92,6 +92,13 @@ def test_build_instance_config_sets_app_slug_and_skill_command():
     assert config["skillCommand"] == "/qa-evidence-acme-cms"
 
 
+def test_build_instance_config_normalizes_a_pasted_ticket_base_url():
+    answers = sample_answers()
+    answers["issueTracker"]["baseUrl"] = "https://x.atlassian.net/browse/ABC-1"
+    config, _ = build_instance_config(answers)
+    assert config["issueTracker"]["baseUrl"] == "https://x.atlassian.net"
+
+
 def test_build_instance_config_passes_status_mapping_through():
     answers = sample_answers()
     answers["issueTracker"]["statusMapping"] = {

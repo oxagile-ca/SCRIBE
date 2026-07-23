@@ -73,8 +73,10 @@ async def verify_issue_tracker(answers: dict) -> Result:
     projects = it.get("projects") or []
     if not token:
         return _fail("No issue-tracker token provided.")
+    if itype == "jira":
+        return await _verify_jira(it)
     if itype != "linear":
-        # Jira/Azure/GitHub-issues live checks aren't implemented yet; don't block.
+        # Azure/GitHub-issues live checks aren't implemented yet; don't block.
         return _ok(f"{itype or 'tracker'}: token present (no live check for this type yet).")
     try:
         async with httpx.AsyncClient(timeout=15) as c:
@@ -90,6 +92,49 @@ async def verify_issue_tracker(answers: dict) -> Result:
     except Exception:
         data = None
     return interpret_linear(r.status_code, data, projects)
+
+
+def interpret_jira(status: int, data: dict | None, email: str) -> Result:
+    """Decide the verdict from a Jira ``/rest/api/3/myself`` response.
+
+    Catches the two real failure classes at onboarding time: a bad email/token
+    (401/403), and a base URL that isn't the site root — a pasted ``/browse/<KEY>``
+    path or trailing slash 302s to login (3xx) or 404s.
+    """
+    if status in (401, 403):
+        return _fail(f"Jira rejected the credentials (HTTP {status}) — check the email + API token.")
+    if 300 <= status < 400:
+        return _fail(f"Jira redirected (HTTP {status}) — the base URL is likely wrong "
+                     "(use the site root, e.g. https://your-org.atlassian.net, with no /browse path).")
+    if status == 404:
+        return _fail("Jira endpoint not found (404) — check the base URL (site root, no /browse path).")
+    data = data or {}
+    who = data.get("emailAddress") or data.get("displayName")
+    if status == 200 and who:
+        return _ok(f"Connected as {who}.")
+    return _fail(f"Jira returned HTTP {status} without a valid user — token or base URL may be wrong.")
+
+
+async def _verify_jira(it: dict) -> Result:
+    import base64
+    from instance_config import normalize_base_url
+    base = normalize_base_url(it.get("baseUrl") or "")
+    if not base:
+        return _fail("No Jira base URL provided.")
+    creds = base64.b64encode(f"{it.get('email') or ''}:{it.get('token') or ''}".encode()).decode()
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(
+                f"{base}/rest/api/3/myself",
+                headers={"Authorization": f"Basic {creds}", "Accept": "application/json"},
+            )
+    except Exception as e:  # noqa: BLE001 — surface a reachability hint, never raise
+        return _fail(f"Could not reach Jira: {e}")
+    try:
+        data = r.json()
+    except Exception:
+        data = None
+    return interpret_jira(r.status_code, data, it.get("email") or "")
 
 
 # ── version control ──────────────────────────────────────────────────────────

@@ -102,9 +102,17 @@ async def test_verify_issue_tracker_requires_token():
     assert res["ok"] is False and "token" in res["hint"].lower()
 
 
-async def test_verify_issue_tracker_non_linear_is_not_blocked():
-    res = await ov.verify_issue_tracker({"issueTracker": {"type": "jira", "token": "x"}})
+async def test_verify_issue_tracker_unimplemented_type_is_not_blocked():
+    # Azure/GitHub-issues have no live check yet — token present, don't block onboarding.
+    res = await ov.verify_issue_tracker({"issueTracker": {"type": "azure", "token": "x"}})
     assert res["ok"] is True
+
+
+async def test_verify_issue_tracker_jira_without_base_url_fails():
+    # Jira now gets a real check; no base URL is an actionable failure, not a pass.
+    res = await ov.verify_issue_tracker({"issueTracker": {"type": "jira", "token": "x"}})
+    assert res["ok"] is False
+    assert "base url" in res["hint"].lower()
 
 
 async def test_verify_vcs_requires_token_and_repo():
@@ -124,3 +132,44 @@ async def test_verify_anthropic_no_key_is_ok():
 async def test_verify_dispatch_unknown_target():
     res = await ov.verify("bogus", {})
     assert res["ok"] is False and "Unknown" in res["hint"]
+
+
+# ── interpret_jira ───────────────────────────────────────────────────────────
+# The onboarding "Test connection" used to just say "token present" for Jira —
+# no real check. These pin a real verdict from a /rest/api/3/myself response so
+# the user can tell whether the email + API token are actually right.
+
+def test_jira_ok_when_myself_returns_a_user():
+    res = ov.interpret_jira(200, {"emailAddress": "ankit@x.com", "displayName": "Ankit"}, "ankit@x.com")
+    assert res["ok"] is True
+    assert "ankit@x.com" in res["detail"]
+
+
+def test_jira_fail_on_401_bad_token():
+    res = ov.interpret_jira(401, None, "ankit@x.com")
+    assert res["ok"] is False
+    assert "token" in res["hint"].lower()
+
+
+def test_jira_fail_on_403():
+    res = ov.interpret_jira(403, None, "ankit@x.com")
+    assert res["ok"] is False
+
+
+def test_jira_redirect_means_bad_base_url():
+    # A /browse/... or trailing-slash base URL 302s to login — call it out as a base-URL problem.
+    res = ov.interpret_jira(302, None, "ankit@x.com")
+    assert res["ok"] is False
+    assert "base url" in res["hint"].lower()
+
+
+def test_jira_404_means_bad_base_url():
+    res = ov.interpret_jira(404, None, "ankit@x.com")
+    assert res["ok"] is False
+    assert "base url" in res["hint"].lower()
+
+
+def test_jira_200_without_user_is_a_failure():
+    # 200 but no user body (e.g. anonymous/HTML) — not a valid auth.
+    res = ov.interpret_jira(200, {}, "ankit@x.com")
+    assert res["ok"] is False

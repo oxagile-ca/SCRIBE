@@ -98,12 +98,21 @@ def _extract_description_text(desc):
     return str(desc)
 
 
+def _tickets_jql(project: str) -> str:
+    """JQL for the active tickets of a project.
+
+    Uses Jira's canonical ``statusCategory`` (To Do / In Progress / Done) rather
+    than hardcoded status *names*. Status names differ per project/workflow, so
+    ``status not in (Done, "Won't Do", Backlog)`` broke or mis-filtered on any Jira
+    that didn't use those exact names. ``statusCategory != Done`` is workflow-agnostic
+    — the Jira analogue of Linear's state-*type* filter — and, like Linear, keeps
+    active + backlog items and drops only done/cancelled ones.
+    """
+    return f"project = {project} AND statusCategory != Done ORDER BY updated DESC"
+
+
 async def get_tickets(project):
-    jql = (
-        f"project = {project} "
-        f"AND status not in (Done, \"Won't Do\", Backlog) "
-        f"ORDER BY updated DESC"
-    )
+    jql = _tickets_jql(project)
     fields = ["summary", "status", "priority", "assignee", "description", "flagged",
               "statuscategorychangedate", QA_ASSIGNEE_FIELD]
     body = {"jql": jql, "maxResults": 100, "fields": fields}

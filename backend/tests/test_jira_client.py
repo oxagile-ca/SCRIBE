@@ -176,3 +176,13 @@ def test_auth_falls_back_to_frozen_constant_without_env(monkeypatch):
     monkeypatch.setattr(os.path, "exists", lambda p: False)
     email, token = jira_client._auth()
     assert (email, token) == ("cfg@example.com", "frozen-token")
+
+
+# ── adaptive fetch: canonical statusCategory, not hardcoded status names ──────
+def test_tickets_jql_uses_status_category_not_hardcoded_names():
+    from jira_client import _tickets_jql
+    jql = _tickets_jql("GHCMSE")
+    assert "statusCategory != Done" in jql          # canonical, workflow-agnostic
+    assert "GHCMSE" in jql
+    # the old hardcoded names must be gone — they broke on other Jira workflows
+    assert "Won't Do" not in jql and "Backlog" not in jql

@@ -287,6 +287,18 @@ async def api_test_cases_delete(key: str, case_id: str):
     return {"ok": test_cases_store.delete_case(key, case_id)}
 
 
+@app.post("/api/test-cases/{key}/generate")
+async def api_test_cases_generate(key: str, payload: Dict[str, Any]):
+    """Draft test cases for a ticket via the claude CLI, stored as added cases."""
+    import test_case_gen
+    text = (payload or {}).get("text", "")
+    try:
+        cases = await test_case_gen.generate(key, text)
+    except Exception as e:
+        return JSONResponse(status_code=502, content={"ok": False, "error": f"generation failed: {e}"})
+    return {"ok": True, "cases": cases}
+
+
 @app.patch("/api/test-cases/{key}/{case_id}")
 async def api_test_cases_update(key: str, case_id: str, payload: Dict[str, Any]):
     """Edit a local test case's text. Blank text -> 400; unknown id -> 404."""

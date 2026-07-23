@@ -4,7 +4,7 @@ import { Ticket } from '../../types'
 import { extractTicketTestCases } from '../../testCases'
 import { redactCredentials } from '../../redact'
 import {
-  fetchTestCases, addTestCase, deleteTestCase, updateTestCase, TestCase,
+  fetchTestCases, addTestCase, deleteTestCase, updateTestCase, generateTestCases, TestCase,
 } from '../../api'
 
 interface Props {
@@ -74,6 +74,24 @@ export default function TestCasesModal({ ticket, runActive = false, onClose, onC
     }
   }
 
+  const [generating, setGenerating] = useState(false)
+  async function handleGenerate() {
+    setGenerating(true)
+    setAddError('')
+    const scope = [ticket.summary, ticket.description].filter(Boolean).join('\n\n')
+    const res = await generateTestCases(ticket.key, scope)
+    setGenerating(false)
+    if (res.ok && res.cases) {
+      // Merge without clobbering: dedupe by id against what's already shown.
+      setAdded((prev) => {
+        const ids = new Set(prev.map((c) => c.id))
+        return [...prev, ...res.cases!.filter((c) => !ids.has(c.id))]
+      })
+    } else {
+      setAddError(res.error ? `Couldn't generate: ${res.error}` : "Couldn't generate test cases.")
+    }
+  }
+
   async function handleDelete(id: string) {
     if (await deleteTestCase(ticket.key, id)) {
       setAdded((prev) => prev.filter((c) => c.id !== id))
@@ -130,7 +148,18 @@ export default function TestCasesModal({ ticket, runActive = false, onClose, onC
         ))
       )}
 
-      <div style={GROUP_TITLE}>Added in Verdikt ({added.length})</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={GROUP_TITLE}>Added in Verdikt ({added.length})</div>
+        <button
+          type="button"
+          className="btn btn--ghost btn--small"
+          title="Draft test cases from this ticket's description using Claude"
+          disabled={generating}
+          onClick={handleGenerate}
+        >
+          {generating ? 'Generating…' : '✨ Generate from ticket'}
+        </button>
+      </div>
       {loadError && (
         <div style={{ fontSize: 11, color: 'var(--danger)' }}>
           {loadError}{' '}
